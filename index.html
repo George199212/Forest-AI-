@@ -1820,7 +1820,9 @@ function openSnapshotLightbox(id) {
   document.getElementById('lightbox-img').src = API + '/api/sectors/snapshots/' + id + '/image';
   document.getElementById('lightbox-img').style.display = 'block';
   document.getElementById('lightbox-meta').innerHTML =
-    (sn.snapshot_date||'–') + ' ' + riskBadge(sn.risk_level) + (sn.note?' · '+sn.note:'');
+    `<div>${sn.snapshot_date||'–'} ${riskBadge(sn.risk_level)}</div>` +
+    (sn.label?`<div style="font-weight:600;margin-top:4px">${sn.label}</div>`:'') +
+    (sn.note?`<div style="margin-top:2px">${sn.note}</div>`:'');
   document.getElementById('lightbox').classList.add('open');
 }
 
