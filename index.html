@@ -1295,10 +1295,16 @@ function detailTab(tab) {
     el.innerHTML = `
       <div style="margin-bottom:14px">
         <div style="font-size:11px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">Add Snapshot</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
           <input id="snap-file" type="file" accept="image/*" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="snap-date" type="date" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="snap-label" placeholder="Label (e.g. Before cutting)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <select id="snap-risk" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+            <option value="">Риск не указан</option>
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HIGH">HIGH</option>
+          </select>
           <input id="snap-note" placeholder="Note" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <button class="btn" onclick="addSectorSnapshot('${s.name}')">+ Добавить</button>
         </div>
@@ -1306,9 +1312,9 @@ function detailTab(tab) {
       </div>
       <div class="photo-grid">${snaps.map(sn=>`
         <div class="photo-card">
-          <img class="photo-thumb" src="${API}/api/sectors/snapshots/${sn.id}/image" onclick="openLightboxImg('${API}/api/sectors/snapshots/${sn.id}/image','${s.name}','${sn.label||'Snapshot'} · ${sn.snapshot_date||''}')">
+          <img class="photo-thumb" src="${API}/api/sectors/snapshots/${sn.id}/image" onclick="openSnapshotLightbox(${sn.id})">
           <div class="photo-info">
-            <div class="sector">${sn.snapshot_date||'–'}</div>
+            <div class="sector">${sn.snapshot_date||'–'} ${riskBadge(sn.risk_level)}</div>
             <div class="type">${sn.label||''}${sn.note?' · '+sn.note:''}</div>
           </div>
           <div style="padding:6px 8px;text-align:right"><span class="tbl-link" style="color:var(--red)" onclick="deleteSectorSnapshot(${sn.id},'${s.name}')">✕ delete</span></div>
@@ -1808,6 +1814,16 @@ function openLightboxImg(src, sector, meta) {
   document.getElementById('lightbox').classList.add('open');
 }
 
+function openSnapshotLightbox(id) {
+  const sn = (currentDetailData && currentDetailData.snapshots || []).find(s => s.id === id);
+  if (!sn) return;
+  document.getElementById('lightbox-img').src = API + '/api/sectors/snapshots/' + id + '/image';
+  document.getElementById('lightbox-img').style.display = 'block';
+  document.getElementById('lightbox-meta').innerHTML =
+    (sn.snapshot_date||'–') + ' ' + riskBadge(sn.risk_level) + (sn.note?' · '+sn.note:'');
+  document.getElementById('lightbox').classList.add('open');
+}
+
 // ── DETAIL MAP & SATELLITE ────────────────────────────────────────────────────
 let detailMap = null;
 
@@ -2032,6 +2048,7 @@ async function addSectorSnapshot(sector) {
   const date  = document.getElementById('snap-date')?.value;
   const label = document.getElementById('snap-label')?.value.trim();
   const note  = document.getElementById('snap-note')?.value.trim();
+  const risk  = document.getElementById('snap-risk')?.value;
   const msg   = document.getElementById('snap-msg');
   if (!file) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ File required';} return; }
   if (!date) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Date required';} return; }
@@ -2041,6 +2058,7 @@ async function addSectorSnapshot(sector) {
     fd.append('snapshot_date', date);
     fd.append('label', label);
     fd.append('note', note);
+    fd.append('risk_level', risk);
     const resp = await fetch('/api/sectors/'+encodeURIComponent(sector)+'/snapshots', {method:'POST', body: fd});
     const data = await resp.json();
     if (data.ok) {

@@ -442,11 +442,14 @@ async def upload_sector_snapshot(
     snapshot_date: str = Form(...),
     label: str = Form(""),
     note: str = Form(""),
+    risk_level: str = Form(""),
 ):
     """Upload a dated historical snapshot image for a sector (e.g. from
     geolatvija.lv), building a snapshot history distinct from the live
     Sentinel-2 fetch under the Satellite tab. Each upload is a new row and
     a new file — existing snapshots are never overwritten."""
+    if risk_level not in ("", "LOW", "MEDIUM", "HIGH"):
+        return Response(content='{"error":"Invalid risk_level"}', media_type="application/json", status_code=400)
     row = db1("SELECT id FROM sectors WHERE name=?", (name,))
     if not row:
         return Response(content='{"error":"Sector not found"}', media_type="application/json", status_code=404)
@@ -463,7 +466,7 @@ async def upload_sector_snapshot(
     with open(dest, "wb") as f:
         f.write(await file.read())
     from database import add_sector_snapshot as _add_sector_snapshot
-    snap_id = _add_sector_snapshot(name, str(dest), snapshot_date, label, note)
+    snap_id = _add_sector_snapshot(name, str(dest), snapshot_date, label, note, risk_level=risk_level)
     return {"ok": True, "id": snap_id, "file_path": str(dest)}
 
 

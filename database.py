@@ -137,6 +137,7 @@ def _migrate():
         uploaded_at TEXT
     )
     """)
+    _add_column_if_missing(cur, "sector_snapshots", "risk_level", "TEXT")
 
     # ── Field-work tables (check-ins, photos, timber, trucks) ──────────────
     cur.execute("CREATE TABLE IF NOT EXISTS work_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT)")
@@ -512,14 +513,14 @@ def log_fuel(vehicle_id, sector, km_start, km_end, fuel_added_l, fuel_per_100km,
 
 # ── Sector Snapshots ──────────────────────────────────────────────────────────
 
-def add_sector_snapshot(sector, image_path, snapshot_date, label="", note="", source="geolatvija"):
+def add_sector_snapshot(sector, image_path, snapshot_date, label="", note="", source="geolatvija", risk_level=""):
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
-    INSERT INTO sector_snapshots (sector, image_path, snapshot_date, label, note, source, uploaded_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (sector, image_path, snapshot_date, label, note, source, now))
+    INSERT INTO sector_snapshots (sector, image_path, snapshot_date, label, note, source, uploaded_at, risk_level)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (sector, image_path, snapshot_date, label, note, source, now, risk_level))
     conn.commit()
     last_id = cur.lastrowid
     conn.close()
