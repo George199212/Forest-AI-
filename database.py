@@ -1,0 +1,497 @@
+import sqlite3
+import json
+import os
+from datetime import datetime
+
+DB_NAME = os.environ.get("DB_PATH", "data/forest_ai.db")
+
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS sectors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        contractor TEXT,
+        status TEXT,
+        approved_volume TEXT,
+        map_url TEXT,
+        image_path TEXT,
+        boundary_json TEXT,
+        center_lat REAL,
+        center_lon REAL,
+        area_ha REAL,
+        color TEXT DEFAULT 'red',
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS risks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT,
+        risk_level TEXT,
+        reason TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+    # Safe migrations — add new columns/tables if they don't exist
+    _migrate()
+
+
+def _add_column_if_missing(cur, table, column, definition):
+    cur.execute(f"PRAGMA table_info({table})")
+    existing = [row[1] for row in cur.fetchall()]
+    if column not in existing:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def _migrate():
+    """Safe ALTER TABLE / CREATE TABLE migrations — never drops data.
+    Centralizes ALL table creation (sectors/risks above, plus the field-work
+    and boundary-plan tables bot.py used to create ad-hoc), so any entry
+    point (api.py or bot.py) can bring up a fresh DB on its own."""
+    new_columns = [
+        ("sectors", "boundary_json", "TEXT"),
+        ("sectors", "center_lat",    "REAL"),
+        ("sectors", "center_lon",    "REAL"),
+        ("sectors", "area_ha",       "REAL"),
+        ("sectors", "color",         "TEXT DEFAULT 'red'"),
+        ("sectors", "created_at",    "TEXT"),
+        ("sectors", "updated_at",    "TEXT"),
+        ("sectors", "tree_species",  "TEXT"),
+        ("sectors", "cut_plan_notes","TEXT"),
+        ("sectors", "notes",         "TEXT"),
+        ("sectors", "boundary_plan_id", "INTEGER"),
+        ("sectors", "object_name",   "TEXT"),
+        ("sectors", "pixel_boundary_json", "TEXT"),
+        ("sectors", "satellite_file_path", "TEXT"),
+    ]
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    for table, column, definition in new_columns:
+        _add_column_if_missing(cur, table, column, definition)
+
+    # New tables
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS sector_employees (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        full_name TEXT,
+        role TEXT,
+        phone TEXT,
+        id_number TEXT,
+        notes TEXT,
+        active INTEGER DEFAULT 1,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS sector_vehicles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        plate TEXT,
+        vehicle_type TEXT,
+        driver TEXT,
+        fuel_capacity_l REAL,
+        fuel_per_100km REAL,
+        total_km REAL DEFAULT 0,
+        notes TEXT,
+        active INTEGER DEFAULT 1,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS vehicle_fuel_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vehicle_id INTEGER,
+        sector TEXT,
+        km_start REAL,
+        km_end REAL,
+        km_driven REAL,
+        fuel_added_l REAL,
+        fuel_calc_l REAL,
+        discrepancy_l REAL,
+        note TEXT,
+        logged_at TEXT
+    )
+    """)
+
+    # ── Field-work tables (check-ins, photos, timber, trucks) ──────────────
+    cur.execute("CREATE TABLE IF NOT EXISTS work_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+    for column, definition in [
+        ("user_id",       "TEXT"),
+        ("employee",      "TEXT"),
+        ("contractor",    "TEXT"),
+        ("sector",        "TEXT"),
+        ("check_in_time", "TEXT"),
+        ("finish_time",   "TEXT"),
+        ("latitude",      "REAL"),
+        ("longitude",     "REAL"),
+        ("distance_m",    "REAL"),
+        ("approved",      "TEXT"),
+        ("comment",       "TEXT"),
+    ]:
+        _add_column_if_missing(cur, "work_sessions", column, definition)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS work_photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER, sector TEXT, photo_type TEXT,
+        image_path TEXT, uploaded_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS timber_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT, planned_volume REAL, actual_volume REAL,
+        difference_volume REAL, status TEXT, note TEXT, created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS truck_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT, truck_number TEXT, driver TEXT,
+        reported_volume REAL, note TEXT, created_at TEXT
+    )
+    """)
+
+    # ── Boundary plan (Robežu Plāns OCR) tables ─────────────────────────────
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS boundary_plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_path TEXT, document_type TEXT, uploaded_at TEXT,
+        status TEXT DEFAULT 'uploaded', uploaded_by TEXT, plan_data_json TEXT
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS boundary_plan_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id INTEGER, point_name TEXT, x_coord REAL, y_coord REAL,
+        lat REAL, lon REAL, raw_text TEXT
+    )
+    """)
+    # object_name / satellite_file_path used to be added via a separate
+    # migration in bot.py's init_plan_tables() — kept here instead.
+    _add_column_if_missing(cur, "boundary_plans", "object_name", "TEXT")
+    _add_column_if_missing(cur, "boundary_plans", "satellite_file_path", "TEXT")
+
+    conn.commit()
+    conn.close()
+
+
+# ── Geo helpers ───────────────────────────────────────────────────────────────
+
+def calc_centroid(points):
+    """Calculate centroid from list of [lat, lon] pairs."""
+    if not points:
+        return None, None
+    lat = sum(p[0] for p in points) / len(points)
+    lon = sum(p[1] for p in points) / len(points)
+    return round(lat, 6), round(lon, 6)
+
+
+def calc_area_ha(points):
+    """Calculate polygon area in hectares using Shoelace formula (approx)."""
+    if len(points) < 3:
+        return 0.0
+    # Convert to approximate meters using lat/lon
+    # 1 degree lat ≈ 111320 m, 1 degree lon ≈ 111320 * cos(lat) m
+    import math
+    avg_lat = sum(p[0] for p in points) / len(points)
+    lat_m = 111320.0
+    lon_m = 111320.0 * math.cos(math.radians(avg_lat))
+
+    # Shoelace
+    n = len(points)
+    area = 0.0
+    for i in range(n):
+        j = (i + 1) % n
+        xi = points[i][1] * lon_m
+        yi = points[i][0] * lat_m
+        xj = points[j][1] * lon_m
+        yj = points[j][0] * lat_m
+        area += xi * yj - xj * yi
+    return round(abs(area) / 2.0 / 10000, 2)  # m² → ha
+
+
+def parse_boundary(boundary_str):
+    """
+    Parse boundary string: '56.9650,24.1800;56.9650,24.1950;56.9550,24.1950;56.9550,24.1800'
+    Returns list of [lat, lon] pairs or None on error.
+    """
+    try:
+        points = []
+        for part in boundary_str.strip().split(";"):
+            lat_s, lon_s = part.strip().split(",")
+            lat, lon = float(lat_s.strip()), float(lon_s.strip())
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                return None
+            points.append([lat, lon])
+        if len(points) < 4:
+            return None
+        return points
+    except Exception:
+        return None
+
+
+# ── Sectors ───────────────────────────────────────────────────────────────────
+
+def add_sector(name, contractor, status, approved_volume, map_url="",
+               boundary=None, color="red", boundary_plan_id=None, object_name="",
+               pixel_boundary=None):
+    """
+    Add or update a sector.
+    boundary: list of [lat, lon] pairs or None
+    boundary_plan_id: optional FK to boundary_plans.id — links this sector back
+        to the Robežu Plāns scan / OCR session it was created from, so the
+        dashboard can group sectors that came from the same object/parcel.
+    object_name: optional human-readable name of the object/parcel this
+        sector belongs to (e.g. "Mūrnieku Jāņa 0.21ha").
+    pixel_boundary: optional list of [pixel_x, pixel_y] pairs locating this
+        sector's outline on the ORIGINAL scanned plan image (same pixel space
+        as boundary_plans.file_path). Only available when the sector came
+        from OCR's geometric reconstruction path. Lets the dashboard draw the
+        sector's outline directly on the source scan.
+    """
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    boundary_json = None
+    center_lat = center_lon = area_ha = None
+
+    if boundary and len(boundary) >= 4:
+        boundary_json = json.dumps(boundary)
+        center_lat, center_lon = calc_centroid(boundary)
+        area_ha = calc_area_ha(boundary)
+
+    pixel_boundary_json = json.dumps(pixel_boundary) if pixel_boundary else None
+
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+
+    # Check if sector already exists. Identity is scoped by (name,
+    # boundary_plan_id) rather than name alone — otherwise two different
+    # plans/objects that happen to produce the same generic sector name
+    # (e.g. "S-001") would silently overwrite each other instead of
+    # coexisting as distinct sectors.
+    if boundary_plan_id is not None:
+        cur.execute("SELECT id FROM sectors WHERE name=? AND boundary_plan_id=?", (name, boundary_plan_id))
+    else:
+        cur.execute("SELECT id FROM sectors WHERE name=? AND boundary_plan_id IS NULL", (name,))
+    existing = cur.fetchone()
+
+    if existing:
+        cur.execute("""
+        UPDATE sectors SET contractor=?, status=?, approved_volume=?, map_url=?,
+            boundary_json=?, center_lat=?, center_lon=?, area_ha=?, color=?, updated_at=?,
+            boundary_plan_id=COALESCE(?, boundary_plan_id),
+            object_name=CASE WHEN ? != '' THEN ? ELSE object_name END,
+            pixel_boundary_json=COALESCE(?, pixel_boundary_json)
+        WHERE id=?
+        """, (contractor, status, approved_volume, map_url,
+              boundary_json, center_lat, center_lon, area_ha, color, now,
+              boundary_plan_id, object_name, object_name, pixel_boundary_json, existing[0]))
+    else:
+        cur.execute("""
+        INSERT INTO sectors
+            (name, contractor, status, approved_volume, map_url, image_path,
+             boundary_json, center_lat, center_lon, area_ha, color, created_at, updated_at,
+             boundary_plan_id, object_name, pixel_boundary_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (name, contractor, status, approved_volume, map_url, "",
+              boundary_json, center_lat, center_lon, area_ha, color, now, now,
+              boundary_plan_id, object_name, pixel_boundary_json))
+
+    conn.commit()
+    conn.close()
+
+
+def get_sectors():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    SELECT name, contractor, status, approved_volume, map_url, image_path,
+           boundary_json, center_lat, center_lon, area_ha, color, created_at, updated_at
+    FROM sectors
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def get_objects():
+    """
+    Group sectors by the object/parcel they belong to (boundary_plan_id).
+    Sectors with no boundary_plan_id (created manually, e.g. A-004..A-008)
+    are returned under a single synthetic "unassigned" bucket so nothing
+    gets lost from the dashboard.
+    Returns a list of:
+        {"boundary_plan_id": int|None, "object_name": str, "sector_names": [str,...]}
+    """
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT boundary_plan_id, object_name, name
+        FROM sectors
+        ORDER BY boundary_plan_id IS NULL, boundary_plan_id, name
+    """)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    grouped = {}
+    order = []
+    for r in rows:
+        key = r["boundary_plan_id"]
+        if key not in grouped:
+            grouped[key] = {
+                "boundary_plan_id": key,
+                "object_name": r["object_name"] or ("Без объекта" if key is None else f"Plan #{key}"),
+                "sector_names": [],
+            }
+            order.append(key)
+        grouped[key]["sector_names"].append(r["name"])
+    return [grouped[k] for k in order]
+
+
+def get_sector_geo(name):
+    """Return boundary_json and center for a sector."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM sectors WHERE name=?", (name,))
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_sector_image(sector_name, image_path):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("UPDATE sectors SET image_path=? WHERE name=?", (image_path, sector_name))
+    conn.commit()
+    affected = cur.rowcount
+    conn.close()
+    return affected
+
+
+def update_sector_boundary(name, boundary, color="red"):
+    """Update just the boundary of an existing sector."""
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    boundary_json = json.dumps(boundary)
+    center_lat, center_lon = calc_centroid(boundary)
+    area_ha = calc_area_ha(boundary)
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    UPDATE sectors SET boundary_json=?, center_lat=?, center_lon=?, area_ha=?, color=?, updated_at=?
+    WHERE name=?
+    """, (boundary_json, center_lat, center_lon, area_ha, color, now, name))
+    conn.commit()
+    affected = cur.rowcount
+    conn.close()
+    return affected
+
+
+# ── Risks ─────────────────────────────────────────────────────────────────────
+
+def add_risk(sector, risk_level, reason):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO risks (sector, risk_level, reason)
+    VALUES (?, ?, ?)
+    """, (sector, risk_level, reason))
+    conn.commit()
+    conn.close()
+
+
+def get_risks():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT sector, risk_level, reason FROM risks")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+# ── Sector Employees ──────────────────────────────────────────────────────────
+
+def add_employee(sector, full_name, role="", phone="", id_number="", notes=""):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO sector_employees (sector, full_name, role, phone, id_number, notes, active, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+    """, (sector, full_name, role, phone, id_number, notes, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_employees(sector=None):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    if sector:
+        cur.execute("SELECT * FROM sector_employees WHERE sector=? ORDER BY full_name", (sector,))
+    else:
+        cur.execute("SELECT * FROM sector_employees ORDER BY sector, full_name")
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+# ── Sector Vehicles ───────────────────────────────────────────────────────────
+
+def add_vehicle(sector, plate, vehicle_type="", driver="", fuel_capacity_l=0, fuel_per_100km=0, notes=""):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO sector_vehicles (sector, plate, vehicle_type, driver, fuel_capacity_l, fuel_per_100km, notes, active, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+    """, (sector, plate, vehicle_type, driver, fuel_capacity_l, fuel_per_100km, notes, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_vehicles(sector=None):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    if sector:
+        cur.execute("SELECT * FROM sector_vehicles WHERE sector=? ORDER BY plate", (sector,))
+    else:
+        cur.execute("SELECT * FROM sector_vehicles ORDER BY sector, plate")
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def log_fuel(vehicle_id, sector, km_start, km_end, fuel_added_l, fuel_per_100km, note=""):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    km_driven = km_end - km_start
+    fuel_calc_l = round(km_driven * fuel_per_100km / 100, 2) if fuel_per_100km else 0
+    discrepancy_l = round(fuel_added_l - fuel_calc_l, 2)
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO vehicle_fuel_logs (vehicle_id, sector, km_start, km_end, km_driven, fuel_added_l, fuel_calc_l, discrepancy_l, note, logged_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (vehicle_id, sector, km_start, km_end, km_driven, fuel_added_l, fuel_calc_l, discrepancy_l, note, now))
+    # Update total km
+    cur.execute("UPDATE sector_vehicles SET total_km = total_km + ? WHERE id=?", (km_driven, vehicle_id))
+    conn.commit()
+    conn.close()
+    return discrepancy_l

@@ -1,0 +1,2007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forest AI — Operations Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0e1208;--bg2:#151c0d;--bg3:#1c2612;--bg4:#222e16;
+  --border:rgba(120,180,60,0.12);--border2:rgba(120,180,60,0.28);
+  --green:#7ab83c;--gdim:#3d6620;--gbright:#a3d45a;
+  --amber:#d4a017;--red:#c94040;--blue:#3b8bd4;
+  --text:#dde8c8;--text2:#8a9e70;--text3:#556644;
+  --mono:'DM Mono',monospace;--sans:'Sora',sans-serif;--r:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;}
+.layout{display:flex;height:100vh;overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:210px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;}
+.logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
+.logo-mark{display:flex;align-items:center;gap:8px;margin-bottom:2px;}
+.logo-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);}
+.logo-name{font-size:15px;font-weight:600;}
+.logo-sub{font-size:11px;color:var(--text3);font-family:var(--mono);padding-left:18px;}
+nav{flex:1;padding:8px 0;overflow-y:auto;}
+.nav-group{padding:12px 16px 4px;font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:var(--text2);cursor:pointer;border-left:2px solid transparent;transition:all 0.15s;}
+.nav-item:hover{color:var(--text);background:var(--bg3);}
+.nav-item.active{color:var(--gbright);border-left-color:var(--green);background:var(--bg3);}
+.nav-icon{width:18px;text-align:center;font-size:15px;}
+.sidebar-foot{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--mono);}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{padding:14px 24px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.topbar-left h1{font-size:16px;font-weight:600;}
+.topbar-left p{font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;}
+.topbar-right{display:flex;gap:8px;align-items:center;}
+.btn{background:var(--bg3);border:1px solid var(--border2);color:var(--green);padding:6px 14px;border-radius:var(--r);font-family:var(--mono);font-size:12px;cursor:pointer;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+.btn:hover{background:var(--gdim);color:var(--gbright);}
+.btn-red{border-color:rgba(201,64,64,0.4);color:#e07070;}
+.btn-red:hover{background:rgba(201,64,64,0.15);}
+.content{flex:1;overflow-y:auto;padding:20px 24px;}
+
+/* SECTIONS */
+.section{display:none;}.section.active{display:block;}
+
+/* KPI CARDS */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px;}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;}
+.kpi-label{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;}
+.kpi-value{font-size:24px;font-weight:600;line-height:1;}
+.kpi-value.green{color:var(--gbright);}
+.kpi-value.amber{color:var(--amber);}
+.kpi-value.red{color:var(--red);}
+.kpi-sub{font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--mono);}
+
+/* GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+
+/* CARD */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;}
+.objects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.object-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color 0.15s;display:flex;flex-direction:column;}
+.object-card:hover{border-color:var(--border2);}
+.object-card-scan{width:100%;height:130px;object-fit:cover;background:var(--bg4);display:block;border-bottom:1px solid var(--border);}
+.object-card-noscan{width:100%;height:130px;background:var(--bg4);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border);}
+.object-card-body{padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:6px;}
+.object-card-title{font-weight:600;color:var(--gbright);font-size:14px;}
+.object-card-meta{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.card-head{font-size:11px;font-weight:500;color:var(--text2);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+.card-head .dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{text-align:left;padding:6px 10px;font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:var(--bg3);}
+.tbl td.mono{font-family:var(--mono);font-size:12px;color:var(--text2);}
+.tbl-link{color:var(--green);font-family:var(--mono);font-size:12px;cursor:pointer;text-decoration:none;}
+.tbl-link:hover{color:var(--gbright);}
+
+/* BADGES */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-family:var(--mono);font-weight:500;white-space:nowrap;}
+.b-green{background:rgba(122,184,60,0.15);color:var(--gbright);border:1px solid var(--gdim);}
+.b-amber{background:rgba(212,160,23,0.15);color:var(--amber);border:1px solid rgba(212,160,23,0.3);}
+.b-red{background:rgba(201,64,64,0.15);color:#e07070;border:1px solid rgba(201,64,64,0.3);}
+.b-gray{background:rgba(85,102,68,0.2);color:var(--text2);border:1px solid var(--border);}
+
+/* RISK SCORE BAR */
+.risk-bar-wrap{width:60px;height:4px;background:var(--bg3);border-radius:2px;display:inline-block;vertical-align:middle;overflow:hidden;}
+.risk-bar-fill{height:100%;border-radius:2px;}
+
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.tab{padding:8px 16px;font-size:12px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:var(--mono);}
+.tab:hover{color:var(--text2);}
+.tab.active{color:var(--gbright);border-bottom-color:var(--green);}
+.tab-pane{display:none;}.tab-pane.active{display:block;}
+
+/* SECTOR DETAIL */
+.back-btn{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);font-family:var(--mono);cursor:pointer;margin-bottom:16px;padding:4px 0;}
+.back-btn:hover{color:var(--green);}
+.detail-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;}
+.detail-title{font-size:22px;font-weight:600;}
+.detail-meta{font-size:13px;color:var(--text2);margin-top:4px;}
+.detail-actions{display:flex;gap:8px;}
+
+/* RISK SCORE CIRCLE */
+.score-circle{width:72px;height:72px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px solid;}
+.score-circle.green{border-color:var(--green);background:rgba(122,184,60,0.1);}
+.score-circle.yellow{border-color:var(--amber);background:rgba(212,160,23,0.1);}
+.score-circle.red{border-color:var(--red);background:rgba(201,64,64,0.1);}
+.score-num{font-size:20px;font-weight:600;line-height:1;}
+.score-label{font-size:9px;font-family:var(--mono);color:var(--text3);}
+
+/* INFO GRID */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px;}
+.info-cell{background:var(--bg2);padding:10px 14px;}
+.info-cell-label{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px;}
+.info-cell-value{font-size:14px;font-weight:500;}
+
+/* STAT ROW */
+.stat-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+.stat-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 16px;text-align:center;min-width:80px;}
+.stat-box-n{font-size:20px;font-weight:600;color:var(--gbright);}
+.stat-box-l{font-size:10px;color:var(--text3);font-family:var(--mono);}
+
+/* PHOTOS */
+.photo-filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.filter-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:5px 12px;border-radius:20px;font-size:12px;font-family:var(--mono);cursor:pointer;transition:all 0.15s;}
+.filter-btn:hover,.filter-btn.active{background:var(--gdim);color:var(--gbright);border-color:var(--green);}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;}
+.photo-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:all 0.15s;}
+.photo-card:hover{border-color:var(--green);}
+.photo-thumb{width:100%;height:120px;object-fit:cover;display:block;background:var(--bg4);}
+.photo-thumb-placeholder{width:100%;height:120px;display:flex;align-items:center;justify-content:center;font-size:28px;background:var(--bg4);color:var(--text3);}
+.photo-info{padding:8px;font-size:11px;}
+.photo-info .sector{font-family:var(--mono);color:var(--green);}
+.photo-info .type{color:var(--text3);}
+
+/* LIGHTBOX */
+.lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:1000;align-items:center;justify-content:center;flex-direction:column;}
+.lightbox.open{display:flex;}
+.lightbox img{max-width:90vw;max-height:80vh;border-radius:var(--r);}
+.lightbox-close{position:absolute;top:20px;right:24px;font-size:24px;color:var(--text2);cursor:pointer;font-family:var(--mono);}
+.lightbox-close:hover{color:var(--text);}
+.lightbox-meta{margin-top:12px;font-size:13px;color:var(--text2);font-family:var(--mono);}
+
+/* MAP */
+#map-container{height:500px;border-radius:var(--r);overflow:hidden;background:var(--bg3);display:flex;align-items:center;justify-content:center;}
+.map-legend{display:flex;gap:16px;margin-top:12px;font-size:12px;font-family:var(--mono);}
+.legend-item{display:flex;align-items:center;gap:6px;}
+.legend-dot{width:10px;height:10px;border-radius:50%;}
+
+/* COMMENTS */
+.comment-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;}
+.comment-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.comment-author{font-size:12px;font-weight:500;color:var(--gbright);}
+.comment-date{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.comment-text{font-size:13px;color:var(--text2);line-height:1.5;}
+
+/* LOADING / EMPTY */
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);font-family:var(--mono);font-size:12px;gap:8px;}
+.spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty{color:var(--text3);font-family:var(--mono);font-size:12px;padding:20px 0;text-align:center;}
+
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px;}
+
+/* AI INSPECTOR */
+.inspector-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;margin-bottom:12px;transition:border-color 0.2s;}
+.inspector-card:hover{border-color:var(--border2);}
+.inspector-card.critical{border-left:3px solid var(--red);}
+.inspector-card.high{border-left:3px solid #e07070;}
+.inspector-card.medium{border-left:3px solid var(--amber);}
+.inspector-card.low{border-left:3px solid var(--green);}
+.inspector-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.inspector-sector{font-size:16px;font-weight:600;font-family:var(--mono);color:var(--gbright);}
+.inspector-score-wrap{display:flex;align-items:center;gap:12px;}
+.inspector-score{font-size:28px;font-weight:600;font-family:var(--mono);}
+.score-track{width:120px;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;}
+.score-track-fill{height:100%;border-radius:3px;transition:width 0.5s;}
+.inspector-issues{margin-bottom:10px;}
+.issue-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);}
+.issue-item:last-child{border-bottom:none;}
+.issue-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+.recommendations{background:var(--bg3);border-radius:var(--r);padding:10px 12px;margin-top:10px;}
+.rec-title{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:6px;}
+.rec-item{font-size:12px;color:var(--text2);padding:3px 0;display:flex;gap:8px;}
+.rec-item::before{content:'→';color:var(--green);flex-shrink:0;}
+.auto-refresh-badge{font-size:10px;font-family:var(--mono);color:var(--text3);display:flex;align-items:center;gap:4px;}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-anim 2s infinite;}
+@keyframes pulse-anim{0%,100%{opacity:1}50%{opacity:0.3}}
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-mark"><div class="logo-dot"></div><span class="logo-name">Forest AI</span></div>
+      <div class="logo-sub">forestai.lv</div>
+    </div>
+    <nav>
+      <div class="nav-group">Monitor</div>
+      <div class="nav-item active" onclick="nav('overview')"><span class="nav-icon">◈</span> Overview</div>
+      <div class="nav-item" onclick="nav('objects')"><span class="nav-icon">🗂</span> Objects</div>
+      <div class="nav-item" onclick="objectFilter=undefined;nav('sectors')"><span class="nav-icon">⬡</span> Sectors</div>
+      <div class="nav-item" onclick="nav('map')"><span class="nav-icon">◎</span> Map</div>
+      <div class="nav-group">Operations</div>
+      <div class="nav-item" onclick="nav('risks')"><span class="nav-icon">△</span> Risks</div>
+      <div class="nav-item" onclick="nav('gps')"><span class="nav-icon">⊕</span> GPS Sessions</div>
+      <div class="nav-item" onclick="nav('trucks')"><span class="nav-icon">▷</span> Truck Reports</div>
+      <div class="nav-item" onclick="nav('timber')"><span class="nav-icon">≡</span> Timber</div>
+      <div class="nav-item" onclick="nav('photos')"><span class="nav-icon">□</span> Photos</div>
+      <div class="nav-group">AI</div>
+      <div class="nav-item" onclick="nav('inspector')"><span class="nav-icon">◆</span> AI Inspector</div>
+      <div class="nav-item" onclick="nav('satellite')"><span class="nav-icon">🛰</span> Satellite</div>
+    </nav>
+    <div class="sidebar-foot" id="last-update">–</div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h1 id="page-title">Overview</h1>
+        <p id="page-sub">Loading...</p>
+      </div>
+      <div class="topbar-right">
+        <button class="btn" onclick="refreshCurrent()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- OVERVIEW -->
+      <div class="section active" id="sec-overview">
+        <div class="kpis" id="kpis"><div class="loading"><div class="spinner"></div> loading</div></div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Risks by sector</span></div>
+            <div style="position:relative;height:220px"><canvas id="chart-risks"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--amber)"></span> Timber volume m³</span></div>
+            <div style="position:relative;height:220px"><canvas id="chart-timber"></canvas></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Sectors</span></div>
+            <div id="ov-sectors"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--red)"></span> Active risks</span></div>
+            <div id="ov-risks"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTORS -->
+      <div class="section" id="sec-objects">
+        <div class="card">
+          <div class="card-head">
+            <span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> All objects</span>
+            <button class="btn" onclick="newObjectPrompt()">+ New Object</button>
+          </div>
+          <div id="objects-grid" class="objects-grid"><div class="loading"><div class="spinner"></div> loading</div></div>
+        </div>
+      </div>
+
+      <div class="section" id="sec-object-detail">
+        <div class="back-btn" onclick="nav('objects')">← back to objects</div>
+        <div class="detail-header">
+          <div>
+            <div class="detail-title" id="obj-detail-name">–</div>
+            <div class="detail-meta" id="obj-detail-meta">–</div>
+          </div>
+        </div>
+        <div class="tabs" id="obj-detail-tabs">
+          <div class="tab active" onclick="objDetailTab('overview')">Overview</div>
+          <div class="tab" onclick="objDetailTab('plan')">Boundary Plan</div>
+          <div class="tab" onclick="objDetailTab('sectors')">Sectors</div>
+          <div class="tab" onclick="objDetailTab('satellite')">🛰 Satellite</div>
+          <div class="tab" onclick="objDetailTab('photos')">Photos</div>
+          <div class="tab" onclick="objDetailTab('risks')">Risks</div>
+        </div>
+        <div id="obj-detail-tab-content"></div>
+      </div>
+
+      <div class="section" id="sec-sectors">
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-head">
+            <span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--blue)"></span> Create Sector</span>
+            <button class="btn" onclick="toggleCreateForm()" id="create-form-toggle">+ New Sector</button>
+          </div>
+          <div id="create-sector-form" style="display:none;margin-top:8px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+              <div>
+                <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Sector ID *</div>
+                <input id="cs-name" placeholder="A-005" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Contractor</div>
+                <input id="cs-contractor" placeholder="Baltic Forest Ltd" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Status</div>
+                <input id="cs-status" placeholder="Active Logging" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Approved Volume</div>
+                <input id="cs-volume" placeholder="500 m3" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              </div>
+            </div>
+            <div style="margin-bottom:12px">
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Boundary Coordinates <span style="color:var(--text3)">(optional — lat,lon;lat,lon;...)</span></div>
+              <input id="cs-boundary" placeholder="56.9650,24.1800;56.9650,24.1950;56.9550,24.1950;56.9550,24.1800" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--r);font-family:var(--mono);font-size:11px">
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:4px">Format: lat,lon;lat,lon;lat,lon;lat,lon — minimum 4 points</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div>
+                <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Color</div>
+                <select id="cs-color" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+                  <option value="red">Red</option>
+                  <option value="orange">Orange</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="#7ab83c">Green</option>
+                  <option value="#3b8bd4">Blue</option>
+                </select>
+              </div>
+              <div style="margin-top:14px">
+                <button class="btn" onclick="createSector()" style="padding:8px 20px">✓ Create Sector</button>
+              </div>
+              <div id="cs-status-msg" style="font-size:12px;font-family:var(--mono);color:var(--text3);margin-top:14px"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> All sectors</span></div>
+          <div id="sectors-table"></div>
+        </div>
+      </div>
+
+      <!-- SECTOR DETAIL -->
+      <div class="section" id="sec-detail">
+        <div class="back-btn" onclick="nav('sectors')">← back to sectors</div>
+        <div class="detail-header">
+          <div>
+            <div class="detail-title" id="detail-name">–</div>
+            <div class="detail-meta" id="detail-meta">–</div>
+          </div>
+          <div class="detail-actions">
+            <button class="btn" id="pdf-btn" onclick="downloadPDF()">↓ PDF Report</button>
+          </div>
+        </div>
+        <div class="stat-row" id="detail-stats"></div>
+        <div class="grid2">
+          <div id="detail-info-card"></div>
+          <div id="detail-score-card"></div>
+        </div>
+        <div class="tabs" id="detail-tabs">
+          <div class="tab active" onclick="detailTab('gps')">GPS</div>
+          <div class="tab" onclick="detailTab('photos')">Photos</div>
+          <div class="tab" onclick="detailTab('risks')">Risks</div>
+          <div class="tab" onclick="detailTab('comments')">Comments</div>
+          <div class="tab" onclick="detailTab('trucks')">Trucks</div>
+          <div class="tab" onclick="detailTab('timber')">Timber</div>
+          <div class="tab" onclick="detailTab('employees')">👷 People</div>
+          <div class="tab" onclick="detailTab('vehicles')">🚛 Vehicles</div>
+          <div class="tab" onclick="detailTab('forest')">🌲 Forest</div>
+          <div class="tab" onclick="detailTab('map')">🗺 Map</div>
+          <div class="tab" onclick="detailTab('satellite')">🛰 Satellite</div>
+        </div>
+        <div id="detail-tab-content"></div>
+      </div>
+
+      <!-- MAP -->
+      <div class="section" id="sec-map">
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Sector map</span>
+            <span style="font-size:11px;color:var(--text3)">Click sector to open details</span>
+          </div>
+          <div id="map-container"><div class="loading"><div class="spinner"></div> Loading map...</div></div>
+          <div class="map-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Low risk</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div> Medium risk</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div> High risk</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--text3)"></div> No GPS data</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RISKS -->
+      <div class="section" id="sec-risks">
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--red)"></span> All risks</span></div>
+          <div id="risks-table"></div>
+        </div>
+      </div>
+
+      <!-- GPS -->
+      <div class="section" id="sec-gps">
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> GPS sessions</span></div>
+          <div id="gps-table"></div>
+        </div>
+      </div>
+
+      <!-- TRUCKS -->
+      <div class="section" id="sec-trucks">
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--amber)"></span> Truck reports</span></div>
+          <div id="trucks-table"></div>
+        </div>
+      </div>
+
+      <!-- TIMBER -->
+      <div class="section" id="sec-timber">
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Timber movements</span></div>
+          <div id="timber-table"></div>
+        </div>
+      </div>
+
+      <!-- PHOTOS -->
+      <div class="section" id="sec-photos">
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Photo gallery</span>
+            <input id="photo-search" placeholder="Search sector..." style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:var(--r);font-size:12px;font-family:var(--mono);width:160px;" oninput="renderPhotos()">
+          </div>
+          <div class="photo-filters">
+            <span class="filter-btn active" onclick="filterPhotos(null,null,this)">All</span>
+            <span class="filter-btn" onclick="filterPhotos(null,'site',this)">Site</span>
+            <span class="filter-btn" onclick="filterPhotos(null,'equipment',this)">Equipment</span>
+            <span class="filter-btn" onclick="filterPhotos(null,'timber',this)">Timber</span>
+          </div>
+          <div id="sector-photo-filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+          <div id="photos-grid" class="photo-grid"></div>
+          <div id="photo-pagination" style="display:flex;gap:8px;margin-top:16px;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;"></div>
+        </div>
+      </div>
+
+      <!-- AI INSPECTOR -->
+      <div class="section" id="sec-inspector">
+        <div class="kpis" id="inspector-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
+        <div style="margin-bottom:16px;">
+          <div class="card-head" style="margin-bottom:12px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text2);">
+            <span style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span> Sector risk analysis</span>
+          </div>
+          <div id="inspector-cards"></div>
+        </div>
+      </div>
+
+      <!-- SATELLITE MONITOR -->
+      <div class="section" id="sec-satellite">
+<div class="kpis" id="sat-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px"></div>
+  <!-- Satellite MAP - interactive -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head">
+      <span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--blue)"></span> Sentinel-2 снимок</span>
+      <div id="sat-image-meta" style="font-size:11px;font-family:var(--mono);color:var(--text3)"></div>
+    </div>
+    <div id="sat-map-container" style="border-radius:var(--r);overflow:hidden;background:var(--bg3);height:480px;position:relative">
+      <div id="sat-map-inner" style="width:100%;height:100%"></div>
+      <div id="sat-image-wrap" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Controls row -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Сектор</div>
+        <select id="sat-sector" onchange="onSatSectorChange()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;width:100%">
+          <option value="">— выбери сектор —</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Дата от</div>
+        <input type="date" id="sat-date-from" value="2024-06-01" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Дата до</div>
+        <input type="date" id="sat-date-to" value="2024-06-30" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="filter-btn active" id="sat-mode-true" onclick="setSatMode('true')">True Color</button>
+        <button class="filter-btn" id="sat-mode-ndvi" onclick="setSatMode('ndvi')">NDVI</button>
+        <button class="filter-btn" id="sat-mode-map" onclick="setSatMode('leaflet')">🗺 Map Only</button>
+        <button class="btn" onclick="loadSatelliteImages()" style="padding:6px 16px">↻ Загрузить</button>
+      </div>
+    </div>
+    <div id="sat-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--amber)"></span> Анализ секторов</span></div>
+    <div id="sat-sectors-list"></div>
+  </div>
+      </div><!-- /sec-satellite -->
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close">✕</span>
+  <img id="lightbox-img" src="" alt="">
+  <div class="lightbox-meta" id="lightbox-meta"></div>
+</div>
+
+<script>
+const API = '';
+let cache = {};
+let currentSection = 'overview';
+let currentSector = null;
+let currentDetailData = null;
+let currentDetailTab = 'gps';
+let allPhotos = [];
+let mapLoaded = false;
+let charts = {};
+
+async function api(path) {
+  if (cache[path]) return cache[path];
+  const r = await fetch(API + path);
+  const d = await r.json();
+  cache[path] = d;
+  return d;
+}
+function clearCache() { cache = {}; }
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function badge(text, cls) { return `<span class="badge ${cls}">${text}</span>`; }
+function riskBadge(level) {
+  if (!level) return '';
+  return badge(level, level==='HIGH'?'b-red':level==='MEDIUM'?'b-amber':'b-green');
+}
+function statusBadge(s) {
+  if (!s) return '';
+  const l = s.toLowerCase();
+  if (l.includes('active')||l==='yes'||l==='ok') return badge(s,'b-green');
+  if (l.includes('pause')||l.includes('missing')||l==='no') return badge(s,'b-amber');
+  if (l==='done'||l==='over_volume') return badge(s,'b-gray');
+  return badge(s,'b-gray');
+}
+function riskColor(color) { return color==='red'?'var(--red)':color==='yellow'?'var(--amber)':'var(--green)'; }
+function riskScoreBar(score, color) {
+  const c = riskColor(color);
+  return `<div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:${score}%;background:${c}"></div></div> <span style="font-size:11px;color:${c};font-family:var(--mono)">${score}</span>`;
+}
+function fmt(s) { if (!s) return '–'; return String(s).replace(' UTC','').slice(0,16); }
+function tbl(headers, keys, rows) {
+  if (!rows||!rows.length) return '<div class="empty">no records</div>';
+  return `<table class="tbl"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map(r=>`<tr>${keys.map(k=>`<td>${r[k]??'–'}</td>`).join('')}</tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+const titles = {overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor'};
+
+function nav(id) {
+  currentSection = id;
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const el = document.getElementById('sec-'+id);
+  if (el) el.classList.add('active');
+  const navMap = {overview:0,objects:1,sectors:2,map:3,risks:4,gps:5,trucks:6,timber:7,photos:8,inspector:9,satellite:10};
+  const items = document.querySelectorAll('.nav-item');
+  if (navMap[id]!==undefined) items[navMap[id]].classList.add('active');
+  document.getElementById('page-title').textContent = titles[id]||id;
+  document.getElementById('page-sub').textContent = new Date().toLocaleString();
+  load(id);
+}
+
+function refreshCurrent() { clearCache(); load(currentSection); }
+
+const loaders = {
+  overview: loadOverview, objects: loadObjects, sectors: loadSectors, map: loadMap,
+  risks: loadRisks, gps: loadGPS, trucks: loadTrucks, timber: loadTimber,
+  photos: loadPhotos, inspector: loadInspector, satellite: loadSatellite
+};
+
+function load(id) {
+  if (loaders[id]) loaders[id]().catch(e => console.error(e));
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  const [summary, sectors, risks, timber] = await Promise.all([
+    api('/api/summary'), api('/api/sectors'), api('/api/risks/by-sector'), api('/api/timber/volume-by-sector')
+  ]);
+
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi" style="border-color:${summary.exposure_low>0?'rgba(201,64,64,0.3)':'var(--border)'}">
+      <div class="kpi-label">⚠ Финансовые риски</div>
+      <div class="kpi-value ${summary.exposure_low>0?'red':'green'}" style="font-size:18px">${summary.exposure_label||'€0'}</div>
+      <div class="kpi-sub">${summary.vol_at_risk||0} m³ под риском</div>
+    </div>
+    <div class="kpi"><div class="kpi-label">Секторы</div><div class="kpi-value green">${summary.sectors}</div><div class="kpi-sub">${summary.red_sectors||0} критических</div></div>
+    <div class="kpi"><div class="kpi-label">Активные риски</div><div class="kpi-value ${summary.high_risks>0?'red':'green'}">${summary.risks}</div><div class="kpi-sub">${summary.high_risks} HIGH</div></div>
+    <div class="kpi"><div class="kpi-label">GPS сессии</div><div class="kpi-value">${summary.gps_sessions}</div><div class="kpi-sub">${summary.photos} фото</div></div>
+    <div class="kpi"><div class="kpi-label">Объём m³</div><div class="kpi-value">${summary.total_volume_m3.toLocaleString()}</div><div class="kpi-sub">${summary.truck_reports} рейсов</div></div>
+    <div class="kpi"><div class="kpi-label">Активные операции</div><div class="kpi-value green">${summary.active_operations||0}</div><div class="kpi-sub">секторов в работе</div></div>
+    <div class="kpi"><div class="kpi-label">Чек-ины сегодня</div><div class="kpi-value">${summary.field_checkins_today||0}</div><div class="kpi-sub">за сегодня</div></div>
+    <div class="kpi"><div class="kpi-label">Непроверено</div><div class="kpi-value ${summary.unverified_work>0?'red':'green'}">${summary.unverified_work||0}</div><div class="kpi-sub">требует проверки</div></div>
+  `;
+
+  // Risks chart
+  if (risks.length) {
+    const ctx = document.getElementById('chart-risks').getContext('2d');
+    if (charts.risks) charts.risks.destroy();
+    charts.risks = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: risks.map(r=>r.sector),
+        datasets: [
+          {label:'HIGH', data:risks.map(r=>r.high), backgroundColor:'rgba(201,64,64,0.75)', borderRadius:3},
+          {label:'MEDIUM', data:risks.map(r=>r.medium), backgroundColor:'rgba(212,160,23,0.75)', borderRadius:3},
+          {label:'LOW', data:risks.map(r=>r.low), backgroundColor:'rgba(122,184,60,0.6)', borderRadius:3},
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#8a9e70',font:{size:11},boxWidth:12}}},
+        scales:{
+          x:{ticks:{color:'#8a9e70',font:{size:11}},grid:{color:'rgba(120,180,60,0.07)'},stacked:false},
+          y:{ticks:{color:'#8a9e70',font:{size:11},stepSize:1},grid:{color:'rgba(120,180,60,0.07)'},beginAtZero:true}
+        }
+      }
+    });
+  }
+
+  // Timber chart
+  if (timber.length) {
+    const ctx2 = document.getElementById('chart-timber').getContext('2d');
+    if (charts.timber) charts.timber.destroy();
+    charts.timber = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: timber.map(r=>r.sector),
+        datasets: [
+          {label:'Actual m³', data:timber.map(r=>r.actual), backgroundColor:'rgba(122,184,60,0.75)', borderRadius:3},
+          {label:'Planned m³', data:timber.map(r=>r.planned), backgroundColor:'rgba(122,184,60,0.2)', borderColor:'rgba(122,184,60,0.5)', borderWidth:1, borderRadius:3},
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#8a9e70',font:{size:11},boxWidth:12}}},
+        scales:{
+          x:{ticks:{color:'#8a9e70',font:{size:11}},grid:{color:'rgba(120,180,60,0.07)'}},
+          y:{ticks:{color:'#8a9e70',font:{size:11}},grid:{color:'rgba(120,180,60,0.07)'},beginAtZero:true}
+        }
+      }
+    });
+  }
+
+  const sdata = await api('/api/sectors');
+  document.getElementById('ov-sectors').innerHTML = `<table class="tbl"><thead><tr><th>Сектор</th><th>Подрядчик</th><th>Статус</th><th>Risk</th><th>Финансовый риск</th></tr></thead><tbody>
+    ${sdata.slice(0,6).map(s=>`<tr>
+      <td><span class="tbl-link" onclick="openSector('${s.name}')">${s.name}</span></td>
+      <td>${s.contractor||'–'}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td>${riskScoreBar(s.risk_score, s.risk_color)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:${s.exposure_low>0?'var(--red)':'var(--green)'};font-weight:500">${s.exposure_label||'€0'}</td>
+    </tr>`).join('')}
+  </tbody></table>`;
+
+  document.getElementById('ov-risks').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Level</th><th>Reason</th></tr></thead><tbody>
+    ${(await api('/api/risks')).slice(0,5).map(r=>`<tr>
+      <td class="mono">${r.sector}</td>
+      <td>${riskBadge(r.risk_level)}</td>
+      <td style="color:var(--text2);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.reason}</td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ── SECTORS ───────────────────────────────────────────────────────────────────
+// ── OBJECTS ───────────────────────────────────────────────────────────────────
+
+function openObject(boundaryPlanId) {
+  if (boundaryPlanId === null) {
+    // "Без объекта" bucket has no real object to manage (no scan, no
+    // uploads possible) — just show its sectors via the existing filter.
+    objectFilter = null;
+    nav('sectors');
+    return;
+  }
+  currentObjectId = boundaryPlanId;
+  currentSection = 'object-detail';
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-object-detail').classList.add('active');
+  document.getElementById('page-sub').textContent = new Date().toLocaleString();
+  objDetailTab('overview');
+}
+
+async function newObjectPrompt() {
+  const name = window.prompt('Название объекта (например: Mūrnieku Jāņa 0.21ha):');
+  if (!name) return;
+  const resp = await fetch('/api/objects', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({object_name: name})
+  });
+  const data = await resp.json();
+  clearCache();
+  if (data.ok) openObject(data.boundary_plan_id);
+  else loadObjects();
+}
+
+async function getCurrentObject() {
+  const objects = await api('/api/objects');
+  return objects.find(o => o.boundary_plan_id === currentObjectId);
+}
+
+async function objDetailTab(tab) {
+  currentObjectTab = tab;
+  const tabs = ['overview','plan','sectors','satellite','photos','risks'];
+  document.querySelectorAll('#obj-detail-tabs .tab').forEach((t,i)=>t.classList.toggle('active', tabs[i]===tab));
+
+  const content = document.getElementById('obj-detail-tab-content');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  const obj = await getCurrentObject();
+  if (!obj) { content.innerHTML = '<div class="empty">Object not found</div>'; return; }
+
+  document.getElementById('obj-detail-name').textContent = obj.object_name;
+  document.getElementById('obj-detail-meta').textContent = `${(obj.sectors||[]).length} sector(s)`;
+  document.getElementById('page-title').textContent = obj.object_name;
+
+  if (tab === 'overview') {
+    const totalArea = (obj.sectors||[]).reduce((s,x)=>s+(x.area_ha||0),0);
+    content.innerHTML = `<div class="card">
+      <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Overview</span></div>
+      <div class="info-grid">
+        <div class="info-cell"><div class="info-cell-label">Object</div><div class="info-cell-value">${obj.object_name}</div></div>
+        <div class="info-cell"><div class="info-cell-label">Sectors</div><div class="info-cell-value">${(obj.sectors||[]).length}</div></div>
+        <div class="info-cell"><div class="info-cell-label">Total area</div><div class="info-cell-value">${totalArea.toFixed(2)} ha</div></div>
+        ${obj.plan_uploaded_at?`<div class="info-cell"><div class="info-cell-label">Uploaded</div><div class="info-cell-value">${fmt(obj.plan_uploaded_at)}</div></div>`:''}
+      </div>
+    </div>`;
+  } else if (tab === 'plan') {
+    const hasScan = !!obj.plan_scan_url;
+    content.innerHTML = `<div class="card">
+      <div class="card-head">
+        <span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Boundary plan</span>
+        <span style="display:flex;gap:8px">
+          <label class="btn" style="cursor:pointer">📤 Upload plan<input type="file" accept="image/*" style="display:none" onchange="uploadBoundaryPlanFile(event)"></label>
+          ${hasScan?`<a class="btn" href="/api/boundary-plans/${currentObjectId}/annotated" target="_blank">📄 Full view</a>`:''}
+        </span>
+      </div>
+      ${hasScan ? `
+        <div style="margin-bottom:10px;color:var(--text3);font-size:12px">Click on the plan to place polygon points, then Save.</div>
+        <div id="draw-wrap" style="position:relative;display:inline-block;max-width:100%">
+          <img id="draw-img" src="/api/boundary-plans/${currentObjectId}/scan" style="max-width:100%;display:block;border-radius:var(--r);border:1px solid var(--border)">
+          <svg id="draw-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair"></svg>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn" onclick="savePolygon()">✓ Save Polygon</button>
+          <button class="btn" onclick="clearPolygon()">✕ Clear</button>
+        </div>
+      ` : `<div class="empty">No plan scan uploaded yet — use "Upload plan" above.</div>`}
+    </div>`;
+    if (hasScan) initPolygonDrawing();
+  } else if (tab === 'sectors') {
+    const rows = (await api('/api/sectors')).filter(s => (s.boundary_plan_id ?? null) === currentObjectId);
+    content.innerHTML = `<table class="tbl"><thead><tr>
+      <th>Сектор</th><th>Статус</th><th>Площадь</th><th>Boundary</th><th></th>
+    </tr></thead><tbody>
+      ${rows.map(s=>`<tr>
+        <td><strong style="color:var(--gbright);font-family:var(--mono)">${s.name}</strong></td>
+        <td>${statusBadge(s.status)}</td>
+        <td class="mono">${s.area_ha?s.area_ha+' ha':'–'}</td>
+        <td>${s.boundary ? `<span class="badge b-green">✓ ${s.boundary.length}pts</span>` : '<span class="badge b-gray">–</span>'}</td>
+        <td><span class="tbl-link" onclick="openSector('${s.name}')">details →</span></td>
+      </tr>`).join('') || '<tr><td colspan="5" class="empty">no sectors yet</td></tr>'}
+    </tbody></table>`;
+  } else if (tab === 'satellite') {
+    content.innerHTML = `<div class="card">
+      <div class="card-head">
+        <span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Object satellite</span>
+        <label class="btn" style="cursor:pointer">📤 Upload satellite<input type="file" accept="image/*" style="display:none" onchange="uploadObjectSatellite(event)"></label>
+      </div>
+      <img src="/api/objects/${currentObjectId}/satellite-image" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border);margin-top:10px" onerror="this.style.display='none'">
+    </div>`;
+  } else if (tab === 'photos') {
+    const names = (obj.sectors||[]).map(s=>s.name);
+    const allPhotos = await api('/api/photos');
+    const photos = allPhotos.filter(p => names.includes(p.sector));
+    content.innerHTML = photos.length ? `<div class="photo-grid">${photos.map(p=>`
+      <div class="photo-card" onclick="openLightbox('${p.filename||''}','${p.sector}','${p.photo_type} · ${fmt(p.uploaded_at)}')">
+        <div class="photo-thumb-placeholder">📷</div>
+        <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${fmt(p.uploaded_at)}</div></div>
+      </div>`).join('')}</div>` : '<div class="empty">no photos</div>';
+  } else if (tab === 'risks') {
+    const names = (obj.sectors||[]).map(s=>s.name);
+    const allRisks = await api('/api/risks');
+    const risks = allRisks.filter(r => names.includes(r.sector));
+    content.innerHTML = tbl(['Sector','Level','Reason'], ['sector','risk_level','reason'], risks);
+  }
+}
+
+async function uploadBoundaryPlanFile(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  await fetch(`/api/objects/${currentObjectId}/boundary-plan`, {method:'POST', body: fd});
+  clearCache();
+  objDetailTab('plan');
+}
+
+async function uploadObjectSatellite(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  await fetch(`/api/objects/${currentObjectId}/satellite`, {method:'POST', body: fd});
+  objDetailTab('satellite');
+}
+
+async function uploadSectorSatellite(sectorName, ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  await fetch(`/api/sectors/${encodeURIComponent(sectorName)}/satellite`, {method:'POST', body: fd});
+  openSector(sectorName);
+}
+
+// ── Polygon drawing tool (plain JS + SVG overlay, no libraries) ──────────────
+let drawnPoints = []; // [[x,y], ...] in natural image pixel coordinates
+
+function initPolygonDrawing() {
+  drawnPoints = [];
+  const img = document.getElementById('draw-img');
+  const svg = document.getElementById('draw-svg');
+  if (!img || !svg) return;
+  const attach = () => {
+    svg.setAttribute('viewBox', `0 0 ${img.naturalWidth} ${img.naturalHeight}`);
+    svg.onclick = (e) => {
+      const rect = svg.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width * img.naturalWidth;
+      const y = (e.clientY - rect.top) / rect.height * img.naturalHeight;
+      drawnPoints.push([Math.round(x), Math.round(y)]);
+      renderPolygonOverlay();
+    };
+    renderPolygonOverlay();
+  };
+  if (img.complete && img.naturalWidth) attach(); else img.onload = attach;
+}
+
+function renderPolygonOverlay() {
+  const svg = document.getElementById('draw-svg');
+  if (!svg) return;
+  const pts = drawnPoints.map(p => p.join(',')).join(' ');
+  svg.innerHTML = `
+    ${drawnPoints.length>=2 ? `<polyline points="${pts}" fill="rgba(122,184,60,0.2)" stroke="#7ab83c" stroke-width="3"/>` : ''}
+    ${drawnPoints.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="#a3d45a" stroke="#0e1208" stroke-width="1.5"/>`).join('')}
+  `;
+}
+
+function clearPolygon() {
+  drawnPoints = [];
+  renderPolygonOverlay();
+}
+
+async function savePolygon() {
+  if (drawnPoints.length < 3) {
+    alert('Нужно минимум 3 точки, чтобы сохранить полигон.');
+    return;
+  }
+  const name = window.prompt('Название сектора (например: S-004):');
+  if (!name) return;
+  const resp = await fetch(`/api/objects/${currentObjectId}/sectors`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, pixel_boundary: drawnPoints})
+  });
+  const data = await resp.json();
+  if (data.ok) {
+    if (data.georeferenced) {
+      alert(`Сектор ${name} создан и автоматически привязан к реальным GPS-координатам (масштаб взят из этого плана).`);
+    } else {
+      alert(`Сектор ${name} создан, но у этого плана нет сохранённого масштаба (он не был построен через геометрический OCR-fallback) — GPS-координат нет. Добавьте их вручную через 🗺 Add Sector Boundary в боте, если нужна привязка на карте.`);
+    }
+    clearPolygon();
+    clearCache();
+    objDetailTab('sectors');
+  } else {
+    alert('Ошибка: ' + (data.error || 'unknown'));
+  }
+}
+
+// ── OBJECTS ───────────────────────────────────────────────────────────────────
+let objectFilter = undefined; // boundary_plan_id currently filtering the Sectors view; undefined = show all
+let currentObjectId = null;   // boundary_plan_id of the object open in Object Details
+let currentObjectTab = 'overview';
+
+async function loadObjects() {
+  const objects = await api('/api/objects');
+  document.getElementById('objects-grid').innerHTML = objects.map(o => {
+    const totalArea = (o.sectors||[]).reduce((sum,s)=>sum+(s.area_ha||0),0);
+    const annotatedUrl = o.boundary_plan_id!==null ? `/api/boundary-plans/${o.boundary_plan_id}/annotated` : o.plan_scan_url;
+    const scan = annotatedUrl
+      ? `<img class="object-card-scan" src="${annotatedUrl}" alt="plan with sectors">`
+      : `<div class="object-card-noscan">no scan</div>`;
+    return `<div class="object-card" onclick="openObject(${o.boundary_plan_id===null?'null':o.boundary_plan_id})">
+      ${scan}
+      <div class="object-card-body">
+        <div class="object-card-title">${o.object_name}</div>
+        <div class="object-card-meta">${(o.sectors||[]).length} sector(s) · ${totalArea.toFixed(2)} ha total</div>
+        ${o.plan_uploaded_at?`<div class="object-card-meta">${fmt(o.plan_uploaded_at)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('') || '<div class="empty">no objects yet</div>';
+}
+
+// ── SECTORS ───────────────────────────────────────────────────────────────────
+async function loadSectors() {
+  const [rows, objects] = await Promise.all([api('/api/sectors'), api('/api/objects')]);
+  let filtered = rows;
+  let banner = '';
+  if (objectFilter !== undefined) {
+    filtered = rows.filter(s => (s.boundary_plan_id ?? null) === objectFilter);
+    const obj = objects.find(o => (o.boundary_plan_id ?? null) === objectFilter);
+    if (obj) {
+      const annotatedUrl = objectFilter!==null ? `/api/boundary-plans/${objectFilter}/annotated` : obj.plan_scan_url;
+      banner = `<div class="card" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div class="object-card-title">🗂 ${obj.object_name}</div>
+          <div class="object-card-meta">${filtered.length} sector(s) shown</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          ${annotatedUrl?`<a class="btn" href="${annotatedUrl}" target="_blank">📄 View plan with sectors</a>`:''}
+          ${objectFilter!==null?`<a class="btn" href="/api/satellite/object/${objectFilter}" target="_blank">🛰 Object satellite</a>`:''}
+          <button class="btn" onclick="clearObjectFilter()">✕ Clear filter</button>
+        </div>
+      </div>`;
+    }
+  }
+  document.getElementById('sectors-table').innerHTML = banner + `<table class="tbl"><thead><tr>
+    <th>Сектор</th><th>Подрядчик</th><th>Статус</th><th>Объём</th><th>Risk Score</th><th>Финансовый риск</th><th>GPS</th><th>Фото</th><th>Boundary</th><th></th>
+  </tr></thead><tbody>
+    ${filtered.map(s=>`<tr>
+      <td><strong style="color:var(--gbright);font-family:var(--mono)">${s.name}</strong></td>
+      <td>${s.contractor||'–'}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td class="mono">${s.approved_volume||'–'}</td>
+      <td>${riskScoreBar(s.risk_score, s.risk_color)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:${s.exposure_low>0?'var(--red)':'var(--green)'};font-weight:500">${s.exposure_label||'€0'}</td>
+      <td class="mono">${s.gps_count}</td>
+      <td class="mono">${s.photo_count}</td>
+      <td>${s.boundary ? `<span class="badge b-green">✓ ${s.boundary.length}pts</span>` : '<span class="badge b-gray">–</span>'}</td>
+      <td><span class="tbl-link" onclick="openSector('${s.name}')">details →</span></td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+function clearObjectFilter() {
+  objectFilter = undefined;
+  loadSectors();
+}
+
+// ── SECTOR DETAIL ─────────────────────────────────────────────────────────────
+async function openSector(name) {
+  currentSector = name;
+  currentSection = 'detail';
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-detail').classList.add('active');
+  document.getElementById('page-title').textContent = name;
+  document.getElementById('page-sub').textContent = 'Sector detail';
+  document.getElementById('detail-name').textContent = name;
+  document.getElementById('detail-meta').textContent = 'Loading...';
+  document.getElementById('detail-stats').innerHTML = '';
+  document.getElementById('detail-tab-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  const data = await api('/api/sectors/'+encodeURIComponent(name));
+  currentDetailData = data;
+  const s = data.sector;
+  document.getElementById('detail-meta').textContent = `${s.contractor||''} · ${s.status||''} · ${s.approved_volume||''}`;
+
+  document.getElementById('detail-stats').innerHTML = `
+    <div class="stat-box"><div class="stat-box-n">${data.gps_sessions.length}</div><div class="stat-box-l">GPS</div></div>
+    <div class="stat-box"><div class="stat-box-n">${data.photos.length}</div><div class="stat-box-l">Photos</div></div>
+    <div class="stat-box"><div class="stat-box-n">${data.risks.length}</div><div class="stat-box-l">Risks</div></div>
+    <div class="stat-box"><div class="stat-box-n">${data.truck_reports.length}</div><div class="stat-box-l">Trucks</div></div>
+    <div class="stat-box"><div class="stat-box-n">${data.timber_movements.length}</div><div class="stat-box-l">Timber</div></div>
+    <div class="stat-box"><div class="stat-box-n">${data.comments.length}</div><div class="stat-box-l">Comments</div></div>
+    ${s.area_ha?`<div class="stat-box"><div class="stat-box-n" style="font-size:15px">${s.area_ha}</div><div class="stat-box-l">ha area</div></div>`:''}
+    ${s.boundary_json?`<div class="stat-box"><div class="stat-box-n" style="font-size:15px;color:var(--green)">✓</div><div class="stat-box-l">boundary</div></div>`:'<div class="stat-box"><div class="stat-box-n" style="font-size:15px;color:var(--text3)">–</div><div class="stat-box-l">boundary</div></div>'}
+  `;
+
+  const rc = s.risk_color||'green';
+  document.getElementById('detail-info-card').innerHTML = `<div class="card">
+    <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Sector info</span></div>
+    <div class="info-grid">
+      <div class="info-cell"><div class="info-cell-label">Sector ID</div><div class="info-cell-value" style="font-family:var(--mono);color:var(--gbright)">${s.name}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Contractor</div><div class="info-cell-value">${s.contractor||'–'}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Status</div><div class="info-cell-value">${statusBadge(s.status)}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Approved volume</div><div class="info-cell-value" style="font-family:var(--mono)">${s.approved_volume||'–'}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Boundary</div><div class="info-cell-value">${s.boundary_json?`<span class="badge b-green">✓ defined</span>`:'<span class="badge b-gray">not set</span>'}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Area</div><div class="info-cell-value" style="font-family:var(--mono)">${s.area_ha?s.area_ha+' ha':'–'}</div></div>
+      ${s.center_lat?`<div class="info-cell"><div class="info-cell-label">Center Lat</div><div class="info-cell-value" style="font-family:var(--mono);font-size:12px">${s.center_lat.toFixed(5)}°N</div></div>`:''}
+      ${s.center_lon?`<div class="info-cell"><div class="info-cell-label">Center Lon</div><div class="info-cell-value" style="font-family:var(--mono);font-size:12px">${s.center_lon.toFixed(5)}°E</div></div>`:''}
+      ${s.object_name?`<div class="info-cell"><div class="info-cell-label">Object</div><div class="info-cell-value">🗂 ${s.object_name}</div></div>`:''}
+      ${s.boundary_plan_id?`<div class="info-cell"><div class="info-cell-label">Source plan</div><div class="info-cell-value"><a class="btn" style="padding:3px 10px" href="/api/boundary-plans/${s.boundary_plan_id}/scan" target="_blank">📄 View full scan</a></div></div>`:''}
+    </div>
+    ${s.pixel_boundary_json?`<div style="margin-top:14px"><div class="info-cell-label" style="margin-bottom:6px">Sector location on plan</div><img src="/api/sectors/${encodeURIComponent(s.name)}/plan-crop" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border)" alt="sector on plan"></div>`:''}
+    <div style="margin-top:10px"><label class="btn" style="cursor:pointer;padding:4px 10px">📤 Upload sector satellite<input type="file" accept="image/*" style="display:none" onchange="uploadSectorSatellite('${s.name}', event)"></label></div>
+  </div>`;
+
+  document.getElementById('detail-score-card').innerHTML = `<div class="card">
+    <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${riskColor(rc)}"></span> Risk & Financial Exposure</span></div>
+    <div style="display:flex;align-items:center;gap:20px;padding:8px 0;">
+      <div class="score-circle ${rc}">
+        <div class="score-num" style="color:${riskColor(rc)}">${s.risk_score}</div>
+        <div class="score-label">/ 100</div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:600;color:${riskColor(rc)}">${s.risk_level} RISK</div>
+        <div style="margin-top:10px;padding:10px 12px;background:${s.exposure_low>0?'rgba(201,64,64,0.08)':'rgba(122,184,60,0.08)'};border-radius:var(--r);border:1px solid ${s.exposure_low>0?'rgba(201,64,64,0.2)':'rgba(122,184,60,0.15)'}">
+          <div style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Estimated Financial Exposure</div>
+          <div style="font-size:20px;font-weight:600;color:${s.exposure_low>0?'var(--red)':'var(--green)'};font-family:var(--mono)">${s.exposure_label||'€0'}</div>
+          ${s.vol_at_risk>0?`<div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--mono)">${s.vol_at_risk} m³ · €60–120/m³ market rate</div>`:''}
+        </div>
+        ${s.timber_miss_vol>0||s.truck_discrepancy>0||s.rejected_gps>0?`
+        <div style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--text2)">
+          ${s.timber_miss_vol>0?`<div style="margin-bottom:2px">⚠ Missing timber: ${s.timber_miss_vol} m³</div>`:''}
+          ${s.truck_discrepancy>0?`<div style="margin-bottom:2px">⚠ Truck gap: ${s.truck_discrepancy} m³</div>`:''}
+          ${s.rejected_gps>0?`<div>⚠ GPS violations: ${s.rejected_gps}</div>`:''}
+        </div>`:''}
+      </div>
+    </div>
+  </div>`;
+
+  detailTab('gps');
+}
+
+function detailTab(tab) {
+  currentDetailTab = tab;
+  document.querySelectorAll('#detail-tabs .tab').forEach(t=>t.classList.remove('active'));
+  const tabs = ['gps','photos','risks','comments','trucks','timber','employees','vehicles','forest','map','satellite'];
+  const idx = tabs.indexOf(tab);
+  if (idx>=0) document.querySelectorAll('#detail-tabs .tab')[idx].classList.add('active');
+  if (!currentDetailData) return;
+  const d = currentDetailData;
+  const s = d.sector;
+  const el = document.getElementById('detail-tab-content');
+
+  if (tab==='gps') {
+    el.innerHTML = `<table class="tbl"><thead><tr><th>Employee</th><th>Check-in</th><th>Finish</th><th>Distance m</th><th>Approved</th><th>Comment</th></tr></thead><tbody>
+      ${d.gps_sessions.map(r=>`<tr>
+        <td>${r.employee}</td><td class="mono" style="font-size:11px">${fmt(r.check_in_time)}</td>
+        <td class="mono" style="font-size:11px">${fmt(r.finish_time)}</td>
+        <td class="mono">${r.distance_m?Math.round(r.distance_m):'–'}</td>
+        <td>${r.approved==='YES'?badge('YES','b-green'):badge('NO','b-red')}</td>
+        <td style="color:var(--text2);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.comment||'–'}</td>
+      </tr>`).join('')||'<tr><td colspan="6" class="empty">no sessions</td></tr>'}
+    </tbody></table>`;
+
+  } else if (tab==='photos') {
+    if (!d.photos.length) { el.innerHTML='<div class="empty">no photos</div>'; return; }
+    el.innerHTML = `<div class="photo-grid">${d.photos.map(p=>`
+      <div class="photo-card" onclick="openLightbox('${p.filename||''}','${p.sector}','${p.photo_type}')">
+        <div class="photo-thumb-placeholder">📷</div>
+        <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${fmt(p.uploaded_at)}</div></div>
+      </div>`).join('')}</div>`;
+
+  } else if (tab==='risks') {
+    el.innerHTML = `<table class="tbl"><thead><tr><th>Level</th><th>Reason</th></tr></thead><tbody>
+      ${d.risks.map(r=>`<tr><td>${riskBadge(r.risk_level)}</td><td style="color:var(--text2)">${r.reason}</td></tr>`).join('')||'<tr><td colspan="2" class="empty">no risks</td></tr>'}
+    </tbody></table>`;
+
+  } else if (tab==='comments') {
+    if (!d.comments.length) { el.innerHTML='<div class="empty">no comments</div>'; return; }
+    el.innerHTML = d.comments.map(c=>`<div class="comment-card">
+      <div class="comment-header"><span class="comment-author">${c.employee}</span><span class="comment-date">${fmt(c.check_in_time)}</span></div>
+      <div class="comment-text">${c.comment}</div>
+    </div>`).join('');
+
+  } else if (tab==='trucks') {
+    el.innerHTML = `<table class="tbl"><thead><tr><th>Truck</th><th>Driver</th><th>Volume m³</th><th>Note</th><th>Time</th></tr></thead><tbody>
+      ${d.truck_reports.map(r=>`<tr>
+        <td class="mono">${r.truck_number}</td><td>${r.driver}</td><td class="mono">${r.reported_volume}</td>
+        <td style="color:var(--text2);font-size:12px">${r.note||'–'}</td><td class="mono" style="font-size:11px">${fmt(r.created_at)}</td>
+      </tr>`).join('')||'<tr><td colspan="5" class="empty">no reports</td></tr>'}
+    </tbody></table>`;
+
+  } else if (tab==='timber') {
+    el.innerHTML = `<table class="tbl"><thead><tr><th>Planned m³</th><th>Actual m³</th><th>Diff m³</th><th>Status</th><th>Note</th></tr></thead><tbody>
+      ${d.timber_movements.map(r=>`<tr>
+        <td class="mono">${r.planned_volume}</td><td class="mono">${r.actual_volume}</td>
+        <td class="mono" style="color:${r.difference_volume>0?'var(--amber)':'var(--green)'}">${r.difference_volume}</td>
+        <td>${statusBadge(r.status)}</td><td style="color:var(--text2);font-size:12px">${r.note||'–'}</td>
+      </tr>`).join('')||'<tr><td colspan="5" class="empty">no records</td></tr>'}
+    </tbody></table>`;
+
+  } else if (tab==='employees') {
+    const emps = d.employees || [];
+    el.innerHTML = `
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">Add Worker</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
+          <input id="emp-name" placeholder="Full name" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="emp-role" placeholder="Role (e.g. Logger)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="emp-phone" placeholder="Phone" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="emp-id" placeholder="ID / Personal code" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <button class="btn" onclick="addEmployee('${s.name}')">+ Add</button>
+        </div>
+        <div id="emp-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
+      </div>
+      <table class="tbl"><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>ID</th><th>Status</th><th></th></tr></thead><tbody>
+        ${emps.map(e=>`<tr>
+          <td style="font-weight:500">${e.full_name}</td>
+          <td class="mono" style="font-size:12px">${e.role||'–'}</td>
+          <td class="mono" style="font-size:12px">${e.phone||'–'}</td>
+          <td class="mono" style="font-size:11px;color:var(--text3)">${e.id_number||'–'}</td>
+          <td>${e.active?badge('Active','b-green'):badge('Inactive','b-gray')}</td>
+          <td><span class="tbl-link" style="color:var(--red)" onclick="deleteEmployee(${e.id},'${s.name}')">✕</span></td>
+        </tr>`).join('')||'<tr><td colspan="6" class="empty">no workers assigned</td></tr>'}
+      </tbody></table>`;
+
+  } else if (tab==='vehicles') {
+    const vehs = d.vehicles || [];
+    el.innerHTML = `
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">Add Vehicle</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
+          <input id="veh-plate" placeholder="Plate (e.g. AB-1234)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="veh-type" placeholder="Type (Truck/Harvester)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="veh-driver" placeholder="Driver" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="veh-capacity" placeholder="Tank L (e.g. 200)" type="number" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="veh-per100" placeholder="L/100km (e.g. 35)" type="number" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <button class="btn" onclick="addVehicle('${s.name}')">+ Add</button>
+        </div>
+        <div id="veh-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
+      </div>
+      ${vehs.map(v=>`
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div>
+              <span style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--gbright)">${v.plate}</span>
+              <span class="badge b-gray" style="margin-left:8px">${v.vehicle_type||'Vehicle'}</span>
+              ${v.active?badge('Active','b-green'):badge('Inactive','b-gray')}
+            </div>
+            <span class="tbl-link" style="color:var(--red)" onclick="deleteVehicle(${v.id},'${s.name}')">✕ Remove</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+            <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">DRIVER</div><div style="font-size:13px">${v.driver||'–'}</div></div>
+            <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">TANK</div><div style="font-size:13px;font-family:var(--mono)">${v.fuel_capacity_l||'–'} L</div></div>
+            <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">L/100km</div><div style="font-size:13px;font-family:var(--mono)">${v.fuel_per_100km||'–'}</div></div>
+            <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">TOTAL KM</div><div style="font-size:13px;font-family:var(--mono)">${Math.round(v.total_km||0)}</div></div>
+          </div>
+          <!-- Fuel log form -->
+          <div style="background:var(--bg3);border-radius:var(--r);padding:10px;margin-bottom:8px">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">⛽ Log Fuel</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 2fr auto;gap:8px;align-items:end">
+              <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px">KM START</div>
+                <input id="fuel-km-start-${v.id}" type="number" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px"></div>
+              <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px">KM END</div>
+                <input id="fuel-km-end-${v.id}" type="number" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px"></div>
+              <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px">FUEL ADDED L</div>
+                <input id="fuel-added-${v.id}" type="number" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px"></div>
+              <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px">NOTE</div>
+                <input id="fuel-note-${v.id}" placeholder="optional note" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px"></div>
+              <button class="btn" onclick="logFuel(${v.id},'${s.name}',${v.fuel_per_100km||0})">Log</button>
+            </div>
+            <div id="fuel-msg-${v.id}" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
+          </div>
+          ${v.fuel_logs && v.fuel_logs.length ? `
+          <table class="tbl" style="font-size:11px"><thead><tr><th>Date</th><th>KM driven</th><th>Fuel added L</th><th>Calc L</th><th>Discrepancy</th></tr></thead><tbody>
+            ${v.fuel_logs.map(f=>`<tr>
+              <td class="mono">${fmt(f.logged_at)}</td>
+              <td class="mono">${Math.round(f.km_driven||0)}</td>
+              <td class="mono">${f.fuel_added_l}</td>
+              <td class="mono">${f.fuel_calc_l}</td>
+              <td class="mono" style="color:${Math.abs(f.discrepancy_l||0)>5?'var(--red)':'var(--green)'}">${f.discrepancy_l>0?'+':''}${f.discrepancy_l}</td>
+            </tr>`).join('')}
+          </tbody></table>` : '<div style="font-size:11px;color:var(--text3);font-family:var(--mono)">No fuel logs yet</div>'}
+        </div>`).join('')||'<div class="empty">no vehicles assigned</div>'}`;
+
+  } else if (tab==='forest') {
+    el.innerHTML = `
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--green)"></span> Tree Species & Forest Info</span></div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px">Tree Species</div>
+            <textarea id="forest-species" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;resize:vertical;min-height:80px" placeholder="e.g. Pine (Pinus sylvestris) — 60%&#10;Spruce (Picea abies) — 30%&#10;Birch (Betula pendula) — 10%">${s.tree_species||''}</textarea>
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px">Cut Plan Notes</div>
+            <textarea id="forest-cutplan" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;resize:vertical;min-height:80px" placeholder="Approved logging zone, restrictions, seasonal limits...">${s.cut_plan_notes||''}</textarea>
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px">General Notes</div>
+            <textarea id="forest-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;resize:vertical;min-height:60px" placeholder="Road access, special conditions, audit notes...">${s.notes||''}</textarea>
+          </div>
+          <button class="btn" onclick="saveForestNotes('${s.name}')">✓ Save</button>
+          <span id="forest-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:10px"></span>
+        </div>
+        <div class="card">
+          <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--amber)"></span> Sector Summary</span></div>
+          <div class="info-grid">
+            <div class="info-cell"><div class="info-cell-label">Approved Volume</div><div class="info-cell-value mono">${s.approved_volume||'–'}</div></div>
+            <div class="info-cell"><div class="info-cell-label">Area</div><div class="info-cell-value mono">${s.area_ha?s.area_ha+' ha':'–'}</div></div>
+            <div class="info-cell"><div class="info-cell-label">GPS Sessions</div><div class="info-cell-value mono">${d.gps_sessions.length}</div></div>
+            <div class="info-cell"><div class="info-cell-label">Photos</div><div class="info-cell-value mono">${d.photos.length}</div></div>
+            <div class="info-cell"><div class="info-cell-label">Workers</div><div class="info-cell-value mono">${(d.employees||[]).length}</div></div>
+            <div class="info-cell"><div class="info-cell-label">Vehicles</div><div class="info-cell-value mono">${(d.vehicles||[]).length}</div></div>
+          </div>
+          <div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:var(--r)">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:6px">⚠ Work Rules</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.6">
+              1. GPS Check-in required before work<br>
+              2. Minimum 1 site photo per session<br>
+              3. Timber movement logged same day<br>
+              4. Fuel logged after each refuel<br>
+              5. Session must be closed on finish
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+  } else if (tab==='map') {
+    const boundary = s.boundary_json ? JSON.parse(s.boundary_json) : null;
+    el.innerHTML = `<div id="detail-map-wrap" style="height:420px;border-radius:var(--r);overflow:hidden;background:var(--bg3)"></div>
+      <div style="margin-top:10px;font-size:11px;font-family:var(--mono);color:var(--text3)">
+        ${boundary ? `Boundary: ${boundary.length} points · Center: ${s.center_lat?.toFixed(5)}°N ${s.center_lon?.toFixed(5)}°E · Area: ${s.area_ha||'–'} ha` : 'No boundary defined yet'}
+      </div>`;
+    setTimeout(()=>renderDetailMap(s, boundary), 50);
+
+  } else if (tab==='satellite') {
+    el.innerHTML = `
+      <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Дата от</div>
+          <input type="date" id="ds-date-from" value="2024-06-01" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Дата до</div>
+          <input type="date" id="ds-date-to" value="2024-06-30" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="filter-btn active" id="ds-mode-true" onclick="setDSMode('true')">True Color</button>
+          <button class="filter-btn" id="ds-mode-ndvi" onclick="setDSMode('ndvi')">NDVI</button>
+          <button class="btn" onclick="loadDetailSatellite()" style="padding:6px 16px">↻ Загрузить</button>
+        </div>
+      </div>
+      <div id="ds-image-wrap" style="border-radius:var(--r);overflow:hidden;background:var(--bg3);height:420px;display:flex;align-items:center;justify-content:center">
+        <div style="text-align:center;font-family:var(--mono);color:var(--text3)"><div style="font-size:24px;margin-bottom:8px">🛰</div>Нажми Загрузить</div>
+      </div>
+      <div id="ds-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:8px"></div>`;
+  }
+}
+
+function downloadPDF() {
+  if (!currentSector) return;
+  window.open(API + '/api/report/pdf/' + encodeURIComponent(currentSector), '_blank');
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────────
+async function loadMap() {
+  if (mapLoaded) return;
+  const container = document.getElementById('map-container');
+
+  // Load Leaflet
+  const css = document.createElement('link');
+  css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(css);
+  const script = document.createElement('script');
+  script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  document.head.appendChild(script);
+  script.onload = async () => {
+    const mapData = await api('/api/map');
+    container.innerHTML = '';
+    container.style.height = '540px';
+    const map = L.map(container).setView([56.9, 24.1], 8);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; CartoDB', maxZoom:19
+    }).addTo(map);
+
+    let hasPins = false;
+    const bounds = [];
+
+    mapData.forEach(s => {
+      const riskCol = s.risk_color==='red'?'#c94040':s.risk_color==='yellow'?'#d4a017':'#7ab83c';
+      const polyCol = s.color || '#c94040';
+
+      // Draw polygon if boundary exists
+      if (s.boundary && s.boundary.length >= 3) {
+        hasPins = true;
+        const poly = L.polygon(s.boundary, {
+          color: polyCol,
+          fillColor: polyCol,
+          fillOpacity: 0.2,
+          weight: 2,
+          dashArray: s.risk_color === 'red' ? '4,4' : null,
+        }).addTo(map);
+
+        poly.bindPopup(`
+          <div style="font-family:monospace;font-size:12px;min-width:180px">
+            <div style="font-weight:bold;font-size:14px;margin-bottom:4px">${s.name}</div>
+            <div>${s.contractor||''}</div>
+            <div>Status: ${s.status||'–'}</div>
+            <div>Volume: ${s.approved_volume||'–'}</div>
+            <div>Risk: <b style="color:${riskCol}">${s.risk_level}</b> (${s.risk_score})</div>
+            ${s.area_ha?`<div>Area: ${s.area_ha} ha</div>`:''}
+            <div style="margin-top:8px"><a href="#" onclick="openSector('${s.name}');return false" style="color:#7ab83c">Open details →</a></div>
+          </div>
+        `);
+
+        s.boundary.forEach(p => bounds.push(p));
+      }
+
+      // Point marker at center (always, for sectors with or without boundary)
+      if (s.latitude && s.longitude) {
+        hasPins = true;
+        const icon = L.divIcon({
+          className:'',
+          html:`<div style="width:12px;height:12px;border-radius:50%;background:${riskCol};border:2px solid rgba(255,255,255,0.6);box-shadow:0 0 8px ${riskCol}"></div>`,
+          iconSize:[12,12], iconAnchor:[6,6]
+        });
+        L.marker([s.latitude, s.longitude], {icon})
+          .addTo(map)
+          .bindPopup(`<b>${s.name}</b><br>${s.contractor||''}<br>Risk: <b style="color:${riskCol}">${s.risk_level}</b> (${s.risk_score})`)
+          .on('click', () => openSector(s.name));
+        bounds.push([s.latitude, s.longitude]);
+      }
+    });
+
+    if (!hasPins) {
+      container.innerHTML = '<div class="empty" style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center">No GPS or boundary data available yet.<br><small style="color:var(--text3);font-family:var(--mono);margin-top:8px">Add sector boundaries or GPS check-ins</small></div>';
+    } else if (bounds.length > 0) {
+      map.fitBounds(bounds, {padding: [40, 40]});
+    }
+    mapLoaded = true;
+  };
+}
+
+// ── RISKS ─────────────────────────────────────────────────────────────────────
+async function loadRisks() {
+  const rows = await api('/api/risks');
+  document.getElementById('risks-table').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Level</th><th>Reason</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td><span class="tbl-link" onclick="openSector('${r.sector}')">${r.sector}</span></td>
+      <td>${riskBadge(r.risk_level)}</td>
+      <td style="color:var(--text2)">${r.reason}</td>
+    </tr>`).join('')||'<tr><td colspan="3" class="empty">no risks</td></tr>'}
+  </tbody></table>`;
+}
+
+// ── GPS ───────────────────────────────────────────────────────────────────────
+async function loadGPS() {
+  const rows = await api('/api/gps');
+  document.getElementById('gps-table').innerHTML = `<table class="tbl"><thead><tr><th>Employee</th><th>Sector</th><th>Check-in</th><th>Finish</th><th>Distance m</th><th>Approved</th><th>Comment</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td>${r.employee}</td>
+      <td><span class="tbl-link" onclick="openSector('${r.sector}')">${r.sector}</span></td>
+      <td class="mono" style="font-size:11px">${fmt(r.check_in_time)}</td>
+      <td class="mono" style="font-size:11px">${fmt(r.finish_time)}</td>
+      <td class="mono">${r.distance_m?Math.round(r.distance_m):'–'}</td>
+      <td>${r.approved==='YES'?badge('YES','b-green'):badge('NO','b-red')}</td>
+      <td style="color:var(--text2);font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.comment||'–'}</td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ── TRUCKS ────────────────────────────────────────────────────────────────────
+async function loadTrucks() {
+  const rows = await api('/api/trucks');
+  document.getElementById('trucks-table').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Truck</th><th>Driver</th><th>Volume m³</th><th>Note</th><th>Time</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td><span class="tbl-link" onclick="openSector('${r.sector}')">${r.sector}</span></td>
+      <td class="mono">${r.truck_number}</td><td>${r.driver}</td>
+      <td class="mono">${r.reported_volume}</td>
+      <td style="color:var(--text2);font-size:12px">${r.note||'–'}</td>
+      <td class="mono" style="font-size:11px">${fmt(r.created_at)}</td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ── TIMBER ────────────────────────────────────────────────────────────────────
+async function loadTimber() {
+  const rows = await api('/api/timber');
+  document.getElementById('timber-table').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Planned m³</th><th>Actual m³</th><th>Diff m³</th><th>Status</th><th>Note</th><th>Time</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td><span class="tbl-link" onclick="openSector('${r.sector}')">${r.sector}</span></td>
+      <td class="mono">${r.planned_volume}</td><td class="mono">${r.actual_volume}</td>
+      <td class="mono" style="color:${r.difference_volume>0?'var(--amber)':'var(--green)'}">${r.difference_volume}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td style="color:var(--text2);font-size:12px">${r.note||'–'}</td>
+      <td class="mono" style="font-size:11px">${fmt(r.created_at)}</td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ── PHOTOS ────────────────────────────────────────────────────────────────────
+let photoFilterSector = null, photoFilterType = null;
+
+async function loadPhotos() {
+  allPhotos = await api('/api/photos');
+  photoPage = 0;
+  const sectors = [...new Set(allPhotos.map(p=>p.sector))].filter(Boolean);
+  document.getElementById('sector-photo-filters').innerHTML =
+    sectors.map(s=>`<span class="filter-btn" onclick="filterPhotos('${s}',null,this)" data-sector="${s}">${s}</span>`).join('');
+  renderPhotos();
+}
+
+function filterPhotos(sector, type, el) {
+  if (sector !== undefined) photoFilterSector = sector;
+  if (type !== undefined) photoFilterType = type;
+  photoPage = 0;
+  if (el) {
+    if (type !== undefined) document.querySelectorAll('.photo-filters .filter-btn').forEach(b=>b.classList.remove('active'));
+    else if (sector !== undefined) document.querySelectorAll('#sector-photo-filters .filter-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+  }
+  renderPhotos();
+}
+
+function renderPhotos() {
+  const PHOTOS_PER_PAGE = 24;
+  let photos = allPhotos;
+  const q = (document.getElementById('photo-search')?.value||'').toLowerCase();
+  if (q) photos = photos.filter(p=>(p.sector||'').toLowerCase().includes(q));
+  if (photoFilterSector) photos = photos.filter(p=>p.sector===photoFilterSector);
+  if (photoFilterType)   photos = photos.filter(p=>p.photo_type===photoFilterType);
+  const total = photos.length;
+  const pages = Math.ceil(total/PHOTOS_PER_PAGE);
+  const slice = photos.slice(photoPage*PHOTOS_PER_PAGE,(photoPage+1)*PHOTOS_PER_PAGE);
+  if (!slice.length) {
+    document.getElementById('photos-grid').innerHTML = '<div class="empty">no photos</div>';
+    document.getElementById('photo-pagination').innerHTML = '';
+    return;
+  }
+  document.getElementById('photos-grid').innerHTML = slice.map(p=>`
+    <div class="photo-card" onclick="openLightbox('${p.filename||''}','${p.sector}','${p.photo_type} · #${p.session_id} · ${fmt(p.uploaded_at)}')">
+      <div class="photo-thumb-placeholder">📷</div>
+      <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${fmt(p.uploaded_at)}</div></div>
+    </div>`).join('');
+  const pg = document.getElementById('photo-pagination');
+  if (pages<=1){pg.innerHTML='';return;}
+  pg.innerHTML = `<button class="btn" onclick="photoPage=Math.max(0,photoPage-1);renderPhotos()" ${photoPage===0?'disabled':''}>← prev</button>
+    <span style="color:var(--text3)">${photoPage+1} / ${pages} (${total} photos)</span>
+    <button class="btn" onclick="photoPage=Math.min(${pages-1},photoPage+1);renderPhotos()" ${photoPage===pages-1?'disabled':''}>next →</button>`;
+}
+
+// ── AI INSPECTOR ──────────────────────────────────────────────────────────────
+async function loadInspector() {
+  const sectors  = await api('/api/sectors');
+  const allRisks = await api('/api/risks');
+  const allGps   = await api('/api/gps');
+  const allTimber= await api('/api/timber');
+  const allTrucks= await api('/api/trucks');
+  const totalScore = sectors.length ? Math.round(sectors.reduce((s,x)=>s+x.risk_score,0)/sectors.length) : 0;
+  const critical = sectors.filter(s=>s.risk_score>75).length;
+  const highRisk = sectors.filter(s=>s.risk_score>50&&s.risk_score<=75).length;
+  document.getElementById('inspector-kpis').innerHTML = `
+    <div class="kpi" style="border-color:rgba(201,64,64,0.3)">
+      <div class="kpi-label">⚠ Общий финансовый риск</div>
+      <div class="kpi-value red" style="font-size:16px">${sectors.reduce((s,x)=>s+(x.exposure_low||0),0).toLocaleString('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0})} – ${sectors.reduce((s,x)=>s+(x.exposure_high||0),0).toLocaleString('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0})}</div>
+      <div class="kpi-sub">оценка потерь</div>
+    </div>
+    <div class="kpi"><div class="kpi-label">Avg risk score</div><div class="kpi-value ${totalScore>60?'red':totalScore>30?'amber':'green'}">${totalScore}</div><div class="kpi-sub">из 100</div></div>
+    <div class="kpi"><div class="kpi-label">Критические</div><div class="kpi-value ${critical>0?'red':'green'}">${critical}</div><div class="kpi-sub">score > 75</div></div>
+    <div class="kpi"><div class="kpi-label">Высокий риск</div><div class="kpi-value ${highRisk>0?'amber':'green'}">${highRisk}</div><div class="kpi-sub">score 51–75</div></div>`;
+  const cards = sectors.sort((a,b)=>b.risk_score-a.risk_score).map(s=>{
+    const score=s.risk_score, level=score>75?'CRITICAL':score>50?'HIGH':score>25?'MEDIUM':'LOW';
+    const cls=level.toLowerCase(), col=level==='CRITICAL'?'var(--red)':level==='HIGH'?'#e07070':level==='MEDIUM'?'var(--amber)':'var(--green)';
+    const sRisks=allRisks.filter(r=>r.sector===s.name), sGps=allGps.filter(r=>r.sector===s.name);
+    const sTimber=allTimber.filter(r=>r.sector===s.name), sTrucks=allTrucks.filter(r=>r.sector===s.name);
+    const rejected=sGps.filter(r=>r.approved==='NO').length, missing=sTimber.filter(r=>r.status==='MISSING_VOLUME').length;
+    const highR=sRisks.filter(r=>r.risk_level==='HIGH').length;
+    const issues=[];
+    if(highR>0) issues.push({c:'var(--red)',t:`${highR} HIGH risk(s) registered`});
+    if(rejected>0) issues.push({c:'var(--amber)',t:`${rejected} GPS check-in(s) rejected`});
+    if(missing>0) issues.push({c:'var(--amber)',t:`${missing} timber movement(s) with missing volume`});
+    if(sTrucks.length===0&&sTimber.length>0) issues.push({c:'var(--text3)',t:'No truck reports for timber movements'});
+    if(sGps.length===0) issues.push({c:'var(--text3)',t:'No GPS check-ins recorded'});
+    if(issues.length===0) issues.push({c:'var(--green)',t:'No issues detected'});
+    const recs=[];
+    if(highR>0) recs.push('Conduct immediate audit of sector operations');
+    if(rejected>0) recs.push('Investigate GPS violations — verify worker locations');
+    if(missing>0) recs.push('Reconcile timber volumes with contractor reports');
+    if(sTrucks.length===0) recs.push('Request truck delivery reports from contractor');
+    if(sGps.length===0) recs.push('Ensure workers use GPS check-in on site entry');
+    if(recs.length===0) recs.push('Continue routine monitoring');
+    const expLow=s.exposure_low||0, expHigh=s.exposure_high||0;
+    const expLabel=s.exposure_label||'€0';
+    return `<div class="inspector-card ${cls}">
+      <div class="inspector-header">
+        <div><div class="inspector-sector">${s.name}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${s.contractor||'–'} · ${s.status||'–'}</div></div>
+        <div class="inspector-score-wrap">
+          <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-align:right;margin-bottom:4px">RISK SCORE</div>
+          <div class="score-track"><div class="score-track-fill" style="width:${score}%;background:${col}"></div></div></div>
+          <div class="inspector-score" style="color:${col}">${score}</div>
+          <div>${badge(level,level==='CRITICAL'||level==='HIGH'?'b-red':level==='MEDIUM'?'b-amber':'b-green')}</div>
+        </div>
+      </div>
+      ${expLow>0?`<div style="padding:10px 12px;background:rgba(201,64,64,0.07);border-radius:var(--r);border:1px solid rgba(201,64,64,0.18);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:0.06em">Estimated Financial Exposure</div>
+          <div style="font-size:18px;font-weight:600;color:var(--red);font-family:var(--mono)">${expLabel}</div>
+        </div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--text3);text-align:right">${s.vol_at_risk||0} m³<br>at risk</div>
+      </div>`:''}
+      <div class="inspector-issues">${issues.map(i=>`<div class="issue-item"><div class="issue-dot" style="background:${i.c}"></div>${i.t}</div>`).join('')}</div>
+      <div class="recommendations"><div class="rec-title">Recommendations</div>${recs.map(r=>`<div class="rec-item">${r}</div>`).join('')}</div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn" onclick="openSector('${s.name}')">View sector →</button>
+        <button class="btn" onclick="window.open('/api/report/pdf/${s.name}','_blank')">↓ PDF</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('inspector-cards').innerHTML = cards||'<div class="empty">no sectors</div>';
+}
+
+// ── LIGHTBOX ──────────────────────────────────────────────────────────────────
+function openLightbox(filename, sector, meta) {
+  if (filename) {
+    document.getElementById('lightbox-img').src = API + '/photos/file/' + filename;
+    document.getElementById('lightbox-img').style.display = 'block';
+  } else {
+    document.getElementById('lightbox-img').style.display = 'none';
+  }
+  document.getElementById('lightbox-meta').textContent = sector + ' · ' + meta;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+
+
+// ── SATELLITE MONITOR ────────────────────────────────────────────────────────
+let satMode = 'true';
+let satSectors = [];
+let satLeafMap = null;
+let satSentinelLayer = null;
+let satPolyLayer = null;
+
+function setSatMode(mode) {
+  satMode = mode;
+  document.getElementById('sat-mode-true').classList.toggle('active', mode==='true');
+  document.getElementById('sat-mode-ndvi').classList.toggle('active', mode==='ndvi');
+  const mapBtn = document.getElementById('sat-mode-map');
+  if (mapBtn) mapBtn.classList.toggle('active', mode==='leaflet');
+  if (mode === 'leaflet') {
+    showSatMap();
+  } else {
+    loadSatelliteImages();
+  }
+}
+
+function onSatSectorChange() {
+  if (satMode === 'leaflet') {
+    showSatMap();
+  } else {
+    loadSatelliteImages();
+  }
+}
+
+function showSatMap() {
+  // Show interactive Leaflet map mode
+  const container = document.getElementById('sat-map-inner');
+  document.getElementById('sat-image-wrap').style.display = 'none';
+  container.style.display = 'block';
+
+  const sectorName = document.getElementById('sat-sector').value;
+  const sectorData = satSectors.find(s => s.name === sectorName);
+
+  ensureSatLeaflet(() => {
+    if (!satLeafMap) {
+      satLeafMap = L.map(container).setView([56.9, 24.1], 9);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution:'&copy; CartoDB', maxZoom:19
+      }).addTo(satLeafMap);
+    }
+
+    // Remove old polygon
+    if (satPolyLayer) { satLeafMap.removeLayer(satPolyLayer); satPolyLayer = null; }
+
+    if (sectorData) {
+      const lat = sectorData.latitude || 56.9;
+      const lon = sectorData.longitude || 24.1;
+
+      if (sectorData.boundary && sectorData.boundary.length >= 3) {
+        satPolyLayer = L.polygon(sectorData.boundary, {
+          color: '#c94040', fillColor: '#c94040', fillOpacity: 0.25, weight: 2
+        }).addTo(satLeafMap);
+        satLeafMap.fitBounds(sectorData.boundary, {padding: [40, 40]});
+
+        // GPS markers
+        if (sectorData.gps_sessions) {
+          sectorData.gps_sessions.forEach(g => {
+            if (g.latitude && g.longitude) {
+              const col = g.approved === 'YES' ? '#7ab83c' : '#c94040';
+              L.circleMarker([g.latitude, g.longitude], {radius:5, color:col, fillColor:col, fillOpacity:0.8})
+                .addTo(satLeafMap)
+                .bindPopup(`${g.employee}<br>${g.approved}`);
+            }
+          });
+        }
+      } else {
+        satLeafMap.setView([lat, lon], 13);
+        L.marker([lat, lon]).addTo(satLeafMap)
+          .bindPopup(`<b>${sectorData.name}</b><br>${sectorData.contractor||''}`);
+      }
+    }
+  });
+  document.getElementById('sat-status').textContent = sectorData
+    ? `🗺 Интерактивная карта · ${sectorData.name} · ${sectorData.area_ha||'?'} ha`
+    : '🗺 Интерактивная карта — выбери сектор';
+}
+
+function ensureSatLeaflet(cb) {
+  if (window.L) { cb(); return; }
+  const css = document.createElement('link');
+  css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(css);
+  const script = document.createElement('script');
+  script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  script.onload = cb;
+  document.head.appendChild(script);
+}
+
+async function loadSatellite() {
+  const check = await api('/api/satellite/token-check');
+  const connected = check.connected;
+
+  document.getElementById('sat-kpis').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Sentinel-2</div><div class="kpi-value ${connected?'green':'red'}">${connected?'Online':'Offline'}</div><div class="kpi-sub">Copernicus CDSE</div></div>
+    <div class="kpi"><div class="kpi-label">Разрешение</div><div class="kpi-value green">10м</div><div class="kpi-sub">Sentinel-2 L2A</div></div>
+    <div class="kpi"><div class="kpi-label">Обновление</div><div class="kpi-value">~5 дней</div><div class="kpi-sub">периодичность</div></div>
+    <div class="kpi"><div class="kpi-label">Кредиты</div><div class="kpi-value green">30,000</div><div class="kpi-sub">в месяц</div></div>
+  `;
+
+  satSectors = await api('/api/satellite/sectors');
+
+  const sel = document.getElementById('sat-sector');
+  sel.innerHTML = '<option value="">— выбери сектор —</option>' +
+    satSectors.map(s=>`<option value="${s.name}">${s.name} — ${s.contractor||''}</option>`).join('');
+
+  document.getElementById('sat-sectors-list').innerHTML = `
+    <table class="tbl"><thead><tr><th>Сектор</th><th>Подрядчик</th><th>Координаты</th><th>Risk</th><th>Финансовый риск</th><th></th></tr></thead><tbody>
+    ${satSectors.map(s=>`<tr>
+      <td><strong style="color:var(--gbright);font-family:var(--mono)">${s.name}</strong></td>
+      <td>${s.contractor||'–'}</td>
+      <td class="mono" style="font-size:11px">${s.latitude?s.latitude.toFixed(4)+'°N':''} ${s.longitude?s.longitude.toFixed(4)+'°E':''}</td>
+      <td>${riskScoreBar(s.risk_score, s.risk_color)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:${s.exposure_label!=='€0'?'var(--red)':'var(--green)'}">${s.exposure_label}</td>
+      <td><span class="tbl-link" onclick="selectSatSector('${s.name}')">снимок →</span></td>
+    </tr>`).join('')}
+    </tbody></table>`;
+
+  // Init map in background
+  ensureSatLeaflet(() => {
+    const container = document.getElementById('sat-map-inner');
+    if (!satLeafMap) {
+      satLeafMap = L.map(container).setView([56.9, 24.1], 8);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution:'&copy; CartoDB', maxZoom:19
+      }).addTo(satLeafMap);
+      // Draw all sectors on map
+      const bounds = [];
+      satSectors.forEach(s => {
+        const col = s.risk_color==='red'?'#c94040':s.risk_color==='yellow'?'#d4a017':'#7ab83c';
+        if (s.boundary && s.boundary.length >= 3) {
+          L.polygon(s.boundary, {color:col, fillColor:col, fillOpacity:0.2, weight:2})
+            .addTo(satLeafMap)
+            .bindPopup(`<b>${s.name}</b><br>${s.contractor||''}<br>Risk: ${s.risk_level}`);
+          s.boundary.forEach(p => bounds.push(p));
+        } else if (s.latitude && s.longitude) {
+          L.circleMarker([s.latitude, s.longitude], {radius:6, color:col, fillColor:col, fillOpacity:0.8})
+            .addTo(satLeafMap)
+            .bindPopup(`<b>${s.name}</b>`);
+          bounds.push([s.latitude, s.longitude]);
+        }
+      });
+      if (bounds.length > 0) satLeafMap.fitBounds(bounds, {padding:[40,40]});
+    }
+  });
+}
+
+function selectSatSector(name) {
+  document.getElementById('sat-sector').value = name;
+  if (satMode === 'leaflet') {
+    showSatMap();
+  } else {
+    loadSatelliteImages();
+  }
+}
+
+async function loadSatelliteImages() {
+  const sector = document.getElementById('sat-sector').value;
+  if (!sector) return;
+  const dateFrom = document.getElementById('sat-date-from').value;
+  const dateTo   = document.getElementById('sat-date-to').value;
+
+  const status = document.getElementById('sat-status');
+
+  // Show loading over the map
+  const mapInner = document.getElementById('sat-map-inner');
+  mapInner.style.display = 'none';
+  const wrap = document.getElementById('sat-image-wrap');
+  wrap.style.display = 'flex';
+  wrap.style.alignItems = 'center';
+  wrap.style.justifyContent = 'center';
+  wrap.style.height = '480px';
+  wrap.innerHTML = '<div class="loading"><div class="spinner"></div> Загрузка снимка Sentinel-2...</div>';
+  status.textContent = `Запрос к Copernicus API: ${sector} · ${dateFrom} → ${dateTo}`;
+
+  const endpoint = satMode === 'ndvi'
+    ? `/api/satellite/ndvi/${encodeURIComponent(sector)}?date_from=${dateFrom}&date_to=${dateTo}`
+    : `/api/satellite/image/${encodeURIComponent(sector)}?date_from=${dateFrom}&date_to=${dateTo}`;
+
+  try {
+    const resp = await fetch(endpoint);
+    if (!resp.ok) {
+      const err = await resp.json().catch(()=>({}));
+      wrap.innerHTML = `<div class="empty" style="color:var(--red)">⚠ ${err.error||'Ошибка загрузки снимка'}</div>`;
+      status.textContent = 'Ошибка. Попробуй другой диапазон дат или сектор.';
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    // Show image, make it interactive with zoom on click
+    wrap.innerHTML = `<div style="position:relative;width:100%;height:100%">
+      <img src="${url}" id="sat-img" style="width:100%;height:480px;object-fit:cover;border-radius:var(--r);display:block;cursor:zoom-in" alt="Sentinel-2 ${sector}"
+        onclick="openLightboxImg(this.src, '${sector}', '${satMode==='ndvi'?'NDVI':'True Color'} · ${dateFrom}–${dateTo}')">
+      <div style="position:absolute;bottom:10px;right:12px;background:rgba(0,0,0,0.6);padding:4px 8px;border-radius:4px;font-size:10px;font-family:var(--mono);color:#fff">
+        🔍 click to zoom
+      </div>
+    </div>`;
+    status.textContent = `✓ Загружено · ${sector} · ${satMode==='ndvi'?'NDVI':'True Color'} · ${dateFrom} – ${dateTo}`;
+    document.getElementById('sat-image-meta').textContent =
+      `Sentinel-2 L2A · 10м · ${satMode==='ndvi'?'NDVI':'Натуральные цвета'}`;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty" style="color:var(--red)">⚠ Сетевая ошибка: ${e.message}</div>`;
+    status.textContent = 'Проверь подключение сервера к интернету.';
+  }
+}
+
+function openLightboxImg(src, sector, meta) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox-img').style.display = 'block';
+  document.getElementById('lightbox-meta').textContent = sector + ' · ' + meta;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+// ── DETAIL MAP & SATELLITE ────────────────────────────────────────────────────
+let detailMap = null;
+
+function renderDetailMap(sector, boundary) {
+  const container = document.getElementById('detail-map-wrap');
+  if (!container) return;
+
+  ensureSatLeaflet(() => {
+    if (detailMap) { detailMap.remove(); detailMap = null; }
+    const lat = sector.center_lat || 56.9;
+    const lon = sector.center_lon || 24.1;
+    detailMap = L.map(container).setView([lat, lon], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; CartoDB', maxZoom:19
+    }).addTo(detailMap);
+
+    if (boundary && boundary.length >= 3) {
+      const poly = L.polygon(boundary, {
+        color:'#c94040', fillColor:'#c94040', fillOpacity:0.2, weight:2
+      }).addTo(detailMap);
+      detailMap.fitBounds(boundary, {padding:[40,40]});
+      poly.bindPopup(`<b>${sector.name}</b><br>${sector.contractor||''}<br>Area: ${sector.area_ha||'?'} ha`).openPopup();
+    }
+
+    // GPS points
+    if (currentDetailData && currentDetailData.gps_sessions) {
+      currentDetailData.gps_sessions.forEach(g => {
+        if (!g.latitude || !g.longitude) return;
+        const col = g.approved==='YES' ? '#7ab83c' : '#c94040';
+        L.circleMarker([g.latitude, g.longitude], {radius:6, color:col, fillColor:col, fillOpacity:0.9})
+          .addTo(detailMap)
+          .bindPopup(`${g.employee}<br>${fmt(g.check_in_time)}<br>${g.approved==='YES'?'✓ Approved':'✗ Rejected'}`);
+      });
+    }
+  });
+}
+
+let dsSatMode = 'true';
+function setDSMode(mode) {
+  dsSatMode = mode;
+  const t = document.getElementById('ds-mode-true');
+  const n = document.getElementById('ds-mode-ndvi');
+  if (t) t.classList.toggle('active', mode==='true');
+  if (n) n.classList.toggle('active', mode==='ndvi');
+}
+
+async function loadDetailSatellite() {
+  if (!currentSector) return;
+  const dateFrom = document.getElementById('ds-date-from')?.value || '2024-06-01';
+  const dateTo   = document.getElementById('ds-date-to')?.value   || '2024-06-30';
+  const wrap = document.getElementById('ds-image-wrap');
+  const status = document.getElementById('ds-status');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="loading"><div class="spinner"></div> Загрузка Sentinel-2...</div>';
+  const endpoint = dsSatMode === 'ndvi'
+    ? `/api/satellite/ndvi/${encodeURIComponent(currentSector)}?date_from=${dateFrom}&date_to=${dateTo}`
+    : `/api/satellite/image/${encodeURIComponent(currentSector)}?date_from=${dateFrom}&date_to=${dateTo}`;
+  try {
+    const resp = await fetch(endpoint);
+    if (!resp.ok) { wrap.innerHTML='<div class="empty" style="color:var(--red)">⚠ Ошибка загрузки</div>'; return; }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    wrap.innerHTML = `<img src="${url}" style="width:100%;height:420px;object-fit:cover;border-radius:var(--r);cursor:zoom-in"
+      onclick="openLightboxImg(this.src,'${currentSector}','${dsSatMode==='ndvi'?'NDVI':'True Color'} · ${dateFrom}–${dateTo}')">`;
+    if (status) status.textContent = `✓ ${currentSector} · ${dsSatMode==='ndvi'?'NDVI':'True Color'} · ${dateFrom}–${dateTo}`;
+  } catch(e) {
+    wrap.innerHTML=`<div class="empty" style="color:var(--red)">⚠ ${e.message}</div>`;
+  }
+}
+
+// ── CREATE SECTOR ─────────────────────────────────────────────────────────────
+function toggleCreateForm() {
+  const f = document.getElementById('create-sector-form');
+  const btn = document.getElementById('create-form-toggle');
+  const visible = f.style.display !== 'none';
+  f.style.display = visible ? 'none' : 'block';
+  btn.textContent = visible ? '+ New Sector' : '✕ Cancel';
+}
+
+async function createSector() {
+  const name       = document.getElementById('cs-name').value.trim();
+  const contractor = document.getElementById('cs-contractor').value.trim();
+  const status     = document.getElementById('cs-status').value.trim();
+  const volume     = document.getElementById('cs-volume').value.trim();
+  const boundaryStr= document.getElementById('cs-boundary').value.trim();
+  const color      = document.getElementById('cs-color').value;
+  const msg        = document.getElementById('cs-status-msg');
+
+  if (!name) { msg.style.color='var(--red)'; msg.textContent='⚠ Sector ID required'; return; }
+
+  let boundary = null;
+  if (boundaryStr) {
+    try {
+      boundary = boundaryStr.split(';').map(p => {
+        const [lat, lon] = p.trim().split(',').map(Number);
+        if (isNaN(lat)||isNaN(lon)) throw new Error('invalid');
+        return [lat, lon];
+      });
+      if (boundary.length < 4) { msg.style.color='var(--red)'; msg.textContent='⚠ Minimum 4 boundary points'; return; }
+    } catch(e) {
+      msg.style.color='var(--red)'; msg.textContent='⚠ Invalid boundary format'; return;
+    }
+  }
+
+  msg.style.color='var(--text3)'; msg.textContent='Saving...';
+
+  try {
+    const resp = await fetch('/api/sectors', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, contractor, status, approved_volume: volume, boundary, color})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      msg.style.color='var(--green)'; msg.textContent=`✓ Sector ${name} created`;
+      // Clear form
+      ['cs-name','cs-contractor','cs-status','cs-volume','cs-boundary'].forEach(id=>document.getElementById(id).value='');
+      clearCache();
+      setTimeout(()=>{ loadSectors(); mapLoaded=false; }, 300);
+    } else {
+      msg.style.color='var(--red)'; msg.textContent='⚠ '+( data.error||'Error');
+    }
+  } catch(e) {
+    msg.style.color='var(--red)'; msg.textContent='⚠ Network error';
+  }
+}
+
+// ── EMPLOYEES ─────────────────────────────────────────────────────────────────
+async function addEmployee(sector) {
+  const name = document.getElementById('emp-name')?.value.trim();
+  const role = document.getElementById('emp-role')?.value.trim();
+  const phone = document.getElementById('emp-phone')?.value.trim();
+  const idnum = document.getElementById('emp-id')?.value.trim();
+  const msg = document.getElementById('emp-msg');
+  if (!name) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Name required';} return; }
+  try {
+    const resp = await fetch('/api/employees', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sector, full_name:name, role, phone, id_number:idnum})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      if(msg){msg.style.color='var(--green)';msg.textContent=`✓ ${name} added`;}
+      // Reload tab
+      const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
+      currentDetailData = data2;
+      detailTab('employees');
+    }
+  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
+}
+
+async function deleteEmployee(eid, sector) {
+  if (!confirm('Remove this worker?')) return;
+  await fetch('/api/employees/'+eid, {method:'DELETE'});
+  const data = await api('/api/sectors/'+encodeURIComponent(sector));
+  currentDetailData = data;
+  detailTab('employees');
+}
+
+// ── VEHICLES ──────────────────────────────────────────────────────────────────
+async function addVehicle(sector) {
+  const plate = document.getElementById('veh-plate')?.value.trim();
+  const type  = document.getElementById('veh-type')?.value.trim();
+  const driver= document.getElementById('veh-driver')?.value.trim();
+  const cap   = parseFloat(document.getElementById('veh-capacity')?.value)||0;
+  const per100= parseFloat(document.getElementById('veh-per100')?.value)||0;
+  const msg   = document.getElementById('veh-msg');
+  if (!plate) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Plate required';} return; }
+  try {
+    const resp = await fetch('/api/vehicles', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sector, plate, vehicle_type:type, driver, fuel_capacity_l:cap, fuel_per_100km:per100})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      if(msg){msg.style.color='var(--green)';msg.textContent=`✓ ${plate} added`;}
+      const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
+      currentDetailData = data2;
+      detailTab('vehicles');
+    }
+  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
+}
+
+async function deleteVehicle(vid, sector) {
+  if (!confirm('Remove this vehicle?')) return;
+  await fetch('/api/vehicles/'+vid, {method:'DELETE'});
+  const data = await api('/api/sectors/'+encodeURIComponent(sector));
+  currentDetailData = data;
+  detailTab('vehicles');
+}
+
+async function logFuel(vid, sector, fper100) {
+  const kmStart = parseFloat(document.getElementById('fuel-km-start-'+vid)?.value)||0;
+  const kmEnd   = parseFloat(document.getElementById('fuel-km-end-'+vid)?.value)||0;
+  const fuelAdded = parseFloat(document.getElementById('fuel-added-'+vid)?.value)||0;
+  const note    = document.getElementById('fuel-note-'+vid)?.value||'';
+  const msg     = document.getElementById('fuel-msg-'+vid);
+  if (kmEnd <= kmStart) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ km end must be > km start';} return; }
+  if (fuelAdded <= 0)   { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Fuel added must be > 0';} return; }
+  try {
+    const resp = await fetch('/api/vehicles/fuel-log', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({vehicle_id:vid, sector, km_start:kmStart, km_end:kmEnd, fuel_added_l:fuelAdded, note})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      const disc = data.discrepancy_l;
+      if(msg){
+        msg.style.color = Math.abs(disc)>5 ? 'var(--red)' : 'var(--green)';
+        msg.textContent = `✓ Logged · Discrepancy: ${disc>0?'+':''}${disc}L ${Math.abs(disc)>5?'⚠ RISK CREATED':'✓ OK'}`;
+      }
+      const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
+      currentDetailData = data2;
+      setTimeout(()=>detailTab('vehicles'), 1500);
+    }
+  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
+}
+
+// ── FOREST NOTES ──────────────────────────────────────────────────────────────
+async function saveForestNotes(sector) {
+  const species  = document.getElementById('forest-species')?.value;
+  const cutplan  = document.getElementById('forest-cutplan')?.value;
+  const notes    = document.getElementById('forest-notes')?.value;
+  const msg      = document.getElementById('forest-msg');
+  try {
+    const resp = await fetch('/api/sectors/'+encodeURIComponent(sector)+'/notes', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({tree_species:species, cut_plan_notes:cutplan, notes})
+    });
+    const data = await resp.json();
+    if(msg){ msg.style.color='var(--green)'; msg.textContent='✓ Saved'; setTimeout(()=>msg.textContent='',2000); }
+    // Refresh sector data silently
+    const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
+    currentDetailData = data2;
+  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
+}
+
+// ── AUTO REFRESH every 30s ────────────────────────────────────────────────────
+setInterval(()=>{ if(currentSection&&currentSection!=='detail'){ clearCache(); load(currentSection); } }, 30000);
+
+// INIT
+nav('overview');
+document.getElementById('last-update').innerHTML = '<span class="auto-refresh-badge"><span class="pulse"></span> live · v2.1</span>';
+</script>
+</body>
+</html>

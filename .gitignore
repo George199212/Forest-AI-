@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+venv/
+data/
+*.log
+*.bak_*
+.claude/
