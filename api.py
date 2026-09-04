@@ -492,6 +492,27 @@ def delete_sector_snapshot_route(id: int):
     return {"ok": ok}
 
 
+class SnapshotRiskIn(BaseModel):
+    risk_id: int
+
+@app.post("/api/sectors/snapshots/{id}/risks")
+def link_snapshot_risk(id: int, body: SnapshotRiskIn):
+    from database import add_snapshot_risk as _add_snapshot_risk
+    link_id = _add_snapshot_risk(id, body.risk_id)
+    return {"ok": True, "id": link_id}
+
+@app.get("/api/sectors/snapshots/{id}/risks")
+def get_snapshot_risks_route(id: int):
+    from database import get_snapshot_risks as _get_snapshot_risks
+    return _get_snapshot_risks(id)
+
+@app.delete("/api/sectors/snapshots/{id}/risks/{risk_id}")
+def unlink_snapshot_risk(id: int, risk_id: int):
+    from database import remove_snapshot_risk as _remove_snapshot_risk
+    ok = _remove_snapshot_risk(id, risk_id)
+    return {"ok": ok}
+
+
 class SectorPolygonIn(BaseModel):
     name: str
     pixel_boundary: List[List[float]]
@@ -890,6 +911,12 @@ def get_sector_detail(name: str):
         v["total_fuel_added"] = db1("SELECT COALESCE(SUM(fuel_added_l),0) AS s FROM vehicle_fuel_logs WHERE vehicle_id=?", (v["id"],)).get("s", 0)
         v["total_discrepancy"] = db1("SELECT COALESCE(SUM(discrepancy_l),0) AS s FROM vehicle_fuel_logs WHERE vehicle_id=?", (v["id"],)).get("s", 0)
 
+    # Snapshots with their manually-linked risks
+    from database import get_snapshot_risks as _get_snapshot_risks
+    snapshots = db("SELECT * FROM sector_snapshots WHERE sector=? ORDER BY snapshot_date, id", (name,))
+    for sn in snapshots:
+        sn["risks"] = _get_snapshot_risks(sn["id"])
+
     return {
         "sector":           sector,
         "risks":            db("SELECT * FROM risks WHERE sector=? ORDER BY CASE risk_level WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, id DESC", (name,)),
@@ -900,7 +927,7 @@ def get_sector_detail(name: str):
         "comments":         db("SELECT id, employee, sector, comment, check_in_time FROM work_sessions WHERE sector=? AND comment != '' AND comment IS NOT NULL ORDER BY id DESC", (name,)),
         "employees":        db("SELECT * FROM sector_employees WHERE sector=? ORDER BY full_name", (name,)),
         "vehicles":         vehicles,
-        "snapshots":        db("SELECT * FROM sector_snapshots WHERE sector=? ORDER BY snapshot_date, id", (name,)),
+        "snapshots":        snapshots,
     }
 
 

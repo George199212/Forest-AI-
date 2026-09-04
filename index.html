@@ -523,6 +523,15 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   <div class="lightbox-meta" id="lightbox-meta"></div>
 </div>
 
+<!-- SNAPSHOT RISKS EDITOR -->
+<div class="lightbox" id="snapshot-risks-modal" onclick="if(event.target===this) closeSnapshotRisksModal()">
+  <div class="card" style="max-width:420px;width:90vw;max-height:80vh;overflow-y:auto">
+    <div class="card-head">Риски снимка <span class="lightbox-close" style="position:static" onclick="closeSnapshotRisksModal()">✕</span></div>
+    <div id="snapshot-risks-list"></div>
+    <button class="btn" style="margin-top:12px" onclick="saveSnapshotRisks()">Сохранить</button>
+  </div>
+</div>
+
 <script>
 const API = '';
 let cache = {};
@@ -1317,7 +1326,10 @@ function detailTab(tab) {
             <div class="sector">${sn.snapshot_date||'–'} ${riskBadge(sn.risk_level)}</div>
             <div class="type">${sn.label||''}${sn.note?' · '+sn.note:''}</div>
           </div>
-          <div style="padding:6px 8px;text-align:right"><span class="tbl-link" style="color:var(--red)" onclick="deleteSectorSnapshot(${sn.id},'${s.name}')">✕ delete</span></div>
+          <div style="padding:6px 8px;text-align:right">
+            <span class="tbl-link" onclick="openSnapshotRisksEditor(${sn.id})">риски снимка</span>
+            <span class="tbl-link" style="color:var(--red);margin-left:10px" onclick="deleteSectorSnapshot(${sn.id},'${s.name}')">✕ delete</span>
+          </div>
         </div>`).join('')||'<div class="empty">no snapshots yet</div>'}</div>`;
   }
 }
@@ -1819,11 +1831,71 @@ function openSnapshotLightbox(id) {
   if (!sn) return;
   document.getElementById('lightbox-img').src = API + '/api/sectors/snapshots/' + id + '/image';
   document.getElementById('lightbox-img').style.display = 'block';
+  const snapRisks = sn.risks || [];
+  const liveRisks = (currentDetailData && currentDetailData.risks) || [];
   document.getElementById('lightbox-meta').innerHTML =
     `<div>${sn.snapshot_date||'–'} ${riskBadge(sn.risk_level)}</div>` +
     (sn.label?`<div style="font-weight:600;margin-top:4px">${sn.label}</div>`:'') +
-    (sn.note?`<div style="margin-top:2px">${sn.note}</div>`:'');
+    (sn.note?`<div style="margin-top:2px">${sn.note}</div>`:'') +
+    `<div style="margin-top:12px;font-weight:600">Риски на момент снимка</div>` +
+    (snapRisks.length
+      ? snapRisks.map(r=>`<div style="margin-top:4px">${riskBadge(r.risk_level)} ${r.reason}</div>`).join('')
+      : `<div style="margin-top:4px;color:var(--text3)">риски для этой даты не отмечены</div>`) +
+    `<div style="margin-top:12px;font-weight:600">Риски сейчас (все текущие)</div>` +
+    (liveRisks.length
+      ? liveRisks.map(r=>`<div style="margin-top:4px">${riskBadge(r.risk_level)} ${r.reason}</div>`).join('')
+      : `<div style="margin-top:4px;color:var(--text3)">нет рисков</div>`);
   document.getElementById('lightbox').classList.add('open');
+}
+
+// ── SNAPSHOT RISKS EDITOR ────────────────────────────────────────────────────
+let snapshotRisksEditingId = null;
+
+function openSnapshotRisksEditor(id) {
+  snapshotRisksEditingId = id;
+  const sn = (currentDetailData && currentDetailData.snapshots || []).find(s => s.id === id);
+  if (!sn) return;
+  const linkedIds = new Set((sn.risks||[]).map(r => r.risk_id));
+  const risks = (currentDetailData && currentDetailData.risks) || [];
+  document.getElementById('snapshot-risks-list').innerHTML = risks.length
+    ? risks.map(r => `
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px">
+        <input type="checkbox" value="${r.id}" ${linkedIds.has(r.id)?'checked':''}>
+        ${riskBadge(r.risk_level)} <span style="color:var(--text2)">${r.reason}</span>
+      </label>`).join('')
+    : '<div class="empty">no risks for this sector</div>';
+  document.getElementById('snapshot-risks-modal').classList.add('open');
+}
+
+function closeSnapshotRisksModal() {
+  document.getElementById('snapshot-risks-modal').classList.remove('open');
+  snapshotRisksEditingId = null;
+}
+
+async function saveSnapshotRisks() {
+  const id = snapshotRisksEditingId;
+  if (!id) return;
+  const sn = (currentDetailData && currentDetailData.snapshots || []).find(s => s.id === id);
+  const currentlyLinked = new Set((sn && sn.risks || []).map(r => r.risk_id));
+  const checkboxes = document.querySelectorAll('#snapshot-risks-list input[type=checkbox]');
+  const checkedIds = new Set(Array.from(checkboxes).filter(c=>c.checked).map(c=>parseInt(c.value)));
+  try {
+    for (const rid of checkedIds) {
+      if (!currentlyLinked.has(rid)) {
+        await fetch(`/api/sectors/snapshots/${id}/risks`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({risk_id: rid})});
+      }
+    }
+    for (const rid of currentlyLinked) {
+      if (!checkedIds.has(rid)) {
+        await fetch(`/api/sectors/snapshots/${id}/risks/${rid}`, {method:'DELETE'});
+      }
+    }
+    const sector = currentDetailData.sector.name;
+    const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
+    currentDetailData = data2;
+    closeSnapshotRisksModal();
+    detailTab('history');
+  } catch(e) { console.error(e); }
 }
 
 // ── DETAIL MAP & SATELLITE ────────────────────────────────────────────────────
@@ -2068,6 +2140,7 @@ async function addSectorSnapshot(sector) {
       const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
       currentDetailData = data2;
       detailTab('history');
+      openSnapshotRisksEditor(data.id);
     }
   } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
 }

@@ -77,6 +77,7 @@ def _migrate():
     cur = conn.cursor()
     for table, column, definition in new_columns:
         _add_column_if_missing(cur, table, column, definition)
+    _add_column_if_missing(cur, "risks", "created_at", "TEXT")
 
     # New tables
     cur.execute("""
@@ -138,6 +139,14 @@ def _migrate():
     )
     """)
     _add_column_if_missing(cur, "sector_snapshots", "risk_level", "TEXT")
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS snapshot_risks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        snapshot_id INTEGER NOT NULL,
+        risk_id INTEGER NOT NULL
+    )
+    """)
 
     # ── Field-work tables (check-ins, photos, timber, trucks) ──────────────
     cur.execute("CREATE TABLE IF NOT EXISTS work_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT)")
@@ -419,12 +428,13 @@ def update_sector_boundary(name, boundary, color="red"):
 # ── Risks ─────────────────────────────────────────────────────────────────────
 
 def add_risk(sector, risk_level, reason):
+    now = datetime.utcnow().isoformat()
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
-    INSERT INTO risks (sector, risk_level, reason)
-    VALUES (?, ?, ?)
-    """, (sector, risk_level, reason))
+    INSERT INTO risks (sector, risk_level, reason, created_at)
+    VALUES (?, ?, ?, ?)
+    """, (sector, risk_level, reason, now))
     conn.commit()
     conn.close()
 
@@ -553,3 +563,38 @@ def delete_sector_snapshot(id):
         except OSError:
             pass
     return True
+
+
+# ── Snapshot Risks ────────────────────────────────────────────────────────────
+
+def add_snapshot_risk(snapshot_id, risk_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO snapshot_risks (snapshot_id, risk_id) VALUES (?, ?)", (snapshot_id, risk_id))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_snapshot_risks(snapshot_id):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("""
+    SELECT risks.id AS risk_id, risks.sector, risks.risk_level, risks.reason
+    FROM snapshot_risks
+    JOIN risks ON risks.id = snapshot_risks.risk_id
+    WHERE snapshot_risks.snapshot_id=?
+    """, (snapshot_id,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def remove_snapshot_risk(snapshot_id, risk_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM snapshot_risks WHERE snapshot_id=? AND risk_id=?", (snapshot_id, risk_id))
+    conn.commit()
+    affected = cur.rowcount
+    conn.close()
+    return affected > 0
