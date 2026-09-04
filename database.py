@@ -125,6 +125,19 @@ def _migrate():
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS sector_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        image_path TEXT NOT NULL,
+        snapshot_date TEXT,
+        label TEXT,
+        note TEXT,
+        source TEXT DEFAULT 'geolatvija',
+        uploaded_at TEXT
+    )
+    """)
+
     # ── Field-work tables (check-ins, photos, timber, trucks) ──────────────
     cur.execute("CREATE TABLE IF NOT EXISTS work_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT)")
     for column, definition in [
@@ -495,3 +508,47 @@ def log_fuel(vehicle_id, sector, km_start, km_end, fuel_added_l, fuel_per_100km,
     conn.commit()
     conn.close()
     return discrepancy_l
+
+
+# ── Sector Snapshots ──────────────────────────────────────────────────────────
+
+def add_sector_snapshot(sector, image_path, snapshot_date, label="", note="", source="geolatvija"):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO sector_snapshots (sector, image_path, snapshot_date, label, note, source, uploaded_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (sector, image_path, snapshot_date, label, note, source, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_sector_snapshots(sector):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM sector_snapshots WHERE sector=? ORDER BY snapshot_date, id", (sector,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def delete_sector_snapshot(id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT image_path FROM sector_snapshots WHERE id=?", (id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return False
+    image_path = row[0]
+    cur.execute("DELETE FROM sector_snapshots WHERE id=?", (id,))
+    conn.commit()
+    conn.close()
+    if image_path:
+        try:
+            os.remove(image_path)
+        except OSError:
+            pass
+    return True

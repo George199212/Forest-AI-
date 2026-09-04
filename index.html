@@ -383,6 +383,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
           <div class="tab" onclick="detailTab('forest')">🌲 Forest</div>
           <div class="tab" onclick="detailTab('map')">🗺 Map</div>
           <div class="tab" onclick="detailTab('satellite')">🛰 Satellite</div>
+          <div class="tab" onclick="detailTab('history')">📅 История</div>
         </div>
         <div id="detail-tab-content"></div>
       </div>
@@ -1068,7 +1069,7 @@ async function openSector(name, push=true) {
 function detailTab(tab) {
   currentDetailTab = tab;
   document.querySelectorAll('#detail-tabs .tab').forEach(t=>t.classList.remove('active'));
-  const tabs = ['gps','photos','risks','comments','trucks','timber','employees','vehicles','forest','map','satellite'];
+  const tabs = ['gps','photos','risks','comments','trucks','timber','employees','vehicles','forest','map','satellite','history'];
   const idx = tabs.indexOf(tab);
   if (idx>=0) document.querySelectorAll('#detail-tabs .tab')[idx].classList.add('active');
   if (!currentDetailData) return;
@@ -1288,6 +1289,30 @@ function detailTab(tab) {
         <div style="text-align:center;font-family:var(--mono);color:var(--text3)"><div style="font-size:24px;margin-bottom:8px">🛰</div>Нажми Загрузить</div>
       </div>
       <div id="ds-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:8px"></div>`;
+
+  } else if (tab==='history') {
+    const snaps = d.snapshots || [];
+    el.innerHTML = `
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">Add Snapshot</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
+          <input id="snap-file" type="file" accept="image/*" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="snap-date" type="date" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="snap-label" placeholder="Label (e.g. Before cutting)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="snap-note" placeholder="Note" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <button class="btn" onclick="addSectorSnapshot('${s.name}')">+ Добавить</button>
+        </div>
+        <div id="snap-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
+      </div>
+      <div class="photo-grid">${snaps.map(sn=>`
+        <div class="photo-card">
+          <img class="photo-thumb" src="${API}/api/sectors/snapshots/${sn.id}/image" onclick="openLightboxImg('${API}/api/sectors/snapshots/${sn.id}/image','${s.name}','${sn.label||'Snapshot'} · ${sn.snapshot_date||''}')">
+          <div class="photo-info">
+            <div class="sector">${sn.snapshot_date||'–'}</div>
+            <div class="type">${sn.label||''}${sn.note?' · '+sn.note:''}</div>
+          </div>
+          <div style="padding:6px 8px;text-align:right"><span class="tbl-link" style="color:var(--red)" onclick="deleteSectorSnapshot(${sn.id},'${s.name}')">✕ delete</span></div>
+        </div>`).join('')||'<div class="empty">no snapshots yet</div>'}</div>`;
   }
 }
 
@@ -1999,6 +2024,40 @@ async function logFuel(vid, sector, fper100) {
       setTimeout(()=>detailTab('vehicles'), 1500);
     }
   } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
+}
+
+// ── SNAPSHOTS ─────────────────────────────────────────────────────────────────
+async function addSectorSnapshot(sector) {
+  const file  = document.getElementById('snap-file')?.files[0];
+  const date  = document.getElementById('snap-date')?.value;
+  const label = document.getElementById('snap-label')?.value.trim();
+  const note  = document.getElementById('snap-note')?.value.trim();
+  const msg   = document.getElementById('snap-msg');
+  if (!file) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ File required';} return; }
+  if (!date) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Date required';} return; }
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('snapshot_date', date);
+    fd.append('label', label);
+    fd.append('note', note);
+    const resp = await fetch('/api/sectors/'+encodeURIComponent(sector)+'/snapshots', {method:'POST', body: fd});
+    const data = await resp.json();
+    if (data.ok) {
+      if(msg){msg.style.color='var(--green)';msg.textContent='✓ Snapshot added';}
+      const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
+      currentDetailData = data2;
+      detailTab('history');
+    }
+  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
+}
+
+async function deleteSectorSnapshot(id, sector) {
+  if (!confirm('Remove this snapshot?')) return;
+  await fetch('/api/sectors/snapshots/'+id, {method:'DELETE'});
+  const data = await api('/api/sectors/'+encodeURIComponent(sector));
+  currentDetailData = data;
+  detailTab('history');
 }
 
 // ── FOREST NOTES ──────────────────────────────────────────────────────────────

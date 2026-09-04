@@ -25,9 +25,11 @@ PHOTOS_DIR = Path(os.environ.get("PHOTOS_DIR", "data/work_photos"))
 PLANS_DIR = Path("data/boundary_plans")
 OBJECT_SATELLITE_DIR = Path("data/object_satellite")
 SECTOR_SATELLITE_DIR = Path("data/sector_satellite")
+SECTOR_SNAPSHOTS_DIR = Path("data/sector_snapshots")
 PLANS_DIR.mkdir(parents=True, exist_ok=True)
 OBJECT_SATELLITE_DIR.mkdir(parents=True, exist_ok=True)
 SECTOR_SATELLITE_DIR.mkdir(parents=True, exist_ok=True)
+SECTOR_SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Forest AI API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -431,6 +433,60 @@ def get_sector_satellite_image(name: str):
     if file_path and Path(file_path).exists():
         return FileResponse(file_path)
     return RedirectResponse(url=f"/api/satellite/image/{name}")
+
+
+@app.post("/api/sectors/{name}/snapshots")
+async def upload_sector_snapshot(
+    name: str,
+    file: UploadFile = File(...),
+    snapshot_date: str = Form(...),
+    label: str = Form(""),
+    note: str = Form(""),
+):
+    """Upload a dated historical snapshot image for a sector (e.g. from
+    geolatvija.lv), building a snapshot history distinct from the live
+    Sentinel-2 fetch under the Satellite tab. Each upload is a new row and
+    a new file — existing snapshots are never overwritten."""
+    row = db1("SELECT id FROM sectors WHERE name=?", (name,))
+    if not row:
+        return Response(content='{"error":"Sector not found"}', media_type="application/json", status_code=404)
+    ext = Path(file.filename or "snapshot.jpg").suffix or ".jpg"
+    safe_name = "".join(c if c.isalnum() else "_" for c in name)
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    dest = SECTOR_SNAPSHOTS_DIR / f"{safe_name}_{timestamp}{ext}"
+    suffix = 1
+    while dest.exists():
+        # Two uploads landing in the same second would otherwise collide on
+        # this filename and silently overwrite each other on disk.
+        dest = SECTOR_SNAPSHOTS_DIR / f"{safe_name}_{timestamp}_{suffix}{ext}"
+        suffix += 1
+    with open(dest, "wb") as f:
+        f.write(await file.read())
+    from database import add_sector_snapshot as _add_sector_snapshot
+    snap_id = _add_sector_snapshot(name, str(dest), snapshot_date, label, note)
+    return {"ok": True, "id": snap_id, "file_path": str(dest)}
+
+
+@app.get("/api/sectors/{name}/snapshots")
+def get_sector_snapshots_route(name: str):
+    from database import get_sector_snapshots as _get_sector_snapshots
+    return _get_sector_snapshots(name)
+
+
+@app.get("/api/sectors/snapshots/{id}/image")
+def get_sector_snapshot_image(id: int):
+    row = db1("SELECT image_path FROM sector_snapshots WHERE id=?", (id,))
+    file_path = row.get("image_path")
+    if not file_path or not Path(file_path).exists():
+        return Response(status_code=404)
+    return FileResponse(file_path)
+
+
+@app.delete("/api/sectors/snapshots/{id}")
+def delete_sector_snapshot_route(id: int):
+    from database import delete_sector_snapshot as _delete_sector_snapshot
+    ok = _delete_sector_snapshot(id)
+    return {"ok": ok}
 
 
 class SectorPolygonIn(BaseModel):
@@ -841,6 +897,7 @@ def get_sector_detail(name: str):
         "comments":         db("SELECT id, employee, sector, comment, check_in_time FROM work_sessions WHERE sector=? AND comment != '' AND comment IS NOT NULL ORDER BY id DESC", (name,)),
         "employees":        db("SELECT * FROM sector_employees WHERE sector=? ORDER BY full_name", (name,)),
         "vehicles":         vehicles,
+        "snapshots":        db("SELECT * FROM sector_snapshots WHERE sector=? ORDER BY snapshot_date, id", (name,)),
     }
 
 
