@@ -557,6 +557,19 @@ function statusBadge(s) {
   return badge(s,'b-gray');
 }
 function riskColor(color) { return color==='red'?'var(--red)':color==='yellow'?'var(--amber)':'var(--green)'; }
+function classifyRisk(reason) {
+  const r = (reason || '').toLowerCase();
+  if (r.includes('polygon boundary') || r.includes('outside approved zone') || r.includes('outside approved')) {
+    return { icon: '📍', label: 'GPS', tab: 'gps' };
+  }
+  if (r.includes('timber volume mismatch')) {
+    return { icon: '🪵', label: 'Timber', tab: 'timber' };
+  }
+  if (r.includes('truck report mismatch')) {
+    return { icon: '🚛', label: 'Trucks', tab: 'trucks' };
+  }
+  return { icon: '⚠', label: 'Manual', tab: null };
+}
 function riskScoreBar(score, color) {
   const c = riskColor(color);
   return `<div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:${score}%;background:${c}"></div></div> <span style="font-size:11px;color:${c};font-family:var(--mono)">${score}</span>`;
@@ -610,9 +623,9 @@ async function loadOverview() {
       <div class="kpi-value ${summary.exposure_low>0?'red':'green'}" style="font-size:18px">${summary.exposure_label||'€0'}</div>
       <div class="kpi-sub">${summary.vol_at_risk||0} m³ под риском</div>
     </div>
-    <div class="kpi"><div class="kpi-label">Секторы</div><div class="kpi-value green">${summary.sectors}</div><div class="kpi-sub">${summary.red_sectors||0} критических</div></div>
-    <div class="kpi"><div class="kpi-label">Активные риски</div><div class="kpi-value ${summary.high_risks>0?'red':'green'}">${summary.risks}</div><div class="kpi-sub">${summary.high_risks} HIGH</div></div>
-    <div class="kpi"><div class="kpi-label">GPS сессии</div><div class="kpi-value">${summary.gps_sessions}</div><div class="kpi-sub">${summary.photos} фото</div></div>
+    <div class="kpi" style="cursor:pointer" onclick="nav('sectors')"><div class="kpi-label">Секторы</div><div class="kpi-value green">${summary.sectors}</div><div class="kpi-sub">${summary.red_sectors||0} критических</div></div>
+    <div class="kpi" style="cursor:pointer" onclick="nav('risks')"><div class="kpi-label">Активные риски</div><div class="kpi-value ${summary.high_risks>0?'red':'green'}">${summary.risks}</div><div class="kpi-sub">${summary.high_risks} HIGH</div></div>
+    <div class="kpi" style="cursor:pointer" onclick="nav('gps')"><div class="kpi-label">GPS сессии</div><div class="kpi-value">${summary.gps_sessions}</div><div class="kpi-sub">${summary.photos} фото</div></div>
     <div class="kpi"><div class="kpi-label">Объём m³</div><div class="kpi-value">${summary.total_volume_m3.toLocaleString()}</div><div class="kpi-sub">${summary.truck_reports} рейсов</div></div>
     <div class="kpi"><div class="kpi-label">Активные операции</div><div class="kpi-value green">${summary.active_operations||0}</div><div class="kpi-sub">секторов в работе</div></div>
     <div class="kpi"><div class="kpi-label">Чек-ины сегодня</div><div class="kpi-value">${summary.field_checkins_today||0}</div><div class="kpi-sub">за сегодня</div></div>
@@ -1038,9 +1051,9 @@ async function openSector(name) {
         </div>
         ${s.timber_miss_vol>0||s.truck_discrepancy>0||s.rejected_gps>0?`
         <div style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--text2)">
-          ${s.timber_miss_vol>0?`<div style="margin-bottom:2px">⚠ Missing timber: ${s.timber_miss_vol} m³</div>`:''}
-          ${s.truck_discrepancy>0?`<div style="margin-bottom:2px">⚠ Truck gap: ${s.truck_discrepancy} m³</div>`:''}
-          ${s.rejected_gps>0?`<div>⚠ GPS violations: ${s.rejected_gps}</div>`:''}
+          ${s.timber_miss_vol>0?`<div style="margin-bottom:2px;cursor:pointer" onclick="detailTab('timber')">⚠ Missing timber: ${s.timber_miss_vol} m³ →</div>`:''}
+          ${s.truck_discrepancy>0?`<div style="margin-bottom:2px;cursor:pointer" onclick="detailTab('trucks')">⚠ Truck gap: ${s.truck_discrepancy} m³ →</div>`:''}
+          ${s.rejected_gps>0?`<div style="cursor:pointer" onclick="detailTab('gps')">⚠ GPS violations: ${s.rejected_gps} →</div>`:''}
         </div>`:''}
       </div>
     </div>
@@ -1080,8 +1093,16 @@ function detailTab(tab) {
       </div>`).join('')}</div>`;
 
   } else if (tab==='risks') {
-    el.innerHTML = `<table class="tbl"><thead><tr><th>Level</th><th>Reason</th></tr></thead><tbody>
-      ${d.risks.map(r=>`<tr><td>${riskBadge(r.risk_level)}</td><td style="color:var(--text2)">${r.reason}</td></tr>`).join('')||'<tr><td colspan="2" class="empty">no risks</td></tr>'}
+    el.innerHTML = `<table class="tbl"><thead><tr><th>Level</th><th>Type</th><th>Reason</th></tr></thead><tbody>
+      ${d.risks.map(r=>{
+        const c = classifyRisk(r.reason);
+        const clickable = c.tab !== null;
+        return `<tr${clickable?` style="cursor:pointer" onclick="detailTab('${c.tab}')" title="Click to view evidence →"`:''}>
+          <td>${riskBadge(r.risk_level)}</td>
+          <td>${c.icon} ${c.label}</td>
+          <td style="color:var(--text2)">${r.reason}</td>
+        </tr>`;
+      }).join('')||'<tr><td colspan="3" class="empty">no risks</td></tr>'}
     </tbody></table>`;
 
   } else if (tab==='comments') {
@@ -1289,8 +1310,8 @@ async function loadMap() {
     container.innerHTML = '';
     container.style.height = '540px';
     const map = L.map(container).setView([56.9, 24.1], 8);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution:'&copy; CartoDB', maxZoom:19
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'&copy; OpenStreetMap contributors', maxZoom:19
     }).addTo(map);
 
     let hasPins = false;
@@ -1583,8 +1604,8 @@ function showSatMap() {
   ensureSatLeaflet(() => {
     if (!satLeafMap) {
       satLeafMap = L.map(container).setView([56.9, 24.1], 9);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution:'&copy; CartoDB', maxZoom:19
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:'&copy; OpenStreetMap contributors', maxZoom:19
       }).addTo(satLeafMap);
     }
 
@@ -1669,8 +1690,8 @@ async function loadSatellite() {
     const container = document.getElementById('sat-map-inner');
     if (!satLeafMap) {
       satLeafMap = L.map(container).setView([56.9, 24.1], 8);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution:'&copy; CartoDB', maxZoom:19
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:'&copy; OpenStreetMap contributors', maxZoom:19
       }).addTo(satLeafMap);
       // Draw all sectors on map
       const bounds = [];
@@ -1771,8 +1792,8 @@ function renderDetailMap(sector, boundary) {
     const lat = sector.center_lat || 56.9;
     const lon = sector.center_lon || 24.1;
     detailMap = L.map(container).setView([lat, lon], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution:'&copy; CartoDB', maxZoom:19
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'&copy; OpenStreetMap contributors', maxZoom:19
     }).addTo(detailMap);
 
     if (boundary && boundary.length >= 3) {
