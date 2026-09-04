@@ -282,7 +282,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
       </div>
 
       <div class="section" id="sec-object-detail">
-        <div class="back-btn" onclick="nav('objects')">← back to objects</div>
+        <div class="back-btn" onclick="history.back()">← back to objects</div>
         <div class="detail-header">
           <div>
             <div class="detail-title" id="obj-detail-name">–</div>
@@ -356,7 +356,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 
       <!-- SECTOR DETAIL -->
       <div class="section" id="sec-detail">
-        <div class="back-btn" onclick="nav('sectors')">← back to sectors</div>
+        <div class="back-btn" onclick="history.back()">← back to sectors</div>
         <div class="detail-header">
           <div>
             <div class="detail-title" id="detail-name">–</div>
@@ -585,7 +585,7 @@ function tbl(headers, keys, rows) {
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 const titles = {overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor'};
 
-function nav(id) {
+function nav(id, push=true) {
   currentSection = id;
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -596,6 +596,7 @@ function nav(id) {
   if (navMap[id]!==undefined) items[navMap[id]].classList.add('active');
   document.getElementById('page-title').textContent = titles[id]||id;
   document.getElementById('page-sub').textContent = new Date().toLocaleString();
+  if (push) history.pushState({type:'nav', id}, '', '#'+id);
   load(id);
 }
 
@@ -704,12 +705,12 @@ async function loadOverview() {
 // ── SECTORS ───────────────────────────────────────────────────────────────────
 // ── OBJECTS ───────────────────────────────────────────────────────────────────
 
-function openObject(boundaryPlanId) {
+function openObject(boundaryPlanId, push=true) {
   if (boundaryPlanId === null) {
     // "Без объекта" bucket has no real object to manage (no scan, no
     // uploads possible) — just show its sectors via the existing filter.
     objectFilter = null;
-    nav('sectors');
+    nav('sectors', push);
     return;
   }
   currentObjectId = boundaryPlanId;
@@ -718,6 +719,7 @@ function openObject(boundaryPlanId) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('sec-object-detail').classList.add('active');
   document.getElementById('page-sub').textContent = new Date().toLocaleString();
+  if (push) history.pushState({type:'object', id: boundaryPlanId}, '', '#object-'+boundaryPlanId);
   objDetailTab('overview');
 }
 
@@ -988,7 +990,7 @@ function clearObjectFilter() {
 }
 
 // ── SECTOR DETAIL ─────────────────────────────────────────────────────────────
-async function openSector(name) {
+async function openSector(name, push=true) {
   currentSector = name;
   currentSection = 'detail';
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
@@ -999,6 +1001,7 @@ async function openSector(name) {
   document.getElementById('detail-meta').textContent = 'Loading...';
   document.getElementById('detail-stats').innerHTML = '';
   document.getElementById('detail-tab-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  if (push) history.pushState({type:'sector', name}, '', '#sector-'+encodeURIComponent(name));
 
   const data = await api('/api/sectors/'+encodeURIComponent(name));
   currentDetailData = data;
@@ -2020,8 +2023,17 @@ async function saveForestNotes(sector) {
 // ── AUTO REFRESH every 30s ────────────────────────────────────────────────────
 setInterval(()=>{ if(currentSection&&currentSection!=='detail'){ clearCache(); load(currentSection); } }, 30000);
 
+window.addEventListener('popstate', e=>{
+  const state = e.state;
+  if (!state) { nav('overview', false); return; }
+  if (state.type==='nav') nav(state.id, false);
+  else if (state.type==='object') openObject(state.id, false);
+  else if (state.type==='sector') openSector(state.name, false);
+});
+
 // INIT
-nav('overview');
+history.replaceState({type:'nav', id:'overview'}, '', '#overview');
+nav('overview', false);
 document.getElementById('last-update').innerHTML = '<span class="auto-refresh-badge"><span class="pulse"></span> live · v2.1</span>';
 </script>
 </body>
