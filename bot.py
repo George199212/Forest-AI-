@@ -685,6 +685,19 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if pending_vehicle_id is not None:
         sector_name = context.user_data.pop("pending_vehicle_sector", "A-004")
         context.user_data.pop("pending_vehicle_id", None)
+
+        vehicle_row = db_fetchone(
+            "SELECT plate FROM sector_vehicles WHERE telegram_user_id=?",
+            (str(update.effective_user.id),)
+        )
+        if not vehicle_row:
+            await update.message.reply_text(
+                "❌ Вы не зарегистрированы в Forest AI. Обратитесь к администратору.",
+                reply_markup=main_keyboard()
+            )
+            return
+        plate = vehicle_row[0]
+
         recorded_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
         sector_row = get_sector_from_db(sector_name)
@@ -702,13 +715,26 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """, (pending_vehicle_id, sector_name, loc.latitude, loc.longitude, inside, recorded_at))
 
         if inside:
-            await update.message.reply_text("✅ Vehicle GPS recorded — inside sector boundary.", reply_markup=main_keyboard())
+            await update.message.reply_text(f"✅ {plate}: GPS recorded — inside sector boundary.", reply_markup=main_keyboard())
         else:
-            await update.message.reply_text("⚠ Вы за пределами границы сектора", reply_markup=main_keyboard())
+            await update.message.reply_text(f"⚠ {plate}: Вы за пределами границы сектора", reply_markup=main_keyboard())
         return
 
     sector_name = context.user_data.get("pending_checkin_sector", "A-004")
-    employee = update.effective_user.full_name or str(update.effective_user.id)
+
+    employee_row = db_fetchone(
+        "SELECT full_name FROM sector_employees WHERE telegram_user_id=?",
+        (str(update.effective_user.id),)
+    )
+    if not employee_row:
+        await update.message.reply_text(
+            "❌ Вы не зарегистрированы в Forest AI. Обратитесь к администратору.",
+            reply_markup=main_keyboard()
+        )
+        context.user_data.pop("pending_checkin_sector", None)
+        return
+    employee = employee_row[0]
+
     checked_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
     # Get sector from DB
