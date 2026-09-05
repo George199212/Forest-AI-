@@ -93,6 +93,7 @@ def _migrate():
         created_at TEXT
     )
     """)
+    _add_column_if_missing(cur, "sector_employees", "telegram_user_id", "TEXT")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS sector_vehicles (
@@ -109,6 +110,7 @@ def _migrate():
         created_at TEXT
     )
     """)
+    _add_column_if_missing(cur, "sector_vehicles", "telegram_user_id", "TEXT")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS vehicle_fuel_logs (
@@ -462,14 +464,14 @@ def get_risks():
 
 # ── Sector Employees ──────────────────────────────────────────────────────────
 
-def add_employee(sector, full_name, role="", phone="", id_number="", notes=""):
+def add_employee(sector, full_name, role="", phone="", id_number="", notes="", telegram_user_id=""):
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
-    INSERT INTO sector_employees (sector, full_name, role, phone, id_number, notes, active, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-    """, (sector, full_name, role, phone, id_number, notes, now))
+    INSERT INTO sector_employees (sector, full_name, role, phone, id_number, notes, active, created_at, telegram_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+    """, (sector, full_name, role, phone, id_number, notes, now, telegram_user_id))
     conn.commit()
     last_id = cur.lastrowid
     conn.close()
@@ -490,14 +492,14 @@ def get_employees(sector=None):
 
 # ── Sector Vehicles ───────────────────────────────────────────────────────────
 
-def add_vehicle(sector, plate, vehicle_type="", driver="", fuel_capacity_l=0, fuel_per_100km=0, notes=""):
+def add_vehicle(sector, plate, vehicle_type="", driver="", fuel_capacity_l=0, fuel_per_100km=0, notes="", telegram_user_id=""):
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
-    INSERT INTO sector_vehicles (sector, plate, vehicle_type, driver, fuel_capacity_l, fuel_per_100km, notes, active, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
-    """, (sector, plate, vehicle_type, driver, fuel_capacity_l, fuel_per_100km, notes, now))
+    INSERT INTO sector_vehicles (sector, plate, vehicle_type, driver, fuel_capacity_l, fuel_per_100km, notes, active, created_at, telegram_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    """, (sector, plate, vehicle_type, driver, fuel_capacity_l, fuel_per_100km, notes, now, telegram_user_id))
     conn.commit()
     last_id = cur.lastrowid
     conn.close()

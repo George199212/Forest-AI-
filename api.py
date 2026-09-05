@@ -779,6 +779,7 @@ class EmployeeIn(BaseModel):
     phone: str = ""
     id_number: str = ""
     notes: str = ""
+    telegram_user_id: str = ""
 
 @app.get("/api/employees")
 def get_all_employees():
@@ -791,7 +792,7 @@ def get_sector_employees(sector: str):
 @app.post("/api/employees")
 def create_employee(body: EmployeeIn):
     from database import add_employee as _add
-    eid = _add(body.sector, body.full_name, body.role, body.phone, body.id_number, body.notes)
+    eid = _add(body.sector, body.full_name, body.role, body.phone, body.id_number, body.notes, body.telegram_user_id)
     return {"ok": True, "id": eid}
 
 @app.delete("/api/employees/{eid}")
@@ -814,6 +815,7 @@ class VehicleIn(BaseModel):
     fuel_capacity_l: float = 0
     fuel_per_100km: float = 0
     notes: str = ""
+    telegram_user_id: str = ""
 
 class FuelLogIn(BaseModel):
     vehicle_id: int
@@ -838,7 +840,7 @@ def get_sector_vehicles(sector: str):
 def create_vehicle(body: VehicleIn):
     from database import add_vehicle as _add
     vid = _add(body.sector, body.plate, body.vehicle_type, body.driver,
-               body.fuel_capacity_l, body.fuel_per_100km, body.notes)
+               body.fuel_capacity_l, body.fuel_per_100km, body.notes, body.telegram_user_id)
     return {"ok": True, "id": vid}
 
 @app.post("/api/vehicles/fuel-log")

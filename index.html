@@ -1160,24 +1160,26 @@ function detailTab(tab) {
     el.innerHTML = `
       <div style="margin-bottom:14px">
         <div style="font-size:11px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">Add Worker</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
           <input id="emp-name" placeholder="Full name" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="emp-role" placeholder="Role (e.g. Logger)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="emp-phone" placeholder="Phone" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="emp-id" placeholder="ID / Personal code" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="emp-telegram-id" placeholder="Telegram user ID" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <button class="btn" onclick="addEmployee('${s.name}')">+ Add</button>
         </div>
         <div id="emp-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
       </div>
-      <table class="tbl"><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>ID</th><th>Status</th><th></th></tr></thead><tbody>
+      <table class="tbl"><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>ID</th><th>Telegram</th><th>Status</th><th></th></tr></thead><tbody>
         ${emps.map(e=>`<tr>
           <td style="font-weight:500">${e.full_name}</td>
           <td class="mono" style="font-size:12px">${e.role||'–'}</td>
           <td class="mono" style="font-size:12px">${e.phone||'–'}</td>
           <td class="mono" style="font-size:11px;color:var(--text3)">${e.id_number||'–'}</td>
+          <td class="mono" style="font-size:11px;color:var(--text3)">${e.telegram_user_id||'–'}</td>
           <td>${e.active?badge('Active','b-green'):badge('Inactive','b-gray')}</td>
           <td><span class="tbl-link" style="color:var(--red)" onclick="deleteEmployee(${e.id},'${s.name}')">✕</span></td>
-        </tr>`).join('')||'<tr><td colspan="6" class="empty">no workers assigned</td></tr>'}
+        </tr>`).join('')||'<tr><td colspan="7" class="empty">no workers assigned</td></tr>'}
       </tbody></table>`;
 
   } else if (tab==='vehicles') {
@@ -1185,12 +1187,13 @@ function detailTab(tab) {
     el.innerHTML = `
       <div style="margin-bottom:14px">
         <div style="font-size:11px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">Add Vehicle</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
           <input id="veh-plate" placeholder="Plate (e.g. AB-1234)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="veh-type" placeholder="Type (Truck/Harvester)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="veh-driver" placeholder="Driver" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="veh-capacity" placeholder="Tank L (e.g. 200)" type="number" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="veh-per100" placeholder="L/100km (e.g. 35)" type="number" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+          <input id="veh-telegram-id" placeholder="Driver Telegram ID" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <button class="btn" onclick="addVehicle('${s.name}')">+ Add</button>
         </div>
         <div id="veh-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
@@ -1205,11 +1208,12 @@ function detailTab(tab) {
             </div>
             <span class="tbl-link" style="color:var(--red)" onclick="deleteVehicle(${v.id},'${s.name}')">✕ Remove</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">DRIVER</div><div style="font-size:13px">${v.driver||'–'}</div></div>
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">TANK</div><div style="font-size:13px;font-family:var(--mono)">${v.fuel_capacity_l||'–'} L</div></div>
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">L/100km</div><div style="font-size:13px;font-family:var(--mono)">${v.fuel_per_100km||'–'}</div></div>
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">TOTAL KM</div><div style="font-size:13px;font-family:var(--mono)">${Math.round(v.total_km||0)}</div></div>
+            <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">TELEGRAM</div><div style="font-size:13px;font-family:var(--mono)">${v.telegram_user_id||'–'}</div></div>
           </div>
           <!-- Fuel log form -->
           <div style="background:var(--bg3);border-radius:var(--r);padding:10px;margin-bottom:8px">
@@ -2088,12 +2092,13 @@ async function addEmployee(sector) {
   const role = document.getElementById('emp-role')?.value.trim();
   const phone = document.getElementById('emp-phone')?.value.trim();
   const idnum = document.getElementById('emp-id')?.value.trim();
+  const telegramId = document.getElementById('emp-telegram-id')?.value.trim();
   const msg = document.getElementById('emp-msg');
   if (!name) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Name required';} return; }
   try {
     const resp = await fetch('/api/employees', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({sector, full_name:name, role, phone, id_number:idnum})
+      body: JSON.stringify({sector, full_name:name, role, phone, id_number:idnum, telegram_user_id:telegramId})
     });
     const data = await resp.json();
     if (data.ok) {
@@ -2121,12 +2126,13 @@ async function addVehicle(sector) {
   const driver= document.getElementById('veh-driver')?.value.trim();
   const cap   = parseFloat(document.getElementById('veh-capacity')?.value)||0;
   const per100= parseFloat(document.getElementById('veh-per100')?.value)||0;
+  const telegramId = document.getElementById('veh-telegram-id')?.value.trim();
   const msg   = document.getElementById('veh-msg');
   if (!plate) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Plate required';} return; }
   try {
     const resp = await fetch('/api/vehicles', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({sector, plate, vehicle_type:type, driver, fuel_capacity_l:cap, fuel_per_100km:per100})
+      body: JSON.stringify({sector, plate, vehicle_type:type, driver, fuel_capacity_l:cap, fuel_per_100km:per100, telegram_user_id:telegramId})
     });
     const data = await resp.json();
     if (data.ok) {
