@@ -511,11 +511,12 @@ def main_keyboard():
     return ReplyKeyboardMarkup([
         ["🌲 Sectors", "⚠️ Risks"],
         ["📍 GPS Check-in", "✅ Finish Work"],
-        ["🪵 Timber Movement", "➕ Add Timber"],
-        ["🚛 Truck Report", "➕ Add Truck"],
-        ["➕ Add Sector", "🗺 Add Sector Boundary"],
-        ["📄 Robežu Plāns — OCR", "📊 Report"],
-        ["📤 Export Report", "⚙️ Settings"],
+        ["🚛 Vehicle GPS", "🪵 Timber Movement"],
+        ["➕ Add Timber", "🚛 Truck Report"],
+        ["➕ Add Truck", "➕ Add Sector"],
+        ["🗺 Add Sector Boundary", "📄 Robežu Plāns — OCR"],
+        ["📊 Report", "📤 Export Report"],
+        ["⚙️ Settings"],
     ], resize_keyboard=True)
 
 def work_keyboard():
@@ -626,8 +627,86 @@ async def sector_selected_callback(update: Update, context: ContextTypes.DEFAULT
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
 
+async def vehicle_gps_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sectors_list = get_sectors()
+    if not sectors_list:
+        await update.message.reply_text("🚛 Vehicle GPS\n\nNo sectors found.", reply_markup=main_keyboard())
+        return
+
+    buttons = []
+    for s in sectors_list:
+        name = s[0]
+        contractor = s[1] or ""
+        label = f"{name} — {contractor}" if contractor else name
+        buttons.append([InlineKeyboardButton(label, callback_data=f"vehgps_sector:{name}")])
+    await update.message.reply_text(
+        "🚛 Vehicle GPS\n\nSelect sector:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+async def vehicle_sector_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not query.data.startswith("vehgps_sector:"):
+        return
+    sector_name = query.data.split(":", 1)[1]
+
+    vehicles = db_fetchall("SELECT id, plate FROM sector_vehicles WHERE sector=? AND active=1", (sector_name,))
+    if not vehicles:
+        await query.message.reply_text(f"🚛 Vehicle GPS\n\nNo active vehicles in {sector_name}.", reply_markup=main_keyboard())
+        return
+
+    context.user_data["pending_vehicle_sector"] = sector_name
+    buttons = [[InlineKeyboardButton(plate or f"Vehicle #{vid}", callback_data=f"vehgps_vehicle:{vid}")] for vid, plate in vehicles]
+    await query.message.reply_text(
+        f"🚛 Vehicle GPS — {sector_name}\n\nSelect vehicle:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+async def vehicle_selected_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not query.data.startswith("vehgps_vehicle:"):
+        return
+    vehicle_id = int(query.data.split(":", 1)[1])
+    context.user_data["pending_vehicle_id"] = vehicle_id
+
+    keyboard = [[KeyboardButton("📍 Send Location", request_location=True)], ["🌲 Sectors"]]
+    await query.message.reply_text(
+        "✅ Vehicle selected\n\nNow send GPS location for this vehicle:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    )
+
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     loc = update.message.location
+
+    # ── Vehicle GPS ping (separate flow — does not touch employee check-in) ──
+    pending_vehicle_id = context.user_data.get("pending_vehicle_id")
+    if pending_vehicle_id is not None:
+        sector_name = context.user_data.pop("pending_vehicle_sector", "A-004")
+        context.user_data.pop("pending_vehicle_id", None)
+        recorded_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        sector_row = get_sector_from_db(sector_name)
+        inside = 0
+        if sector_row and sector_row.get("boundary_json"):
+            try:
+                boundary = json.loads(sector_row["boundary_json"])
+                inside = 1 if point_in_polygon(loc.latitude, loc.longitude, boundary) else 0
+            except Exception:
+                inside = 0
+
+        db_execute("""
+        INSERT INTO vehicle_gps_pings (vehicle_id, sector, latitude, longitude, inside_boundary, recorded_at)
+        VALUES (?,?,?,?,?,?)
+        """, (pending_vehicle_id, sector_name, loc.latitude, loc.longitude, inside, recorded_at))
+
+        if inside:
+            await update.message.reply_text("✅ Vehicle GPS recorded — inside sector boundary.", reply_markup=main_keyboard())
+        else:
+            await update.message.reply_text("⚠ Вы за пределами границы сектора", reply_markup=main_keyboard())
+        return
+
     sector_name = context.user_data.get("pending_checkin_sector", "A-004")
     employee = update.effective_user.full_name or str(update.effective_user.id)
     checked_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -974,6 +1053,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🌲 Sectors":              sectors_command,
         "⚠️ Risks":               risks_command,
         "📍 GPS Check-in":        check_in,
+        "🚛 Vehicle GPS":         vehicle_gps_start,
         "✅ Finish Work":         finish_work,
         "🪵 Timber Movement":     timber_movement,
         "➕ Add Timber":          lambda u,c: u.message.reply_text("/add_timber A-004 | 300 | 280 | note"),
@@ -1024,6 +1104,8 @@ def main():
     app.add_handler(CommandHandler("export_report", export_report))
 
     app.add_handler(CallbackQueryHandler(sector_selected_callback, pattern="^checkin_sector:"))
+    app.add_handler(CallbackQueryHandler(vehicle_sector_callback, pattern="^vehgps_sector:"))
+    app.add_handler(CallbackQueryHandler(vehicle_selected_callback, pattern="^vehgps_vehicle:"))
     app.add_handler(CallbackQueryHandler(plan_callback, pattern="^plan_"))
     app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))

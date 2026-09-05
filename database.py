@@ -127,6 +127,18 @@ def _migrate():
     """)
 
     cur.execute("""
+    CREATE TABLE IF NOT EXISTS vehicle_gps_pings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vehicle_id INTEGER NOT NULL,
+        sector TEXT NOT NULL,
+        latitude REAL,
+        longitude REAL,
+        inside_boundary INTEGER,
+        recorded_at TEXT
+    )
+    """)
+
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS sector_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sector TEXT NOT NULL,

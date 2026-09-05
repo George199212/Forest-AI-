@@ -513,6 +513,14 @@ def unlink_snapshot_risk(id: int, risk_id: int):
     return {"ok": ok}
 
 
+@app.get("/api/sectors/{name}/vehicles/{vehicle_id}/route")
+def get_vehicle_route(name: str, vehicle_id: int):
+    return db(
+        "SELECT latitude, longitude, inside_boundary, recorded_at FROM vehicle_gps_pings WHERE vehicle_id=? ORDER BY recorded_at ASC",
+        (vehicle_id,),
+    )
+
+
 class SectorPolygonIn(BaseModel):
     name: str
     pixel_boundary: List[List[float]]
