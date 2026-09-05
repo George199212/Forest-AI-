@@ -2104,6 +2104,7 @@ async function addEmployee(sector) {
     if (data.ok) {
       if(msg){msg.style.color='var(--green)';msg.textContent=`✓ ${name} added`;}
       // Reload tab
+      clearCache();
       const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
       currentDetailData = data2;
       detailTab('employees');
@@ -2114,6 +2115,7 @@ async function addEmployee(sector) {
 async function deleteEmployee(eid, sector) {
   if (!confirm('Remove this worker?')) return;
   await fetch('/api/employees/'+eid, {method:'DELETE'});
+  clearCache();
   const data = await api('/api/sectors/'+encodeURIComponent(sector));
   currentDetailData = data;
   detailTab('employees');
@@ -2137,6 +2139,7 @@ async function addVehicle(sector) {
     const data = await resp.json();
     if (data.ok) {
       if(msg){msg.style.color='var(--green)';msg.textContent=`✓ ${plate} added`;}
+      clearCache();
       const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
       currentDetailData = data2;
       detailTab('vehicles');
@@ -2147,6 +2150,7 @@ async function addVehicle(sector) {
 async function deleteVehicle(vid, sector) {
   if (!confirm('Remove this vehicle?')) return;
   await fetch('/api/vehicles/'+vid, {method:'DELETE'});
+  clearCache();
   const data = await api('/api/sectors/'+encodeURIComponent(sector));
   currentDetailData = data;
   detailTab('vehicles');
