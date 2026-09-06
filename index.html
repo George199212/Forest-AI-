@@ -1171,14 +1171,31 @@ function detailTab(tab) {
         <div id="emp-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
       </div>
       <table class="tbl"><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>ID</th><th>Telegram</th><th>Status</th><th></th></tr></thead><tbody>
-        ${emps.map(e=>`<tr>
+        ${emps.map(e=>`<tr id="emp-row-${e.id}">
           <td style="font-weight:500">${e.full_name}</td>
           <td class="mono" style="font-size:12px">${e.role||'–'}</td>
           <td class="mono" style="font-size:12px">${e.phone||'–'}</td>
           <td class="mono" style="font-size:11px;color:var(--text3)">${e.id_number||'–'}</td>
           <td class="mono" style="font-size:11px;color:var(--text3)">${e.telegram_user_id||'–'}</td>
           <td>${e.active?badge('Active','b-green'):badge('Inactive','b-gray')}</td>
-          <td><span class="tbl-link" style="color:var(--red)" onclick="deleteEmployee(${e.id},'${s.name}')">✕</span></td>
+          <td>
+            <span class="tbl-link" onclick="toggleEditEmployee(${e.id})">✎</span>
+            <span class="tbl-link" style="color:var(--red)" onclick="deleteEmployee(${e.id},'${s.name}')">✕</span>
+          </td>
+        </tr>
+        <tr id="emp-edit-row-${e.id}" style="display:none">
+          <td colspan="7" style="background:var(--bg3)">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto auto;gap:8px;align-items:end;padding:8px 0">
+              <input id="emp-edit-name-${e.id}" value="${e.full_name||''}" placeholder="Full name" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <input id="emp-edit-role-${e.id}" value="${e.role||''}" placeholder="Role" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <input id="emp-edit-phone-${e.id}" value="${e.phone||''}" placeholder="Phone" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <input id="emp-edit-id-${e.id}" value="${e.id_number||''}" placeholder="ID / Personal code" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <input id="emp-edit-telegram-${e.id}" value="${e.telegram_user_id||''}" placeholder="Telegram user ID" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <button class="btn" onclick="saveEmployeeEdit(${e.id},'${s.name}')">Save</button>
+              <button class="btn" style="background:var(--bg2)" onclick="toggleEditEmployee(${e.id})">Cancel</button>
+            </div>
+            <div id="emp-edit-msg-${e.id}" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:6px"></div>
+          </td>
         </tr>`).join('')||'<tr><td colspan="7" class="empty">no workers assigned</td></tr>'}
       </tbody></table>`;
 
@@ -2132,6 +2149,37 @@ async function deleteEmployee(eid, sector) {
   const data = await api('/api/sectors/'+encodeURIComponent(sector));
   currentDetailData = data;
   detailTab('employees');
+}
+
+function toggleEditEmployee(eid) {
+  const row = document.getElementById('emp-row-'+eid);
+  const editRow = document.getElementById('emp-edit-row-'+eid);
+  if (!row || !editRow) return;
+  const editing = editRow.style.display !== 'none';
+  editRow.style.display = editing ? 'none' : 'table-row';
+}
+
+async function saveEmployeeEdit(eid, sector) {
+  const full_name = document.getElementById('emp-edit-name-'+eid)?.value.trim();
+  const role       = document.getElementById('emp-edit-role-'+eid)?.value.trim();
+  const phone      = document.getElementById('emp-edit-phone-'+eid)?.value.trim();
+  const id_number  = document.getElementById('emp-edit-id-'+eid)?.value.trim();
+  const telegram_user_id = document.getElementById('emp-edit-telegram-'+eid)?.value.trim();
+  const msg = document.getElementById('emp-edit-msg-'+eid);
+  if (!full_name) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Name required';} return; }
+  try {
+    const resp = await fetch('/api/employees/'+eid, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({full_name, role, phone, id_number, telegram_user_id})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      clearCache();
+      const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
+      currentDetailData = data2;
+      detailTab('employees');
+    }
+  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
 }
 
 // ── VEHICLES ──────────────────────────────────────────────────────────────────

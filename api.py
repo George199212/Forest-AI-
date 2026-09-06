@@ -820,6 +820,28 @@ def delete_employee(eid: int):
     conn.close()
     return {"ok": True}
 
+class EmployeePatchIn(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    phone: Optional[str] = None
+    id_number: Optional[str] = None
+    notes: Optional[str] = None
+    telegram_user_id: Optional[str] = None
+    active: Optional[int] = None
+
+@app.patch("/api/employees/{eid}")
+def update_employee(eid: int, body: EmployeePatchIn):
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not fields:
+        return {"ok": True}
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    set_clause = ", ".join(f"{k}=?" for k in fields)
+    cur.execute(f"UPDATE sector_employees SET {set_clause} WHERE id=?", (*fields.values(), eid))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
 
 # ── Vehicles ──────────────────────────────────────────────────────────────────
 
