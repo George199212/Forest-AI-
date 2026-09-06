@@ -329,7 +329,11 @@ def add_sector(name, contractor, status, approved_volume, map_url="",
     if existing:
         cur.execute("""
         UPDATE sectors SET contractor=?, status=?, approved_volume=?, map_url=?,
-            boundary_json=?, center_lat=?, center_lon=?, area_ha=?, color=?, updated_at=?,
+            boundary_json=COALESCE(?, boundary_json),
+            center_lat=COALESCE(?, center_lat),
+            center_lon=COALESCE(?, center_lon),
+            area_ha=COALESCE(?, area_ha),
+            color=?, updated_at=?,
             boundary_plan_id=COALESCE(?, boundary_plan_id),
             object_name=CASE WHEN ? != '' THEN ? ELSE object_name END,
             pixel_boundary_json=COALESCE(?, pixel_boundary_json)

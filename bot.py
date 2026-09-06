@@ -756,9 +756,11 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             approved = False
     else:
-        # Fallback: radius check using center or hardcoded
-        sector_lat = sector_row.get("center_lat", 56.9587) if sector_row else 56.9587
-        sector_lon = sector_row.get("center_lon", 24.1034) if sector_row else 24.1034
+        # Fallback: radius check using center or hardcoded.
+        # sector_row is a dict(sqlite3.Row), so a NULL column is present
+        # with value None — .get(key, default) would not catch that.
+        sector_lat = (sector_row.get("center_lat") if sector_row else None) or 56.9587
+        sector_lon = (sector_row.get("center_lon") if sector_row else None) or 24.1034
         allowed_radius = 10000
         distance = calculate_distance_meters(loc.latitude, loc.longitude, sector_lat, sector_lon)
         approved = distance <= allowed_radius
