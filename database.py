@@ -167,6 +167,7 @@ def _migrate():
     for column, definition in [
         ("user_id",       "TEXT"),
         ("employee",      "TEXT"),
+        ("employee_id",   "INTEGER"),
         ("contractor",    "TEXT"),
         ("sector",        "TEXT"),
         ("check_in_time", "TEXT"),

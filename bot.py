@@ -589,8 +589,14 @@ def build_export_zip():
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    employee_row = db_fetchone(
+        "SELECT full_name FROM sector_employees WHERE telegram_user_id=?",
+        (str(update.effective_user.id),)
+    )
+    intro = f"🌲 Forest AI\n\nС возвращением, {employee_row[0]}!\n\n" if employee_row \
+        else "🌲 Forest AI\n\nAutonomous Forest Oversight Platform\n\n"
     await update.message.reply_text(
-        "🌲 Forest AI\n\nAutonomous Forest Oversight Platform\n\n"
+        intro +
         "Main modules:\n🌲 Sectors\n⚠️ Risks\n📍 GPS Check-in\n"
         "🪵 Timber Movement\n🚛 Truck Report\n📊 Report\n📤 Export Report",
         reply_markup=main_keyboard()
@@ -621,9 +627,54 @@ async def sector_selected_callback(update: Update, context: ContextTypes.DEFAULT
     sector_name = query.data.split(":", 1)[1]
     context.user_data["pending_checkin_sector"] = sector_name
 
+    already_linked = db_fetchone(
+        "SELECT id FROM sector_employees WHERE telegram_user_id=?",
+        (str(update.effective_user.id),)
+    )
+    if not already_linked:
+        candidates = db_fetchall(
+            "SELECT id, full_name FROM sector_employees WHERE sector=? AND active=1 "
+            "AND (telegram_user_id IS NULL OR telegram_user_id='')",
+            (sector_name,)
+        )
+        if candidates:
+            buttons = [[InlineKeyboardButton(name, callback_data=f"linkemp:{eid}")] for eid, name in candidates]
+            buttons.append([InlineKeyboardButton("Меня нет в списке", callback_data="linkemp:skip")])
+            await query.message.reply_text(
+                f"👤 Сектор {sector_name}\n\nЭто вы?",
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+            return
+
     keyboard = [[KeyboardButton("📍 Send Location", request_location=True)], ["🌲 Sectors"]]
     await query.message.reply_text(
         f"✅ Sector selected: {sector_name}\n\nNow send your GPS location:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    )
+
+async def link_employee_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not query.data.startswith("linkemp:"):
+        return
+    choice = query.data.split(":", 1)[1]
+
+    if choice == "skip":
+        context.user_data.pop("pending_checkin_sector", None)
+        await query.message.reply_text(
+            "❌ Вы не зарегистрированы в Forest AI. Обратитесь к администратору.",
+            reply_markup=main_keyboard()
+        )
+        return
+
+    db_execute(
+        "UPDATE sector_employees SET telegram_user_id=? WHERE id=?",
+        (str(update.effective_user.id), int(choice))
+    )
+
+    keyboard = [[KeyboardButton("📍 Send Location", request_location=True)], ["🌲 Sectors"]]
+    await query.message.reply_text(
+        "✅ Привязано\n\nNow send your GPS location:",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
 
@@ -723,7 +774,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sector_name = context.user_data.get("pending_checkin_sector", "A-004")
 
     employee_row = db_fetchone(
-        "SELECT full_name FROM sector_employees WHERE telegram_user_id=?",
+        "SELECT id, full_name FROM sector_employees WHERE telegram_user_id=?",
         (str(update.effective_user.id),)
     )
     if not employee_row:
@@ -733,7 +784,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         context.user_data.pop("pending_checkin_sector", None)
         return
-    employee = employee_row[0]
+    employee_id, employee = employee_row
 
     checked_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
@@ -767,9 +818,9 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     session_id = db_execute("""
     INSERT INTO work_sessions
-    (user_id,employee,contractor,sector,check_in_time,finish_time,latitude,longitude,distance_m,approved,comment)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)
-    """, (str(update.effective_user.id), employee, contractor, sector_name, checked_at, "",
+    (user_id,employee,employee_id,contractor,sector,check_in_time,finish_time,latitude,longitude,distance_m,approved,comment)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (str(update.effective_user.id), employee, employee_id, contractor, sector_name, checked_at, "",
           loc.latitude, loc.longitude, distance, "YES" if approved else "NO", ""))
 
     context.user_data["active_work_session"] = {
@@ -1132,6 +1183,7 @@ def main():
     app.add_handler(CommandHandler("export_report", export_report))
 
     app.add_handler(CallbackQueryHandler(sector_selected_callback, pattern="^checkin_sector:"))
+    app.add_handler(CallbackQueryHandler(link_employee_callback, pattern="^linkemp:"))
     app.add_handler(CallbackQueryHandler(vehicle_sector_callback, pattern="^vehgps_sector:"))
     app.add_handler(CallbackQueryHandler(vehicle_selected_callback, pattern="^vehgps_vehicle:"))
     app.add_handler(CallbackQueryHandler(plan_callback, pattern="^plan_"))
