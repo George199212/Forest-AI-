@@ -3,12 +3,12 @@ Forest AI — Full Commercial API
 Run: uvicorn api:app --host 0.0.0.0 --port 8000
 """
 
-import sqlite3, os, io, math, json
+import sqlite3, os, io, math, json, secrets
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List
-from fastapi import FastAPI, Response, Request, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Response, Request, UploadFile, File, Form, Depends, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
 
@@ -31,8 +31,24 @@ OBJECT_SATELLITE_DIR.mkdir(parents=True, exist_ok=True)
 SECTOR_SATELLITE_DIR.mkdir(parents=True, exist_ok=True)
 SECTOR_SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="Forest AI API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+_basic_auth = HTTPBasic()
+
+
+def verify_credentials(credentials: HTTPBasicCredentials = Depends(_basic_auth)):
+    expected_user = os.environ.get("DASHBOARD_USERNAME", "")
+    expected_pass = os.environ.get("DASHBOARD_PASSWORD", "")
+    user_ok = secrets.compare_digest(credentials.username, expected_user)
+    pass_ok = secrets.compare_digest(credentials.password, expected_pass)
+    if not (user_ok and pass_ok):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
+app = FastAPI(title="Forest AI API", dependencies=[Depends(verify_credentials)])
 
 
 @app.on_event("startup")
