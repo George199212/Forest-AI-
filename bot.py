@@ -5,7 +5,7 @@ import os
 import zipfile
 import sqlite3
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
@@ -728,8 +728,61 @@ async def vehicle_selected_callback(update: Update, context: ContextTypes.DEFAUL
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
 
+def _calc_expiry(started_at: str, live_period: int) -> str:
+    started = datetime.strptime(started_at, "%Y-%m-%d %H:%M:%S UTC")
+    return (started + timedelta(seconds=live_period or 0)).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+def upsert_live_location(employee_id, telegram_user_id, sector, latitude, longitude, live_period):
+    """One row per person — UPSERT by telegram_user_id so live-location edits
+    (sent every few seconds by Telegram) update the same row instead of
+    piling up history."""
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    existing = db_fetchone(
+        "SELECT id, started_at, live_period FROM live_locations WHERE telegram_user_id=?",
+        (telegram_user_id,)
+    )
+    if existing:
+        row_id, started_at, existing_period = existing
+        period = live_period if live_period is not None else existing_period
+        expires_at = _calc_expiry(started_at, period)
+        db_execute("""
+        UPDATE live_locations SET employee_id=?, sector=?, latitude=?, longitude=?,
+            live_period=?, updated_at=?, expires_at=?
+        WHERE id=?
+        """, (employee_id, sector, latitude, longitude, period, now, expires_at, row_id))
+    else:
+        period = live_period or 0
+        expires_at = _calc_expiry(now, period)
+        db_execute("""
+        INSERT INTO live_locations
+            (employee_id, telegram_user_id, sector, latitude, longitude, live_period, started_at, updated_at, expires_at)
+        VALUES (?,?,?,?,?,?,?,?,?)
+        """, (employee_id, telegram_user_id, sector, latitude, longitude, period, now, now, expires_at))
+
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    loc = update.message.location
+    is_edit = update.edited_message is not None
+    msg = update.edited_message or update.message
+    loc = msg.location
+
+    if is_edit:
+        # Live-location update (Telegram edits the original message every
+        # few seconds) — only refresh live_locations, never re-run the
+        # check-in flow or it would insert a new work_session each time.
+        employee_row = db_fetchone(
+            "SELECT id, full_name, sector FROM sector_employees WHERE telegram_user_id=?",
+            (str(update.effective_user.id),)
+        )
+        if not employee_row:
+            return
+        employee_id, _employee_name, employee_sector = employee_row
+        sector_name = context.user_data.get("pending_checkin_sector") \
+            or (context.user_data.get("active_work_session") or {}).get("sector") \
+            or employee_sector
+        upsert_live_location(
+            employee_id, str(update.effective_user.id), sector_name,
+            loc.latitude, loc.longitude, loc.live_period
+        )
+        return
 
     # ── Vehicle GPS ping (separate flow — does not touch employee check-in) ──
     pending_vehicle_id = context.user_data.get("pending_vehicle_id")
@@ -822,6 +875,12 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     """, (str(update.effective_user.id), employee, employee_id, contractor, sector_name, checked_at, "",
           loc.latitude, loc.longitude, distance, "YES" if approved else "NO", ""))
+
+    if loc.live_period:
+        upsert_live_location(
+            employee_id, str(update.effective_user.id), sector_name,
+            loc.latitude, loc.longitude, loc.live_period
+        )
 
     context.user_data["active_work_session"] = {
         "id": session_id, "employee": employee, "contractor": contractor,
@@ -1193,7 +1252,10 @@ def main():
     app.add_error_handler(error_handler)
 
     print("🌲 Forest AI Bot started...")
-    app.run_polling()
+    # Explicit allowed_updates so edited_message (Telegram Live Location
+    # updates arrive as message edits) is guaranteed to be delivered,
+    # regardless of any previously-set restriction on this bot token.
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()

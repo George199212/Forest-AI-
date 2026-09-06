@@ -141,6 +141,21 @@ def _migrate():
     """)
 
     cur.execute("""
+    CREATE TABLE IF NOT EXISTS live_locations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER,
+        telegram_user_id TEXT,
+        sector TEXT,
+        latitude REAL,
+        longitude REAL,
+        live_period INTEGER,
+        started_at TEXT,
+        updated_at TEXT,
+        expires_at TEXT
+    )
+    """)
+
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS sector_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sector TEXT NOT NULL,
