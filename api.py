@@ -883,6 +883,28 @@ def delete_vehicle(vid: int):
     conn.close()
     return {"ok": True}
 
+class VehiclePatchIn(BaseModel):
+    plate: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    driver: Optional[str] = None
+    fuel_capacity_l: Optional[float] = None
+    fuel_per_100km: Optional[float] = None
+    notes: Optional[str] = None
+    active: Optional[int] = None
+
+@app.patch("/api/vehicles/{vid}")
+def update_vehicle(vid: int, body: VehiclePatchIn):
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not fields:
+        return {"ok": True}
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    set_clause = ", ".join(f"{k}=?" for k in fields)
+    cur.execute(f"UPDATE sector_vehicles SET {set_clause} WHERE id=?", (*fields.values(), vid))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
 
 # ── Sector notes/species update ───────────────────────────────────────────────
 

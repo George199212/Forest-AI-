@@ -1206,14 +1206,27 @@ function detailTab(tab) {
               <span class="badge b-gray" style="margin-left:8px">${v.vehicle_type||'Vehicle'}</span>
               ${v.active?badge('Active','b-green'):badge('Inactive','b-gray')}
             </div>
+            <span class="tbl-link" onclick="toggleEditVehicle(${v.id})">✎ Edit</span>
             <span class="tbl-link" style="color:var(--red)" onclick="deleteVehicle(${v.id},'${s.name}')">✕ Remove</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
+          <div id="veh-view-${v.id}" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">DRIVER</div><div style="font-size:13px">${v.driver||'–'}</div></div>
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">TANK</div><div style="font-size:13px;font-family:var(--mono)">${v.fuel_capacity_l||'–'} L</div></div>
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">L/100km</div><div style="font-size:13px;font-family:var(--mono)">${v.fuel_per_100km||'–'}</div></div>
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">TOTAL KM</div><div style="font-size:13px;font-family:var(--mono)">${Math.round(v.total_km||0)}</div></div>
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">TELEGRAM</div><div style="font-size:13px;font-family:var(--mono)">${v.telegram_user_id||'–'}</div></div>
+          </div>
+          <div id="veh-edit-${v.id}" style="display:none;background:var(--bg3);border-radius:var(--r);padding:10px;margin-bottom:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto auto;gap:8px;align-items:end">
+              <input id="veh-edit-plate-${v.id}" value="${v.plate||''}" placeholder="Plate" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <input id="veh-edit-type-${v.id}" value="${v.vehicle_type||''}" placeholder="Type" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <input id="veh-edit-driver-${v.id}" value="${v.driver||''}" placeholder="Driver" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <input id="veh-edit-capacity-${v.id}" value="${v.fuel_capacity_l||0}" type="number" placeholder="Tank L" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <input id="veh-edit-per100-${v.id}" value="${v.fuel_per_100km||0}" type="number" placeholder="L/100km" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+              <button class="btn" onclick="saveVehicleEdit(${v.id},'${s.name}')">Save</button>
+              <button class="btn" style="background:var(--bg2)" onclick="toggleEditVehicle(${v.id})">Cancel</button>
+            </div>
+            <div id="veh-edit-msg-${v.id}" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
           </div>
           <!-- Fuel log form -->
           <div style="background:var(--bg3);border-radius:var(--r);padding:10px;margin-bottom:8px">
@@ -2154,6 +2167,38 @@ async function deleteVehicle(vid, sector) {
   const data = await api('/api/sectors/'+encodeURIComponent(sector));
   currentDetailData = data;
   detailTab('vehicles');
+}
+
+function toggleEditVehicle(vid) {
+  const view = document.getElementById('veh-view-'+vid);
+  const edit = document.getElementById('veh-edit-'+vid);
+  if (!view || !edit) return;
+  const editing = edit.style.display !== 'none';
+  edit.style.display = editing ? 'none' : 'block';
+  view.style.display = editing ? 'grid' : 'none';
+}
+
+async function saveVehicleEdit(vid, sector) {
+  const plate   = document.getElementById('veh-edit-plate-'+vid)?.value.trim();
+  const type    = document.getElementById('veh-edit-type-'+vid)?.value.trim();
+  const driver  = document.getElementById('veh-edit-driver-'+vid)?.value.trim();
+  const cap     = parseFloat(document.getElementById('veh-edit-capacity-'+vid)?.value)||0;
+  const per100  = parseFloat(document.getElementById('veh-edit-per100-'+vid)?.value)||0;
+  const msg     = document.getElementById('veh-edit-msg-'+vid);
+  if (!plate) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Plate required';} return; }
+  try {
+    const resp = await fetch('/api/vehicles/'+vid, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({plate, vehicle_type:type, driver, fuel_capacity_l:cap, fuel_per_100km:per100})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      clearCache();
+      const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
+      currentDetailData = data2;
+      detailTab('vehicles');
+    }
+  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
 }
 
 async function logFuel(vid, sector, fper100) {
