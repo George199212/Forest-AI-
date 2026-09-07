@@ -660,10 +660,11 @@ async def link_employee_callback(update: Update, context: ContextTypes.DEFAULT_T
     choice = query.data.split(":", 1)[1]
 
     if choice == "skip":
-        context.user_data.pop("pending_checkin_sector", None)
+        sector_name = context.user_data.get("pending_checkin_sector", "A-004")
+        keyboard = [[KeyboardButton("📍 Send Location", request_location=True)], ["🌲 Sectors"]]
         await query.message.reply_text(
-            "❌ Вы не зарегистрированы в Forest AI. Обратитесь к администратору.",
-            reply_markup=main_keyboard()
+            f"✅ Sector selected: {sector_name}\n\nNow send your GPS location:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
         )
         return
 
@@ -830,14 +831,10 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "SELECT id, full_name FROM sector_employees WHERE telegram_user_id=?",
         (str(update.effective_user.id),)
     )
-    if not employee_row:
-        await update.message.reply_text(
-            "❌ Вы не зарегистрированы в Forest AI. Обратитесь к администратору.",
-            reply_markup=main_keyboard()
-        )
-        context.user_data.pop("pending_checkin_sector", None)
-        return
-    employee_id, employee = employee_row
+    if employee_row:
+        employee_id, employee = employee_row
+    else:
+        employee_id, employee = None, update.effective_user.full_name or str(update.effective_user.id)
 
     checked_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
