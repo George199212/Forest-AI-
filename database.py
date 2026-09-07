@@ -226,9 +226,11 @@ def _migrate():
         live_period INTEGER,
         started_at TEXT,
         updated_at TEXT,
-        expires_at TEXT
+        expires_at TEXT,
+        last_status TEXT
     )
     """)
+    _add_column_if_missing(cur, "live_locations", "last_status", "TEXT")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS sector_snapshots (

@@ -464,6 +464,18 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
           </div>
           <div id="inspector-cards"></div>
         </div>
+        <div style="margin-bottom:16px;">
+          <div class="card-head" style="margin-bottom:12px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text2);">
+            <span style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:var(--amber);display:inline-block"></span> Incidents</span>
+          </div>
+          <div id="incidents-cards"></div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div class="card-head" style="margin-bottom:12px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text2);">
+            <span style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:var(--blue);display:inline-block"></span> Equipment</span>
+          </div>
+          <div id="equipment-cards"></div>
+        </div>
       </div>
 
       <!-- SATELLITE MONITOR -->
@@ -628,7 +640,7 @@ function refreshCurrent() { clearCache(); load(currentSection); }
 const loaders = {
   overview: loadOverview, objects: loadObjects, sectors: loadSectors, map: loadMap,
   risks: loadRisks, gps: loadGPS, trucks: loadTrucks, timber: loadTimber,
-  photos: loadPhotos, inspector: loadInspector, satellite: loadSatellite
+  photos: loadPhotos, inspector: () => Promise.all([loadInspector(), loadIncidentsEquipment()]), satellite: loadSatellite
 };
 
 function load(id) {
@@ -1646,6 +1658,31 @@ async function loadInspector() {
     </div>`;
   }).join('');
   document.getElementById('inspector-cards').innerHTML = cards||'<div class="empty">no sectors</div>';
+}
+
+// ── INCIDENTS & EQUIPMENT (read-only) ──────────────────────────────────────────
+async function loadIncidentsEquipment() {
+  const [incidents, equipment] = await Promise.all([api('/api/incidents'), api('/api/equipment')]);
+
+  const incCards = incidents.map(i => {
+    const col = i.risk_level==='HIGH'?'var(--red)':i.risk_level==='MEDIUM'?'var(--amber)':'var(--green)';
+    const cls = (i.risk_level||'').toLowerCase();
+    const statusCls = i.status==='OPEN'?'b-red':i.status==='NOTIFIED'?'b-amber':'b-green';
+    return `<div class="inspector-card ${cls}">
+      <div class="inspector-header">
+        <div><div class="inspector-sector">${i.sector||'–'}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${i.rule_code||'–'} · ${fmt(i.created_at)}</div></div>
+        <div>${badge(i.status||'–', statusCls)}</div>
+      </div>
+      <div class="inspector-issues"><div class="issue-item"><div class="issue-dot" style="background:${col}"></div>${i.reason||'–'}</div></div>
+    </div>`;
+  }).join('');
+  document.getElementById('incidents-cards').innerHTML = incCards || '<div class="empty">no incidents</div>';
+
+  document.getElementById('equipment-cards').innerHTML = tbl(
+    ['Sector','Code','Type','Brand','Model','Status','Fuel %'],
+    ['sector','equipment_code','type','brand','model','status','fuel_level_pct'],
+    equipment
+  );
 }
 
 // ── LIGHTBOX ──────────────────────────────────────────────────────────────────

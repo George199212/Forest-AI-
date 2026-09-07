@@ -12,7 +12,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
 
-from database import init_db
+from database import init_db, get_incidents, get_equipment
 
 try:
     from PIL import Image, ImageDraw
@@ -1019,6 +1019,17 @@ def risks_by_sector():
             "low":    n("SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='LOW'", (s["name"],)),
         })
     return result
+
+
+# ── Incidents & Equipment (read-only) ──────────────────────────────────────────
+
+@app.get("/api/incidents")
+def get_incidents_route(status: str = None):
+    return get_incidents(status)
+
+@app.get("/api/equipment")
+def get_equipment_route(sector: str = None):
+    return get_equipment(sector)
 
 
 # ── GPS ───────────────────────────────────────────────────────────────────────
