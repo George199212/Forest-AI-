@@ -179,6 +179,42 @@ def _migrate():
     ]:
         _add_column_if_missing(cur, "vehicle_gps_pings", column, definition)
 
+    # vehicle_gps_pings.vehicle_id was NOT NULL back when this table only
+    # carried vehicle pings — employee/equipment pings (entity_type above)
+    # have no vehicle_id, so the constraint has to go. ADD COLUMN can't
+    # relax a constraint on an existing column, so rebuild the table
+    # (SQLite's standard 12-step ALTER pattern). Guarded on the current
+    # notnull flag so this only runs once, safe to re-run after that.
+    cur.execute("PRAGMA table_info(vehicle_gps_pings)")
+    vehicle_id_notnull = next(
+        (row[3] for row in cur.fetchall() if row[1] == "vehicle_id"), 0
+    )
+    if vehicle_id_notnull:
+        cur.execute("""
+        CREATE TABLE vehicle_gps_pings_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicle_id INTEGER,
+            sector TEXT NOT NULL,
+            latitude REAL,
+            longitude REAL,
+            inside_boundary INTEGER,
+            recorded_at TEXT,
+            entity_type TEXT DEFAULT 'VEHICLE',
+            employee_id INTEGER,
+            equipment_id INTEGER
+        )
+        """)
+        cur.execute("""
+        INSERT INTO vehicle_gps_pings_new
+            (id, vehicle_id, sector, latitude, longitude, inside_boundary,
+             recorded_at, entity_type, employee_id, equipment_id)
+        SELECT id, vehicle_id, sector, latitude, longitude, inside_boundary,
+               recorded_at, entity_type, employee_id, equipment_id
+        FROM vehicle_gps_pings
+        """)
+        cur.execute("DROP TABLE vehicle_gps_pings")
+        cur.execute("ALTER TABLE vehicle_gps_pings_new RENAME TO vehicle_gps_pings")
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS live_locations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -592,6 +628,128 @@ def log_fuel(vehicle_id, sector, km_start, km_end, fuel_added_l, fuel_per_100km,
     conn.commit()
     conn.close()
     return discrepancy_l
+
+
+# ── Sector Equipment ────────────────────────────────────────────────────────
+
+def add_equipment(sector, equipment_code, type, brand="", model="", registration_id="",
+                   photo_url="", operator_employee_id=None):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO sector_equipment
+        (sector, equipment_code, type, brand, model, registration_id, photo_url,
+         operator_employee_id, status, active, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OFFLINE', 1, ?)
+    """, (sector, equipment_code, type, brand, model, registration_id, photo_url,
+          operator_employee_id, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_equipment(sector=None):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    if sector:
+        cur.execute("SELECT * FROM sector_equipment WHERE sector=? ORDER BY equipment_code", (sector,))
+    else:
+        cur.execute("SELECT * FROM sector_equipment ORDER BY sector, equipment_code")
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+# ── GPS ping history (employees / vehicles / equipment) ────────────────────
+# Shared append-only log — vehicle_gps_pings originally only carried vehicle
+# pings; entity_type + employee_id/equipment_id (Phase 1 migration) let it
+# carry employee and equipment pings too, for route-over-period queries.
+
+def add_gps_ping(entity_type, entity_id, sector, latitude, longitude, inside_boundary):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    vehicle_id = entity_id if entity_type == "VEHICLE" else None
+    employee_id = entity_id if entity_type == "EMPLOYEE" else None
+    equipment_id = entity_id if entity_type == "EQUIPMENT" else None
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO vehicle_gps_pings
+        (vehicle_id, sector, latitude, longitude, inside_boundary, recorded_at,
+         entity_type, employee_id, equipment_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (vehicle_id, sector, latitude, longitude, int(bool(inside_boundary)), now,
+          entity_type, employee_id, equipment_id))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_route(entity_type, entity_id, start, end):
+    """GPS pings for one entity within [start, end] (recorded_at strings,
+    same '%Y-%m-%d %H:%M:%S UTC' format used everywhere else), oldest first."""
+    id_column = {"VEHICLE": "vehicle_id", "EMPLOYEE": "employee_id", "EQUIPMENT": "equipment_id"}[entity_type]
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(f"""
+    SELECT latitude, longitude, inside_boundary, recorded_at
+    FROM vehicle_gps_pings
+    WHERE {id_column}=? AND recorded_at BETWEEN ? AND ?
+    ORDER BY recorded_at ASC
+    """, (entity_id, start, end))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+# ── Incidents (risks, extended with Incident-lifecycle fields) ─────────────
+
+def add_incident(sector, risk_level, reason, entity_type=None, entity_id=None,
+                  rule_code=None, distance_m=None, duration_min=None, ai_recommendation=None):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO risks
+        (sector, risk_level, reason, created_at, entity_type, entity_id, status,
+         rule_code, distance_m, duration_min, ai_recommendation)
+    VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?)
+    """, (sector, risk_level, reason, now, entity_type, entity_id,
+          rule_code, distance_m, duration_min, ai_recommendation))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_incidents(status=None):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    if status:
+        cur.execute("SELECT * FROM risks WHERE entity_type IS NOT NULL AND status=? ORDER BY created_at DESC", (status,))
+    else:
+        cur.execute("SELECT * FROM risks WHERE entity_type IS NOT NULL ORDER BY created_at DESC")
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def update_incident_status(incident_id, status, telegram_message_id=None):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    if status == "NOTIFIED":
+        cur.execute(
+            "UPDATE risks SET status=?, notified_at=?, telegram_message_id=? WHERE id=?",
+            (status, now, telegram_message_id, incident_id),
+        )
+    elif status in ("RESOLVED", "DISMISSED"):
+        cur.execute("UPDATE risks SET status=?, resolved_at=? WHERE id=?", (status, now, incident_id))
+    else:
+        cur.execute("UPDATE risks SET status=? WHERE id=?", (status, incident_id))
+    conn.commit()
+    conn.close()
 
 
 # ── Sector Snapshots ──────────────────────────────────────────────────────────
