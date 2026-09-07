@@ -811,7 +811,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             existing = db_fetchone(
                 "SELECT id FROM risks WHERE entity_type='EMPLOYEE' AND entity_id=? "
-                "AND status IN ('OPEN','NOTIFIED') ORDER BY id DESC LIMIT 1",
+                "AND rule_code='SECTOR_EXIT' AND status IN ('OPEN','NOTIFIED') ORDER BY id DESC LIMIT 1",
                 (employee_id,)
             )
             if existing:
@@ -1347,6 +1347,18 @@ async def emergency_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     status_line = "Диспетчер уведомлён." if dispatcher_notified else \
         "⚠ Не удалось автоматически уведомить диспетчера — пожалуйста, также свяжитесь по рации/телефону, если это возможно."
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    emergency_reason = f"🆘 EMERGENCY reported by {employee_name}"
+    recommendation = await loop.run_in_executor(
+        None, generate_incident_recommendation,
+        {"sector": sector, "reason": emergency_reason,
+         "entity_type": "EMPLOYEE", "rule_code": "EMERGENCY"}
+    )
+    if recommendation:
+        set_ai_recommendation(incident_id, recommendation)
+        add_risk_event(incident_id, "AI_RECOMMENDATION_GENERATED", actor="ai")
 
     sent = await update.message.reply_text(
         f"🆘 Экстренная ситуация зафиксирована. {status_line}\n\n"
