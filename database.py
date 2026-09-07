@@ -78,6 +78,19 @@ def _migrate():
     for table, column, definition in new_columns:
         _add_column_if_missing(cur, table, column, definition)
     _add_column_if_missing(cur, "risks", "created_at", "TEXT")
+    for column, definition in [
+        ("entity_type",         "TEXT"),
+        ("entity_id",           "INTEGER"),
+        ("status",              "TEXT DEFAULT 'OPEN'"),
+        ("rule_code",           "TEXT"),
+        ("ai_recommendation",   "TEXT"),
+        ("distance_m",          "REAL"),
+        ("duration_min",        "REAL"),
+        ("notified_at",         "TEXT"),
+        ("resolved_at",         "TEXT"),
+        ("telegram_message_id", "TEXT"),
+    ]:
+        _add_column_if_missing(cur, "risks", column, definition)
 
     # New tables
     cur.execute("""
@@ -113,6 +126,26 @@ def _migrate():
     _add_column_if_missing(cur, "sector_vehicles", "telegram_user_id", "TEXT")
 
     cur.execute("""
+    CREATE TABLE IF NOT EXISTS sector_equipment (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        equipment_code TEXT,
+        type TEXT,
+        brand TEXT,
+        model TEXT,
+        registration_id TEXT,
+        photo_url TEXT,
+        operator_employee_id INTEGER,
+        status TEXT DEFAULT 'OFFLINE',
+        current_task TEXT,
+        fuel_level_pct REAL,
+        working_hours_today REAL DEFAULT 0,
+        active INTEGER DEFAULT 1,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS vehicle_fuel_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         vehicle_id INTEGER,
@@ -139,6 +172,12 @@ def _migrate():
         recorded_at TEXT
     )
     """)
+    for column, definition in [
+        ("entity_type",  "TEXT DEFAULT 'VEHICLE'"),
+        ("employee_id",  "INTEGER"),
+        ("equipment_id", "INTEGER"),
+    ]:
+        _add_column_if_missing(cur, "vehicle_gps_pings", column, definition)
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS live_locations (
