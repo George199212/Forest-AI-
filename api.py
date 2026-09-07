@@ -1093,7 +1093,7 @@ def approve_incident(incident_id: int, body: ApproveIn = ApproveIn(), username: 
     message_id = str(tg_data["result"]["message_id"])
     update_incident_status(incident_id, "NOTIFIED", telegram_message_id=message_id)
     add_risk_event(incident_id, "APPROVED", actor=username)
-    add_risk_event(incident_id, "TELEGRAM_SENT", actor="system")
+    add_risk_event(incident_id, "TELEGRAM_SENT", actor="system", details=action_text)
 
     return {"ok": True, "status": "NOTIFIED"}
 
