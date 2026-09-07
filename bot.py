@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha
+from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event
 from services.robez_ocr_vision import analyze_robez_plan_ocr_vision
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -805,7 +805,11 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         if old_status == "IN" and new_status == "OUT":
-            add_risk(sector_name, "HIGH", f"Worker {employee_name} left sector boundary")
+            incident_id = add_incident(
+                sector_name, "HIGH", f"Worker {employee_name} left sector boundary",
+                entity_type="EMPLOYEE", entity_id=employee_id, rule_code="SECTOR_EXIT"
+            )
+            add_risk_event(incident_id, "DETECTED", actor="system")
 
             try:
                 await context.bot.send_message(

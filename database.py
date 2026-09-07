@@ -92,6 +92,17 @@ def _migrate():
     ]:
         _add_column_if_missing(cur, "risks", column, definition)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS risk_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        risk_id INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        actor TEXT,
+        details TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+
     # New tables
     cur.execute("""
     CREATE TABLE IF NOT EXISTS sector_employees (
@@ -752,6 +763,31 @@ def update_incident_status(incident_id, status, telegram_message_id=None):
         cur.execute("UPDATE risks SET status=? WHERE id=?", (status, incident_id))
     conn.commit()
     conn.close()
+
+
+# ── Risk Events (audit log for risks/incidents) ─────────────────────────────
+
+def add_risk_event(risk_id, event_type, actor=None, details=None):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO risk_events (risk_id, event_type, actor, details, created_at)
+    VALUES (?, ?, ?, ?, ?)
+    """, (risk_id, event_type, actor, details, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_risk_events(risk_id):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM risk_events WHERE risk_id=? ORDER BY created_at ASC", (risk_id,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
 
 
 # ── Sector Snapshots ──────────────────────────────────────────────────────────
