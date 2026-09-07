@@ -561,6 +561,7 @@ const API = '';
 let cache = {};
 let currentSection = 'overview';
 let currentSector = null;
+let currentRiskId = null;
 let currentDetailData = null;
 let currentDetailTab = 'gps';
 let selectedSnapshotId = null;
@@ -651,7 +652,8 @@ function refreshCurrent() { clearCache(); load(currentSection); }
 const loaders = {
   overview: loadOverview, objects: loadObjects, sectors: loadSectors, map: loadMap,
   risks: loadRisks, gps: loadGPS, trucks: loadTrucks, timber: loadTimber,
-  photos: loadPhotos, inspector: () => Promise.all([loadInspector(), loadIncidentsEquipment()]), satellite: loadSatellite
+  photos: loadPhotos, inspector: () => Promise.all([loadInspector(), loadIncidentsEquipment()]), satellite: loadSatellite,
+  'risk-detail': () => currentRiskId && openRisk(currentRiskId),
 };
 
 function load(id) {
@@ -1522,6 +1524,7 @@ function startTypewriter(elId, text) {
 
 async function openRisk(id) {
   currentSection = 'risk-detail';
+  currentRiskId = id;
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('sec-risk-detail').classList.add('active');
   clearCache();
