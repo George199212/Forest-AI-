@@ -1505,7 +1505,6 @@ async function loadRisks() {
   </tbody></table>`;
 }
 
-let selectedOptionId = null;
 let typewriterInterval = null;
 
 function startTypewriter(elId, text) {
@@ -1519,15 +1518,6 @@ function startTypewriter(elId, text) {
     el.textContent = text.slice(0, i);
     if (i >= text.length) clearInterval(typewriterInterval);
   }, 15);
-}
-
-function selectAiOption(optionId) {
-  selectedOptionId = optionId;
-  document.querySelectorAll('.ai-option-card').forEach(el=>{
-    const active = el.dataset.optionId === optionId;
-    el.style.border = active ? '1px solid var(--green)' : '1px solid var(--border)';
-    el.style.background = active ? 'rgba(122,184,60,0.08)' : 'var(--bg3)';
-  });
 }
 
 async function openRisk(id) {
@@ -1563,14 +1553,14 @@ async function openRisk(id) {
   let rec = null;
   try { rec = r.ai_recommendation ? JSON.parse(r.ai_recommendation) : null; } catch(e) { rec = null; }
   const structured = !!(rec && Array.isArray(rec.options) && rec.options.length > 0);
-  selectedOptionId = structured ? (rec.recommended_option_id || rec.options[0].id) : null;
   const aiText = structured ? (rec.summary || '') : (r.ai_recommendation || '');
 
   const optionsHtml = structured ? `
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
       ${rec.options.map(o=>`
-        <div class="ai-option-card" data-option-id="${o.id}" onclick="selectAiOption('${o.id}')"
-             style="padding:10px 12px;border-radius:var(--r);cursor:pointer;border:1px solid ${o.id===selectedOptionId?'var(--green)':'var(--border)'};background:${o.id===selectedOptionId?'rgba(122,184,60,0.08)':'var(--bg3)'}">
+        <div class="ai-option-card" data-option-id="${o.id}"
+             onclick="if(confirm('Отправить это сообщение работнику?')) approveRisk(${r.id}, '${o.id}')"
+             style="padding:10px 12px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border);background:var(--bg3)">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
             <b>${o.label}</b>
             ${o.id===rec.recommended_option_id?'<span class="badge b-green">Recommended</span>':''}
@@ -1604,8 +1594,8 @@ async function openRisk(id) {
       </div>
     </div>
 
-    ${r.status==='OPEN' && r.ai_recommendation ? `
-      <button class="btn" onclick="approveRisk(${r.id}, ${structured ? 'selectedOptionId' : 'null'})" style="margin-bottom:16px">✓ Approve & Send</button>
+    ${!structured && r.status==='OPEN' && r.ai_recommendation ? `
+      <button class="btn" onclick="approveRisk(${r.id}, null)" style="margin-bottom:16px">✓ Approve & Send</button>
     ` : ''}
 
     <div class="card-head" style="margin-top:16px">💬 Chat</div>

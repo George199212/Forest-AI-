@@ -812,6 +812,19 @@ def get_risk_by_telegram_message_id(message_id):
     conn.close()
     return dict(row) if row else None
 
+def get_active_incident_for_employee(employee_id):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM risks WHERE entity_type='EMPLOYEE' AND entity_id=? "
+        "AND status IN ('OPEN','NOTIFIED') ORDER BY id DESC LIMIT 1",
+        (employee_id,)
+    )
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
 
 # ── Sector Snapshots ──────────────────────────────────────────────────────────
 

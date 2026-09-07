@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters, ApplicationHandlerStop
-from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event, set_ai_recommendation, get_risk_by_telegram_message_id
+from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event, set_ai_recommendation, get_active_incident_for_employee
 from services.robez_ocr_vision import analyze_robez_plan_ocr_vision
 from services.ai_resolution import generate_incident_recommendation
 
@@ -1293,18 +1293,57 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Choose action from menu or type /start.")
 
-async def handle_worker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+_KNOWN_MENU_TEXTS = None
+def _is_menu_command(text):
+    global _KNOWN_MENU_TEXTS
+    if _KNOWN_MENU_TEXTS is None:
+        texts = set()
+        for kb in (main_keyboard(), work_keyboard()):
+            for row in kb.keyboard:
+                for btn in row:
+                    texts.add(btn if isinstance(btn, str) else getattr(btn, 'text', str(btn)))
+        texts.add("❌ Cancel")
+        _KNOWN_MENU_TEXTS = texts
+    return text in _KNOWN_MENU_TEXTS
+
+async def handle_worker_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    if not msg or not msg.reply_to_message or not msg.text:
+    if not msg or not msg.text:
         return
-    risk = get_risk_by_telegram_message_id(msg.reply_to_message.message_id)
+    if _is_menu_command(msg.text):
+        return  # let menu_handler (group=0) process it normally
+
+    if any(k.startswith("waiting_") and context.user_data.get(k) for k in list(context.user_data.keys())):
+        return  # user is mid-flow in another menu action — don't hijack their input
+
+    employee_row = db_fetchone(
+        "SELECT id FROM sector_employees WHERE telegram_user_id=?",
+        (str(update.effective_user.id),)
+    )
+    if not employee_row:
+        return
+    employee_id = employee_row[0]
+
+    risk = get_active_incident_for_employee(employee_id)
     if not risk:
-        return  # reply to something unrelated to a risk alert — ignore, don't interfere with menu flow
+        return  # no active incident — let normal menu flow handle it
+
     add_risk_event(risk["id"], "WORKER_REPLIED", actor=f"employee:{update.effective_user.id}", details=msg.text)
     try:
         await msg.reply_text("✅ Ваш ответ передан диспетчеру.")
     except Exception:
         pass
+
+    # AI follow-up с учётом нового сообщения работника
+    import asyncio
+    loop = asyncio.get_event_loop()
+    updated_incident = dict(risk)
+    updated_incident["reason"] = f"{risk['reason']} | Последнее сообщение работника: {msg.text}"
+    recommendation = await loop.run_in_executor(None, generate_incident_recommendation, updated_incident)
+    if recommendation:
+        set_ai_recommendation(risk["id"], recommendation)
+        add_risk_event(risk["id"], "AI_RECOMMENDATION_GENERATED", actor="ai")
+
     raise ApplicationHandlerStop
 
 async def emergency_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1381,7 +1420,7 @@ def main():
     init_plan_tables()
     app = Application.builder().token(TOKEN).build()
 
-    app.add_handler(MessageHandler(filters.REPLY & filters.TEXT, handle_worker_reply), group=-1)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_worker_message), group=-1)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", start))
