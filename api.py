@@ -1020,6 +1020,19 @@ def risks_by_sector():
         })
     return result
 
+@app.get("/api/risks/{risk_id}")
+def get_risk_detail(risk_id: int):
+    risk = db1("SELECT * FROM risks WHERE id=?", (risk_id,))
+    if not risk:
+        return Response(content='{"error":"Not found"}', media_type="application/json", status_code=404)
+    from database import get_risk_events
+    risk["events"] = get_risk_events(risk_id)
+    if risk.get("entity_type") == "EMPLOYEE" and risk.get("entity_id"):
+        employee = db1("SELECT full_name, telegram_user_id FROM sector_employees WHERE id=?", (risk["entity_id"],))
+        risk["employee_name"] = employee.get("full_name") if employee else None
+        risk["telegram_connected"] = bool(employee.get("telegram_user_id")) if employee else False
+    return risk
+
 
 # ── Incidents & Equipment (read-only) ──────────────────────────────────────────
 

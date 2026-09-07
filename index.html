@@ -525,6 +525,17 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   </div>
       </div><!-- /sec-satellite -->
 
+      <!-- RISK DETAIL (opened via click, not in nav menu) -->
+      <div class="section" id="sec-risk-detail">
+        <div class="card">
+          <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
+            <span id="risk-detail-title">Risk</span>
+            <span class="tbl-link" onclick="nav('risks')">← Back to Risks</span>
+          </div>
+          <div id="risk-detail-body"></div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /layout -->
@@ -1486,12 +1497,66 @@ async function loadMap() {
 async function loadRisks() {
   const rows = await api('/api/risks');
   document.getElementById('risks-table').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Level</th><th>Reason</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr>
-      <td><span class="tbl-link" onclick="openSector('${r.sector}')">${r.sector}</span></td>
+    ${rows.map(r=>`<tr style="cursor:pointer" onclick="openRisk(${r.id})">
+      <td><span class="tbl-link" onclick="event.stopPropagation();openSector('${r.sector}')">${r.sector}</span></td>
       <td>${riskBadge(r.risk_level)}</td>
       <td style="color:var(--text2)">${r.reason}</td>
     </tr>`).join('')||'<tr><td colspan="3" class="empty">no risks</td></tr>'}
   </tbody></table>`;
+}
+
+async function openRisk(id) {
+  currentSection = 'risk-detail';
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-risk-detail').classList.add('active');
+  clearCache();
+  const r = await api(`/api/risks/${id}`);
+  document.getElementById('risk-detail-title').textContent = `Risk #${r.id} — ${r.sector}`;
+
+  const eventsHtml = (r.events||[]).map(e=>
+    `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+       <span style="color:var(--text2);font-family:var(--mono);font-size:11px">${e.created_at}</span>
+       <b>${e.event_type}</b>${e.actor?` <span style="color:var(--text2)">(${e.actor})</span>`:''}
+     </div>`
+  ).join('') || '<div class="empty">No events</div>';
+
+  document.getElementById('risk-detail-body').innerHTML = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+      <div>${riskBadge(r.risk_level)}</div>
+      <div style="color:var(--text2)">Status: <b>${r.status||'OPEN'}</b></div>
+      <div style="color:var(--text2)">Sector: <b>${r.sector}</b></div>
+      ${r.employee_name?`<div style="color:var(--text2)">Worker: <b>${r.employee_name}</b></div>`:''}
+    </div>
+    <div style="margin-bottom:16px">${r.reason}</div>
+
+    <div class="card" style="background:var(--bg2);margin-bottom:16px">
+      <div class="card-head">🤖 AI Recommendation</div>
+      <div style="padding:12px;white-space:pre-wrap">${r.ai_recommendation || 'AI analysis not yet available for this risk.'}</div>
+    </div>
+
+    ${r.status==='OPEN' && r.ai_recommendation ? `
+      <button class="btn" onclick="approveRisk(${r.id})" style="margin-bottom:16px">✓ Approve & Send</button>
+    ` : ''}
+
+    <div class="card-head" style="margin-top:16px">Timeline</div>
+    ${eventsHtml}
+  `;
+}
+
+async function approveRisk(id) {
+  if (!confirm('Send this recommendation to the worker via Telegram?')) return;
+  try {
+    const resp = await fetch(`/api/incidents/${id}/approve`, {method:'POST'});
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      alert('Failed: ' + (data.error || resp.statusText));
+      return;
+    }
+    clearCache();
+    openRisk(id);
+  } catch(e) {
+    alert('Failed: ' + e.message);
+  }
 }
 
 // ── GPS ───────────────────────────────────────────────────────────────────────
