@@ -733,32 +733,51 @@ def _calc_expiry(started_at: str, live_period: int) -> str:
     started = datetime.strptime(started_at, "%Y-%m-%d %H:%M:%S UTC")
     return (started + timedelta(seconds=live_period or 0)).strftime("%Y-%m-%d %H:%M:%S UTC")
 
+def _is_inside_sector(sector, latitude, longitude):
+    """Same polygon-or-radius-fallback geo-check handle_location's check-in
+    flow uses, reused here so live-location tracking agrees with it."""
+    sector_row = get_sector_from_db(sector)
+    if sector_row and sector_row.get("boundary_json"):
+        try:
+            boundary = json.loads(sector_row["boundary_json"])
+            return point_in_polygon(latitude, longitude, boundary)
+        except Exception:
+            return False
+    sector_lat = (sector_row.get("center_lat") if sector_row else None) or 56.9587
+    sector_lon = (sector_row.get("center_lon") if sector_row else None) or 24.1034
+    return calculate_distance_meters(latitude, longitude, sector_lat, sector_lon) <= 10000
+
 def upsert_live_location(employee_id, telegram_user_id, sector, latitude, longitude, live_period):
     """One row per person — UPSERT by telegram_user_id so live-location edits
     (sent every few seconds by Telegram) update the same row instead of
-    piling up history."""
+    piling up history. Returns (old_status, new_status) — 'IN'/'OUT' —
+    so the caller can detect an IN->OUT transition and alert.
+    old_status is None on the very first report (nothing to transition from)."""
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    new_status = "IN" if _is_inside_sector(sector, latitude, longitude) else "OUT"
     existing = db_fetchone(
-        "SELECT id, started_at, live_period FROM live_locations WHERE telegram_user_id=?",
+        "SELECT id, started_at, live_period, last_status FROM live_locations WHERE telegram_user_id=?",
         (telegram_user_id,)
     )
     if existing:
-        row_id, started_at, existing_period = existing
+        row_id, started_at, existing_period, old_status = existing
         period = live_period if live_period is not None else existing_period
         expires_at = _calc_expiry(started_at, period)
         db_execute("""
         UPDATE live_locations SET employee_id=?, sector=?, latitude=?, longitude=?,
-            live_period=?, updated_at=?, expires_at=?
+            live_period=?, updated_at=?, expires_at=?, last_status=?
         WHERE id=?
-        """, (employee_id, sector, latitude, longitude, period, now, expires_at, row_id))
+        """, (employee_id, sector, latitude, longitude, period, now, expires_at, new_status, row_id))
     else:
+        old_status = None
         period = live_period or 0
         expires_at = _calc_expiry(now, period)
         db_execute("""
         INSERT INTO live_locations
-            (employee_id, telegram_user_id, sector, latitude, longitude, live_period, started_at, updated_at, expires_at)
-        VALUES (?,?,?,?,?,?,?,?,?)
-        """, (employee_id, telegram_user_id, sector, latitude, longitude, period, now, now, expires_at))
+            (employee_id, telegram_user_id, sector, latitude, longitude, live_period, started_at, updated_at, expires_at, last_status)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (employee_id, telegram_user_id, sector, latitude, longitude, period, now, now, expires_at, new_status))
+    return old_status, new_status
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_edit = update.edited_message is not None
@@ -775,14 +794,48 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         if not employee_row:
             return
-        employee_id, _employee_name, employee_sector = employee_row
+        employee_id, employee_name, employee_sector = employee_row
         sector_name = context.user_data.get("pending_checkin_sector") \
             or (context.user_data.get("active_work_session") or {}).get("sector") \
             or employee_sector
-        upsert_live_location(
-            employee_id, str(update.effective_user.id), sector_name,
+        telegram_user_id = str(update.effective_user.id)
+        old_status, new_status = upsert_live_location(
+            employee_id, telegram_user_id, sector_name,
             loc.latitude, loc.longitude, loc.live_period
         )
+
+        if old_status == "IN" and new_status == "OUT":
+            add_risk(sector_name, "HIGH", f"Worker {employee_name} left sector boundary")
+
+            try:
+                await context.bot.send_message(
+                    chat_id=int(telegram_user_id),
+                    text=(
+                        "⚠️ Похоже, вы вышли за границу рабочего участка.\n\n"
+                        "Пожалуйста, вернитесь в зону сектора. Диспетчер уже уведомлён."
+                    )
+                )
+            except Exception:
+                pass  # e.g. user blocked the bot — don't break tracking over it
+
+            dispatcher_chat_id = os.environ.get("DISPATCHER_CHAT_ID", "").strip()
+            if dispatcher_chat_id:
+                maps_link = f"https://maps.google.com/?q={loc.latitude},{loc.longitude}"
+                try:
+                    await context.bot.send_message(
+                        chat_id=int(dispatcher_chat_id),
+                        text=(
+                            "🚨 Сотрудник покинул границу сектора\n\n"
+                            f"Сотрудник: {employee_name}\n"
+                            f"Сектор: {sector_name}\n"
+                            f"Координаты: {loc.latitude:.6f}, {loc.longitude:.6f}\n"
+                            f"Карта: {maps_link}"
+                        )
+                    )
+                except Exception:
+                    pass
+            else:
+                print("DISPATCHER_CHAT_ID not set — skipping dispatcher alert")
         return
 
     # ── Vehicle GPS ping (separate flow — does not touch employee check-in) ──
