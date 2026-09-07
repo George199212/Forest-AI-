@@ -84,6 +84,17 @@ def generate_incident_recommendation(incident: dict) -> str:
         text = "".join(
             block.text for block in response.content if getattr(block, "type", "") == "text"
         ).strip()
+
+        text = text.strip()
+        if text.startswith("```"):
+            # Strip a leading ```json / ``` fence and trailing ``` if present
+            lines = text.split("\n")
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+
         return text or None
     except Exception as e:
         print(f"generate_incident_recommendation failed: {e}")
