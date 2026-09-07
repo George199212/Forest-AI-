@@ -9,8 +9,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event
+from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event, set_ai_recommendation
 from services.robez_ocr_vision import analyze_robez_plan_ocr_vision
+from services.ai_resolution import generate_incident_recommendation
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
@@ -805,11 +806,23 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         if old_status == "IN" and new_status == "OUT":
+            incident_reason = f"Worker {employee_name} left sector boundary"
             incident_id = add_incident(
-                sector_name, "HIGH", f"Worker {employee_name} left sector boundary",
+                sector_name, "HIGH", incident_reason,
                 entity_type="EMPLOYEE", entity_id=employee_id, rule_code="SECTOR_EXIT"
             )
             add_risk_event(incident_id, "DETECTED", actor="system")
+
+            import asyncio
+            loop = asyncio.get_event_loop()
+            recommendation = await loop.run_in_executor(
+                None, generate_incident_recommendation,
+                {"sector": sector_name, "reason": incident_reason,
+                 "entity_type": "EMPLOYEE", "rule_code": "SECTOR_EXIT"}
+            )
+            if recommendation:
+                set_ai_recommendation(incident_id, recommendation)
+                add_risk_event(incident_id, "AI_RECOMMENDATION_GENERATED", actor="ai")
 
             try:
                 await context.bot.send_message(

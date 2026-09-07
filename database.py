@@ -764,6 +764,13 @@ def update_incident_status(incident_id, status, telegram_message_id=None):
     conn.commit()
     conn.close()
 
+def set_ai_recommendation(incident_id, text):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("UPDATE risks SET ai_recommendation=? WHERE id=?", (text, incident_id))
+    conn.commit()
+    conn.close()
+
 
 # ── Risk Events (audit log for risks/incidents) ─────────────────────────────
 
