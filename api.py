@@ -1097,6 +1097,40 @@ def approve_incident(incident_id: int, body: ApproveIn = ApproveIn(), username: 
 
     return {"ok": True, "status": "NOTIFIED"}
 
+class SendMessageIn(BaseModel):
+    text: str
+
+@app.post("/api/risks/{risk_id}/send-message")
+def send_risk_message(risk_id: int, body: SendMessageIn, username: str = Depends(verify_credentials)):
+    if not body.text or not body.text.strip():
+        return Response(content='{"error":"Empty message"}', media_type="application/json", status_code=400)
+
+    incident = db1("SELECT * FROM risks WHERE id=?", (risk_id,))
+    if not incident or not incident.get("entity_type"):
+        return Response(content='{"error":"Not an incident"}', media_type="application/json", status_code=400)
+
+    employee = db1("SELECT telegram_user_id, full_name FROM sector_employees WHERE id=?", (incident["entity_id"],))
+    telegram_user_id = employee.get("telegram_user_id") if employee else None
+    if not telegram_user_id:
+        return Response(content='{"error":"Employee not linked to Telegram"}', media_type="application/json", status_code=400)
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    tg_response = requests.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        json={"chat_id": telegram_user_id, "text": f"💬 Диспетчер Forest AI:\n\n{body.text.strip()}"},
+        timeout=10,
+    )
+    tg_data = tg_response.json()
+    if not tg_data.get("ok"):
+        return Response(content=f'{{"error":"Telegram send failed: {tg_data.get("description","")}"}}', media_type="application/json", status_code=502)
+
+    message_id = str(tg_data["result"]["message_id"])
+    from database import set_telegram_message_id
+    set_telegram_message_id(risk_id, message_id)
+    add_risk_event(risk_id, "DISPATCHER_MESSAGE", actor=username, details=body.text.strip())
+
+    return {"ok": True}
+
 
 # ── GPS ───────────────────────────────────────────────────────────────────────
 

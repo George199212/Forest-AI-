@@ -764,6 +764,13 @@ def update_incident_status(incident_id, status, telegram_message_id=None):
     conn.commit()
     conn.close()
 
+def set_telegram_message_id(risk_id, message_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("UPDATE risks SET telegram_message_id=? WHERE id=?", (str(message_id), risk_id))
+    conn.commit()
+    conn.close()
+
 def set_ai_recommendation(incident_id, text):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
