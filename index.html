@@ -1538,13 +1538,27 @@ async function openRisk(id) {
   const r = await api(`/api/risks/${id}`);
   document.getElementById('risk-detail-title').textContent = `Risk #${r.id} — ${r.sector}`;
 
-  const eventsHtml = (r.events||[]).map(e=>
-    `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
-       <span style="color:var(--text2);font-family:var(--mono);font-size:11px">${e.created_at}</span>
-       <b>${e.event_type}</b>${e.actor?` <span style="color:var(--text2)">(${e.actor})</span>`:''}
-       ${e.event_type==='WORKER_REPLIED' && e.details ? `<div style="margin-top:4px;padding:8px;background:var(--bg3);border-radius:var(--r)">💬 ${e.details}</div>` : ''}
-     </div>`
-  ).join('') || '<div class="empty">No events</div>';
+  const chatEventTypes = ['WORKER_REPLIED', 'DISPATCHER_MESSAGE', 'TELEGRAM_SENT'];
+  const isFromWorker = (type) => type === 'WORKER_REPLIED';
+
+  const eventsHtml = (r.events||[]).map(e=>{
+    if (chatEventTypes.includes(e.event_type) && e.details) {
+      const fromWorker = isFromWorker(e.event_type);
+      return `<div style="display:flex;justify-content:${fromWorker?'flex-start':'flex-end'};margin:8px 0">
+        <div style="max-width:70%;padding:10px 14px;border-radius:var(--r);
+                    background:${fromWorker?'var(--bg3)':'rgba(122,184,60,0.12)'};
+                    border:1px solid ${fromWorker?'var(--border)':'var(--green)'}">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;font-family:var(--mono)">
+            ${fromWorker ? (r.employee_name||'Worker') : 'Forest AI'} · ${e.created_at}
+          </div>
+          <div>${e.details}</div>
+        </div>
+      </div>`;
+    }
+    return `<div style="text-align:center;margin:6px 0;font-size:11px;color:var(--text2);font-family:var(--mono)">
+      ${e.created_at} — ${e.event_type}${e.actor?` (${e.actor})`:''}
+    </div>`;
+  }).join('') || '<div class="empty">No events</div>';
 
   let rec = null;
   try { rec = r.ai_recommendation ? JSON.parse(r.ai_recommendation) : null; } catch(e) { rec = null; }
@@ -1594,11 +1608,20 @@ async function openRisk(id) {
       <button class="btn" onclick="approveRisk(${r.id}, ${structured ? 'selectedOptionId' : 'null'})" style="margin-bottom:16px">✓ Approve & Send</button>
     ` : ''}
 
-    <div class="card-head" style="margin-top:16px">Timeline</div>
-    ${eventsHtml}
+    <div class="card-head" style="margin-top:16px">💬 Chat</div>
+    <div id="risk-chat-log" style="max-height:400px;overflow-y:auto;padding:8px 0">${eventsHtml}</div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <input id="risk-chat-input" type="text" placeholder="Написать работнику..."
+             style="flex:1;padding:10px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg3);color:var(--text)"
+             onkeydown="if(event.key==='Enter')sendRiskMessage(${r.id})">
+      <button class="btn" onclick="sendRiskMessage(${r.id})">Отправить</button>
+    </div>
   `;
 
   if (aiText) startTypewriter('ai-summary', aiText);
+
+  const chatLog = document.getElementById('risk-chat-log');
+  if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
 }
 
 async function approveRisk(id, optionId) {
@@ -1617,6 +1640,32 @@ async function approveRisk(id, optionId) {
     openRisk(id);
   } catch(e) {
     alert('Failed: ' + e.message);
+  }
+}
+
+async function sendRiskMessage(id) {
+  const input = document.getElementById('risk-chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.disabled = true;
+  try {
+    const resp = await fetch(`/api/risks/${id}/send-message`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text})
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      alert('Failed: ' + (data.error || resp.statusText));
+      input.disabled = false;
+      return;
+    }
+    input.value = '';
+    input.disabled = false;
+    clearCache();
+    openRisk(id);
+  } catch(e) {
+    alert('Failed: ' + e.message);
+    input.disabled = false;
   }
 }
 
