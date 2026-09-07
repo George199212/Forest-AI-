@@ -1044,8 +1044,11 @@ def get_incidents_route(status: str = None):
 def get_equipment_route(sector: str = None):
     return get_equipment(sector)
 
+class ApproveIn(BaseModel):
+    option_id: Optional[str] = None
+
 @app.post("/api/incidents/{incident_id}/approve")
-def approve_incident(incident_id: int, username: str = Depends(verify_credentials)):
+def approve_incident(incident_id: int, body: ApproveIn = ApproveIn(), username: str = Depends(verify_credentials)):
     incident = db1("SELECT * FROM risks WHERE id=?", (incident_id,))
     if not incident or not incident.get("entity_type"):
         return Response(content='{"error":"Not an incident"}', media_type="application/json", status_code=400)
@@ -1055,11 +1058,21 @@ def approve_incident(incident_id: int, username: str = Depends(verify_credential
     if not telegram_user_id:
         return Response(content='{"error":"Employee not linked to Telegram"}', media_type="application/json", status_code=400)
 
+    import json as _json
+    try:
+        rec = _json.loads(incident.get("ai_recommendation") or "")
+        options = {o["id"]: o for o in rec.get("options", [])}
+        chosen_id = body.option_id or rec.get("recommended_option_id")
+        chosen = options.get(chosen_id)
+        action_text = chosen["message_text"] if chosen else rec.get("summary", "")
+    except Exception:
+        action_text = incident.get("ai_recommendation") or ""
+
     text = (
         f"🚨 FOREST AI — ACTION REQUIRED\n\n"
         f"Risk: {incident['reason']}\n"
         f"Sector: {incident['sector']}\nPriority: {incident['risk_level']}\n\n"
-        f"{incident.get('ai_recommendation') or ''}"
+        f"{action_text}"
     )
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     tg_response = requests.post(
