@@ -807,22 +807,32 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if old_status == "IN" and new_status == "OUT":
             incident_reason = f"Worker {employee_name} left sector boundary"
-            incident_id = add_incident(
-                sector_name, "HIGH", incident_reason,
-                entity_type="EMPLOYEE", entity_id=employee_id, rule_code="SECTOR_EXIT"
-            )
-            add_risk_event(incident_id, "DETECTED", actor="system")
 
-            import asyncio
-            loop = asyncio.get_event_loop()
-            recommendation = await loop.run_in_executor(
-                None, generate_incident_recommendation,
-                {"sector": sector_name, "reason": incident_reason,
-                 "entity_type": "EMPLOYEE", "rule_code": "SECTOR_EXIT"}
+            existing = db_fetchone(
+                "SELECT id FROM risks WHERE entity_type='EMPLOYEE' AND entity_id=? "
+                "AND status IN ('OPEN','NOTIFIED') ORDER BY id DESC LIMIT 1",
+                (employee_id,)
             )
-            if recommendation:
-                set_ai_recommendation(incident_id, recommendation)
-                add_risk_event(incident_id, "AI_RECOMMENDATION_GENERATED", actor="ai")
+            if existing:
+                incident_id = existing[0]
+                add_risk_event(incident_id, "STILL_OUTSIDE", actor="system")
+            else:
+                incident_id = add_incident(
+                    sector_name, "HIGH", incident_reason,
+                    entity_type="EMPLOYEE", entity_id=employee_id, rule_code="SECTOR_EXIT"
+                )
+                add_risk_event(incident_id, "DETECTED", actor="system")
+
+                import asyncio
+                loop = asyncio.get_event_loop()
+                recommendation = await loop.run_in_executor(
+                    None, generate_incident_recommendation,
+                    {"sector": sector_name, "reason": incident_reason,
+                     "entity_type": "EMPLOYEE", "rule_code": "SECTOR_EXIT"}
+                )
+                if recommendation:
+                    set_ai_recommendation(incident_id, recommendation)
+                    add_risk_event(incident_id, "AI_RECOMMENDATION_GENERATED", actor="ai")
 
             try:
                 await context.bot.send_message(
