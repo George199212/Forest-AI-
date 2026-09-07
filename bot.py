@@ -1357,6 +1357,21 @@ async def emergency_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     employee_id, employee_name, sector = employee_row
     sector = context.user_data.get("pending_checkin_sector") or (context.user_data.get("active_work_session") or {}).get("sector") or sector or "UNKNOWN"
 
+    existing = db_fetchone(
+        "SELECT id FROM risks WHERE entity_type='EMPLOYEE' AND entity_id=? "
+        "AND rule_code='EMERGENCY' AND status IN ('OPEN','NOTIFIED') ORDER BY id DESC LIMIT 1",
+        (employee_id,)
+    )
+    if existing:
+        incident_id = existing[0]
+        add_risk_event(incident_id, "SOS_REPEATED", actor="worker_sos")
+        await update.message.reply_text(
+            "🆘 У вас уже зарегистрирована активная экстренная ситуация. "
+            "Диспетчер уведомлён и уже работает над этим. Просто напишите "
+            "любое сообщение, если нужно передать дополнительную информацию."
+        )
+        return
+
     incident_id = add_incident(
         sector, "HIGH", f"🆘 EMERGENCY reported by {employee_name}",
         entity_type="EMPLOYEE", entity_id=employee_id, rule_code="EMERGENCY"
