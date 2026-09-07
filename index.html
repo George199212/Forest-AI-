@@ -1586,6 +1586,21 @@ async function openRisk(id) {
     </div>
     <div style="margin-bottom:16px">${r.reason}</div>
 
+    ${r.assigned_equipment ? `
+      <div style="color:var(--text2);font-size:13px;margin-bottom:12px">
+        🚜 Техника: <b>${r.assigned_equipment.type} ${r.assigned_equipment.brand||''} ${r.assigned_equipment.model||''}</b>
+        (${r.assigned_equipment.equipment_code}) — статус: ${r.assigned_equipment.status}
+      </div>
+    ` : ''}
+
+    ${r.last_location ? `
+      <div class="card-head" style="margin-top:8px">📍 Последняя позиция</div>
+      <div id="risk-map-wrap" style="height:220px;border-radius:var(--r);overflow:hidden;margin-bottom:16px"></div>
+      <div style="color:var(--text2);font-size:11px;margin-top:-12px;margin-bottom:16px">
+        Обновлено: ${r.last_location.updated_at}
+      </div>
+    ` : ''}
+
     <div class="card" style="background:var(--bg2);margin-bottom:16px">
       <div class="card-head">🤖 AI Recommendation</div>
       <div style="padding:12px">
@@ -1612,6 +1627,19 @@ async function openRisk(id) {
 
   const chatLog = document.getElementById('risk-chat-log');
   if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+
+  if (r.last_location) {
+    ensureSatLeaflet(() => {
+      const container = document.getElementById('risk-map-wrap');
+      if (!container) return;
+      const map = L.map(container).setView([r.last_location.latitude, r.last_location.longitude], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:'&copy; OpenStreetMap contributors', maxZoom:19
+      }).addTo(map);
+      L.marker([r.last_location.latitude, r.last_location.longitude]).addTo(map)
+        .bindPopup(`${r.employee_name||'Worker'}<br>${r.last_location.updated_at}`).openPopup();
+    });
+  }
 }
 
 async function approveRisk(id, optionId) {

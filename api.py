@@ -1031,6 +1031,22 @@ def get_risk_detail(risk_id: int):
         employee = db1("SELECT full_name, telegram_user_id FROM sector_employees WHERE id=?", (risk["entity_id"],))
         risk["employee_name"] = employee.get("full_name") if employee else None
         risk["telegram_connected"] = bool(employee.get("telegram_user_id")) if employee else False
+
+        loc = db1(
+            "SELECT latitude, longitude, updated_at, sector FROM live_locations "
+            "WHERE employee_id=? ORDER BY updated_at DESC LIMIT 1",
+            (risk["entity_id"],)
+        )
+        if loc.get("latitude"):
+            risk["last_location"] = loc
+
+        equipment = db1(
+            "SELECT equipment_code, type, brand, model, status FROM sector_equipment "
+            "WHERE operator_employee_id=? AND active=1 LIMIT 1",
+            (risk["entity_id"],)
+        )
+        if equipment.get("equipment_code"):
+            risk["assigned_equipment"] = equipment
     return risk
 
 
