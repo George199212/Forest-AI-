@@ -518,6 +518,7 @@ def main_keyboard():
         ["🗺 Add Sector Boundary", "📄 Robežu Plāns — OCR"],
         ["📊 Report", "📤 Export Report"],
         ["⚙️ Settings"],
+        ["🆘 SOS"],
     ], resize_keyboard=True)
 
 def work_keyboard():
@@ -1284,6 +1285,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📊 Report":              report,
         "📤 Export Report":       export_report,
         "⚙️ Settings":           settings,
+        "🆘 SOS":                 emergency_button,
     }
     handler = dispatch.get(text)
     if handler:
@@ -1304,6 +1306,54 @@ async def handle_worker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception:
         pass
     raise ApplicationHandlerStop
+
+async def emergency_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    employee_row = db_fetchone(
+        "SELECT id, full_name, sector FROM sector_employees WHERE telegram_user_id=?",
+        (str(update.effective_user.id),)
+    )
+    if not employee_row:
+        await update.message.reply_text("❌ Вы не зарегистрированы в Forest AI. Обратитесь к администратору.")
+        return
+    employee_id, employee_name, sector = employee_row
+    sector = context.user_data.get("pending_checkin_sector") or (context.user_data.get("active_work_session") or {}).get("sector") or sector or "UNKNOWN"
+
+    incident_id = add_incident(
+        sector, "HIGH", f"🆘 EMERGENCY reported by {employee_name}",
+        entity_type="EMPLOYEE", entity_id=employee_id, rule_code="EMERGENCY"
+    )
+    add_risk_event(incident_id, "DETECTED", actor="worker_sos")
+
+    dispatcher_notified = False
+    dispatcher_chat_id = os.environ.get("DISPATCHER_CHAT_ID", "").strip()
+    if dispatcher_chat_id:
+        try:
+            await context.bot.send_message(
+                chat_id=int(dispatcher_chat_id),
+                text=(
+                    f"🆘🆘🆘 ЭКСТРЕННАЯ СИТУАЦИЯ 🆘🆘🆘\n\n"
+                    f"Сотрудник: {employee_name}\nСектор: {sector}\n\n"
+                    f"Требуется немедленное реагирование."
+                )
+            )
+            add_risk_event(incident_id, "DISPATCHER_ALERTED", actor="system")
+            dispatcher_notified = True
+        except Exception as e:
+            print(f"EMERGENCY: failed to alert dispatcher for incident {incident_id}: {e}")
+            add_risk_event(incident_id, "DISPATCHER_ALERT_FAILED", actor="system", details=str(e))
+    else:
+        print(f"EMERGENCY: DISPATCHER_CHAT_ID not set — incident {incident_id} has NO dispatcher alert")
+        add_risk_event(incident_id, "DISPATCHER_NOT_CONFIGURED", actor="system")
+
+    status_line = "Диспетчер уведомлён." if dispatcher_notified else \
+        "⚠ Не удалось автоматически уведомить диспетчера — пожалуйста, также свяжитесь по рации/телефону, если это возможно."
+
+    sent = await update.message.reply_text(
+        f"🆘 Экстренная ситуация зафиксирована. {status_line}\n\n"
+        "Пожалуйста, ОТВЕТЬТЕ на это сообщение и опишите, что произошло и где вы находитесь."
+    )
+    from database import update_incident_status
+    update_incident_status(incident_id, "NOTIFIED", telegram_message_id=str(sent.message_id))
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     print("BOT ERROR:", context.error)
