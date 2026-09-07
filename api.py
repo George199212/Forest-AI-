@@ -3,7 +3,7 @@ Forest AI — Full Commercial API
 Run: uvicorn api:app --host 0.0.0.0 --port 8000
 """
 
-import sqlite3, os, io, math, json, secrets
+import sqlite3, os, io, math, json, secrets, requests
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List
@@ -12,7 +12,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
 
-from database import init_db, get_incidents, get_equipment
+from database import init_db, get_incidents, get_equipment, update_incident_status, add_risk_event
 
 try:
     from PIL import Image, ImageDraw
@@ -1030,6 +1030,46 @@ def get_incidents_route(status: str = None):
 @app.get("/api/equipment")
 def get_equipment_route(sector: str = None):
     return get_equipment(sector)
+
+@app.post("/api/incidents/{incident_id}/approve")
+def approve_incident(incident_id: int, username: str = Depends(verify_credentials)):
+    incident = db1("SELECT * FROM risks WHERE id=?", (incident_id,))
+    if not incident or not incident.get("entity_type"):
+        return Response(content='{"error":"Not an incident"}', media_type="application/json", status_code=400)
+
+    employee = db1("SELECT telegram_user_id, full_name FROM sector_employees WHERE id=?", (incident["entity_id"],))
+    telegram_user_id = employee.get("telegram_user_id") if employee else None
+    if not telegram_user_id:
+        return Response(content='{"error":"Employee not linked to Telegram"}', media_type="application/json", status_code=400)
+
+    text = (
+        f"🚨 FOREST AI — ACTION REQUIRED\n\n"
+        f"Risk: {incident['reason']}\n"
+        f"Sector: {incident['sector']}\nPriority: {incident['risk_level']}\n\n"
+        f"{incident.get('ai_recommendation') or ''}"
+    )
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    tg_response = requests.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        json={
+            "chat_id": telegram_user_id,
+            "text": text,
+            "reply_markup": {"inline_keyboard": [[
+                {"text": "✓ I HAVE RETURNED", "callback_data": f"confirm_return:{incident_id}"}
+            ]]},
+        },
+        timeout=10,
+    )
+    tg_data = tg_response.json()
+    if not tg_data.get("ok"):
+        return Response(content=f'{{"error":"Telegram send failed: {tg_data.get("description","")}"}}', media_type="application/json", status_code=502)
+
+    message_id = str(tg_data["result"]["message_id"])
+    update_incident_status(incident_id, "NOTIFIED", telegram_message_id=message_id)
+    add_risk_event(incident_id, "APPROVED", actor=username)
+    add_risk_event(incident_id, "TELEGRAM_SENT", actor="system")
+
+    return {"ok": True, "status": "NOTIFIED"}
 
 
 # ── GPS ───────────────────────────────────────────────────────────────────────
