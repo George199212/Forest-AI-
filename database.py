@@ -796,6 +796,15 @@ def get_risk_events(risk_id):
     conn.close()
     return rows
 
+def get_risk_by_telegram_message_id(message_id):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM risks WHERE telegram_message_id=?", (str(message_id),))
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
 
 # ── Sector Snapshots ──────────────────────────────────────────────────────────
 

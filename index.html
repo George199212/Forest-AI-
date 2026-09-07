@@ -1542,6 +1542,7 @@ async function openRisk(id) {
     `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
        <span style="color:var(--text2);font-family:var(--mono);font-size:11px">${e.created_at}</span>
        <b>${e.event_type}</b>${e.actor?` <span style="color:var(--text2)">(${e.actor})</span>`:''}
+       ${e.event_type==='WORKER_REPLIED' && e.details ? `<div style="margin-top:4px;padding:8px;background:var(--bg3);border-radius:var(--r)">💬 ${e.details}</div>` : ''}
      </div>`
   ).join('') || '<div class="empty">No events</div>';
 

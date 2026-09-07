@@ -8,8 +8,8 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event, set_ai_recommendation
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters, ApplicationHandlerStop
+from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event, set_ai_recommendation, get_risk_by_telegram_message_id
 from services.robez_ocr_vision import analyze_robez_plan_ocr_vision
 from services.ai_resolution import generate_incident_recommendation
 
@@ -1291,6 +1291,20 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Choose action from menu or type /start.")
 
+async def handle_worker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.reply_to_message or not msg.text:
+        return
+    risk = get_risk_by_telegram_message_id(msg.reply_to_message.message_id)
+    if not risk:
+        return  # reply to something unrelated to a risk alert — ignore, don't interfere with menu flow
+    add_risk_event(risk["id"], "WORKER_REPLIED", actor=f"employee:{update.effective_user.id}", details=msg.text)
+    try:
+        await msg.reply_text("✅ Ваш ответ передан диспетчеру.")
+    except Exception:
+        pass
+    raise ApplicationHandlerStop
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     print("BOT ERROR:", context.error)
     if update and hasattr(update, "effective_message") and update.effective_message:
@@ -1304,6 +1318,8 @@ def main():
     init_work_tables()
     init_plan_tables()
     app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(MessageHandler(filters.REPLY & filters.TEXT, handle_worker_reply), group=-1)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", start))
