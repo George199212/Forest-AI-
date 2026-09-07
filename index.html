@@ -1567,12 +1567,18 @@ async function openRisk(id) {
     </div>
   ` : '';
 
+  const hasReply = (r.events||[]).some(e=>e.event_type==='WORKER_REPLIED');
+  const deliveryBadge = hasReply
+    ? '<span style="color:var(--green)">✓✓ Отвечено</span>'
+    : (r.status!=='OPEN' ? '<span style="color:var(--text2)">✓ Отправлено</span>' : '');
+
   document.getElementById('risk-detail-body').innerHTML = `
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
       <div>${riskBadge(r.risk_level)}</div>
       <div style="color:var(--text2)">Status: <b>${r.status||'OPEN'}</b></div>
       <div style="color:var(--text2)">Sector: <b>${r.sector}</b></div>
       ${r.employee_name?`<div style="color:var(--text2)">Worker: <b>${r.employee_name}</b></div>`:''}
+      ${deliveryBadge}
     </div>
     <div style="margin-bottom:16px">${r.reason}</div>
 

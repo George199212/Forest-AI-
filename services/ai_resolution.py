@@ -33,14 +33,15 @@ PROMPT_TEMPLATE = (
     "Entity type: {entity_type}\n"
     "Rule triggered: {rule_code}\n\n"
     "Based ONLY on the information given above (do not invent distances, "
-    "durations, or any other numbers not provided), produce a short summary "
-    "and 2-4 concrete response options for the dispatcher handling this "
-    "incident. Each option needs a ready-to-send Telegram message to the "
-    "worker (polite, specific, in Russian, no markdown formatting).\n\n"
+    "durations, or any other numbers not provided), produce a detailed "
+    "summary and 2-4 concrete response options for the dispatcher handling "
+    "this incident. Each option needs a ready-to-send Telegram message to "
+    "the worker — polite, specific, professional, in Russian, no markdown "
+    "formatting, 2-3 sentences (not just one).\n\n"
     "Return ONLY valid JSON, no markdown code fences, no explanation outside "
     "the JSON object, matching exactly this schema:\n\n"
     "{{\n"
-    '  "summary": "1-2 sentences describing what happened, in Russian, based ONLY on given data",\n'
+    '  "summary": "A detailed paragraph (4-6 sentences) describing what happened, the context, and why it matters operationally — suitable for display on a supervisor'"'"'s dashboard during a live demo, in Russian, based ONLY on given data",\n'
     '  "options": [\n'
     '    {{"id": "contact_worker", "label": "Связаться с работником", "message_text": "..."}},\n'
     '    {{"id": "dispatch_supervisor", "label": "Направить супервайзера", "message_text": "..."}}\n'
