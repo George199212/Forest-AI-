@@ -210,8 +210,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="logo">
-      <div class="logo-mark"><div class="logo-dot"></div><span class="logo-name">Forest AI</span></div>
-      <div class="logo-sub">forestai.lv</div>
+      <div class="logo-mark" onclick="nav('overview')" style="cursor:pointer"><div class="logo-dot"></div><span class="logo-name">Forest AI</span></div>
     </div>
     <nav>
       <div class="nav-group">Monitor</div>
@@ -653,7 +652,7 @@ const loaders = {
   overview: loadOverview, objects: loadObjects, sectors: loadSectors, map: loadMap,
   risks: loadRisks, gps: loadGPS, trucks: loadTrucks, timber: loadTimber,
   photos: loadPhotos, inspector: () => Promise.all([loadInspector(), loadIncidentsEquipment()]), satellite: loadSatellite,
-  'risk-detail': () => currentRiskId && openRisk(currentRiskId),
+  'risk-detail': () => currentRiskId && openRisk(currentRiskId, false),
 };
 
 function load(id) {
@@ -1522,11 +1521,12 @@ function startTypewriter(elId, text) {
   }, 15);
 }
 
-async function openRisk(id) {
+async function openRisk(id, push=true) {
   currentSection = 'risk-detail';
   currentRiskId = id;
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('sec-risk-detail').classList.add('active');
+  if (push) history.pushState({type:'risk', id}, '', '#risk/'+id);
   clearCache();
   const r = await api(`/api/risks/${id}`);
   document.getElementById('risk-detail-title').textContent = `Risk #${r.id} — ${r.sector}`;
@@ -1678,7 +1678,7 @@ async function approveRisk(id, optionId) {
       return;
     }
     clearCache();
-    openRisk(id);
+    openRisk(id, false);
   } catch(e) {
     alert('Failed: ' + e.message);
   }
@@ -1703,7 +1703,7 @@ async function sendRiskMessage(id) {
     input.value = '';
     input.disabled = false;
     clearCache();
-    openRisk(id);
+    openRisk(id, false);
   } catch(e) {
     alert('Failed: ' + e.message);
     input.disabled = false;
@@ -2594,6 +2594,7 @@ window.addEventListener('popstate', e=>{
   if (state.type==='nav') nav(state.id, false);
   else if (state.type==='object') openObject(state.id, false);
   else if (state.type==='sector') openSector(state.name, false);
+  else if (state.type==='risk') openRisk(state.id, false);
 });
 
 // INIT
