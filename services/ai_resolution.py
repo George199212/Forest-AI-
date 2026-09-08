@@ -38,6 +38,15 @@ PROMPT_TEMPLATE = (
     "this incident. Each option needs a ready-to-send Telegram message to "
     "the worker — polite, specific, professional, in Russian, no markdown "
     "formatting, 2-3 sentences (not just one).\n\n"
+    "Additionally, estimate a plausible financial exposure range in EUR for "
+    "this specific incident, based on the type of violation described (e.g. "
+    "lost/unaccounted timber value at typical market price ~€60-120/m³, "
+    "equipment downtime cost, environmental fine risk, remediation cost for "
+    "unauthorized infrastructure). Be explicit that this is an ESTIMATE, not "
+    "a precise calculation. If the reason includes concrete volume/duration "
+    "numbers, base the range on those; otherwise reason qualitatively from "
+    "the violation type and severity (HIGH/MEDIUM). Keep the range realistic "
+    "for a Latvian forestry operation.\n\n"
     "Return ONLY valid JSON, no markdown code fences, no explanation outside "
     "the JSON object, matching exactly this schema:\n\n"
     "{{\n"
@@ -46,7 +55,10 @@ PROMPT_TEMPLATE = (
     '    {{"id": "contact_worker", "label": "Связаться с работником", "message_text": "..."}},\n'
     '    {{"id": "dispatch_supervisor", "label": "Направить супервайзера", "message_text": "..."}}\n'
     "  ],\n"
-    '  "recommended_option_id": "contact_worker"\n'
+    '  "recommended_option_id": "contact_worker",\n'
+    '  "estimated_exposure_eur_low": 1000,\n'
+    '  "estimated_exposure_eur_high": 5000,\n'
+    '  "exposure_basis": "Короткое (1 предложение) обоснование оценки на русском"\n'
     "}}"
 )
 
@@ -72,7 +84,7 @@ def generate_incident_recommendation(incident: dict) -> str:
         client = _get_client()
         response = client.messages.create(
             model="claude-sonnet-4-5",
-            max_tokens=1024,
+            max_tokens=2048,
             messages=[
                 {
                     "role": "user",
