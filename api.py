@@ -174,6 +174,42 @@ def serve_photo_file(filename: str):
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
+def calc_financial_risk_from_incidents() -> dict:
+    """
+    Financial risk exposure for the Overview KPI: exact sum of
+    estimated_exposure_eur_low/high parsed from ai_recommendation JSON
+    across all risks that have one. Risks with no ai_recommendation, or
+    whose JSON lacks these fields, are skipped (not counted as zero) so
+    the sum isn't artificially deflated. Independent from calc_risk_score(),
+    which still drives the per-sector risk_score/exposure on Sectors detail.
+    """
+    rows = db("SELECT ai_recommendation FROM risks WHERE ai_recommendation IS NOT NULL AND ai_recommendation != ''")
+    total_low = 0
+    total_high = 0
+    counted = 0
+    for row in rows:
+        try:
+            rec = json.loads(row["ai_recommendation"])
+        except Exception:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        low = rec.get("estimated_exposure_eur_low")
+        high = rec.get("estimated_exposure_eur_high")
+        if low is None or high is None:
+            continue
+        total_low += low
+        total_high += high
+        counted += 1
+    if counted == 0:
+        return {"exposure_low": 0, "exposure_high": 0, "exposure_label": "€0"}
+    return {
+        "exposure_low": total_low,
+        "exposure_high": total_high,
+        "exposure_label": f"€{total_low:,}–€{total_high:,}" if total_low > 0 else "€0",
+    }
+
+
 @app.get("/api/summary")
 def summary():
     total_vol = db1("SELECT COALESCE(SUM(reported_volume),0) AS v FROM truck_reports").get("v", 0)
@@ -181,9 +217,8 @@ def summary():
     risk_scores = [calc_risk_score(s["name"]) for s in sectors]
     red_count    = sum(1 for r in risk_scores if r["color"] == "red")
     yellow_count = sum(1 for r in risk_scores if r["color"] == "yellow")
-    total_exp_low  = sum(r["exposure_low"]  for r in risk_scores)
-    total_exp_high = sum(r["exposure_high"] for r in risk_scores)
     total_vol_risk = sum(r["vol_at_risk"]   for r in risk_scores)
+    financial_risk = calc_financial_risk_from_incidents()
     return {
         "sectors":          n("SELECT COUNT(*) AS n FROM sectors"),
         "risks":            n("SELECT COUNT(*) AS n FROM risks"),
@@ -195,9 +230,9 @@ def summary():
         "total_volume_m3":  round(float(total_vol), 1),
         "red_sectors":      red_count,
         "yellow_sectors":   yellow_count,
-        "exposure_low":     total_exp_low,
-        "exposure_high":    total_exp_high,
-        "exposure_label":   f"€{total_exp_low:,}–€{total_exp_high:,}" if total_exp_low > 0 else "€0",
+        "exposure_low":     financial_risk["exposure_low"],
+        "exposure_high":    financial_risk["exposure_high"],
+        "exposure_label":   financial_risk["exposure_label"],
         "vol_at_risk":      round(total_vol_risk, 1),
         "active_operations":    n("SELECT COUNT(DISTINCT sector) AS n FROM work_sessions WHERE finish_time='' OR finish_time IS NULL"),
         "field_checkins_today": n("""
