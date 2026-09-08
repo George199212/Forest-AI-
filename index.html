@@ -1602,6 +1602,12 @@ async function openRisk(id) {
       </div>
     ` : ''}
 
+    ${r.assigned_vehicle ? `
+      <div style="color:var(--text2);font-size:13px;margin-bottom:12px">
+        🚛 Транспорт: <b>${r.assigned_vehicle.vehicle_type}</b> (${r.assigned_vehicle.plate})
+      </div>
+    ` : ''}
+
     ${r.last_location ? `
       <div class="card-head" style="margin-top:8px">📍 Последняя позиция</div>
       <div id="risk-map-wrap" style="height:220px;border-radius:var(--r);overflow:hidden;margin-bottom:16px"></div>

@@ -1047,6 +1047,15 @@ def get_risk_detail(risk_id: int):
         )
         if equipment.get("equipment_code"):
             risk["assigned_equipment"] = equipment
+
+        if employee and employee.get("telegram_user_id"):
+            vehicle = db1(
+                "SELECT plate, vehicle_type FROM sector_vehicles "
+                "WHERE telegram_user_id=? AND active=1 LIMIT 1",
+                (employee["telegram_user_id"],)
+            )
+            if vehicle.get("plate"):
+                risk["assigned_vehicle"] = vehicle
     return risk
 
 
