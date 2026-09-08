@@ -1628,6 +1628,12 @@ async function openRisk(id, push=true) {
       <div class="card-head">🤖 AI Recommendation</div>
       <div style="padding:12px">
         <div id="ai-summary" style="white-space:pre-wrap">${aiText ? '' : 'AI analysis not yet available for this risk.'}</div>
+        ${(rec && rec.estimated_exposure_eur_low != null && rec.estimated_exposure_eur_high != null) ? `
+          <div style="margin-top:12px;padding:10px 12px;background:rgba(201,64,64,0.08);border-radius:var(--r);border:1px solid rgba(201,64,64,0.2)">
+            <div style="font-size:13px;font-weight:600;color:var(--red);font-family:var(--mono)">⚠ ESTIMATED FINANCIAL EXPOSURE: €${rec.estimated_exposure_eur_low.toLocaleString('de-DE')}–€${rec.estimated_exposure_eur_high.toLocaleString('de-DE')}</div>
+            ${rec.exposure_basis ? `<div style="font-size:12px;color:var(--text3);margin-top:4px">${rec.exposure_basis}</div>` : ''}
+          </div>
+        ` : ''}
         ${optionsHtml}
       </div>
     </div>
