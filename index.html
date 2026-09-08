@@ -1587,11 +1587,11 @@ async function openRisk(id) {
       ${r.employee_name?`<div style="color:var(--text2)">Worker: <b>${r.employee_name}</b></div>`:''}
       ${deliveryBadge}
     </div>
-    <div style="margin-bottom:16px">${r.reason}</div>
+    <div style="margin-bottom:16px">${(r.reason||'').replace(/\(водитель ([^)]+)\)/, '(водитель <b>$1</b>)')}</div>
 
     ${r.photo_path ? `
       <div class="card-head" style="margin-top:8px">📷 Фото</div>
-      <img src="${API}/api/risks/${r.id}/photo" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border);margin-bottom:16px;cursor:zoom-in"
+      <img src="${API}/api/risks/${r.id}/photo" style="width:150px;border-radius:var(--r);border:1px solid var(--border);margin-bottom:16px;cursor:zoom-in"
            onclick="openLightboxImg('${API}/api/risks/${r.id}/photo', '${r.sector}', 'Risk #${r.id}')" onerror="this.style.display='none'">
     ` : ''}
 
