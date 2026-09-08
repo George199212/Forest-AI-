@@ -136,6 +136,7 @@ def _migrate():
     )
     """)
     _add_column_if_missing(cur, "sector_vehicles", "telegram_user_id", "TEXT")
+    _add_column_if_missing(cur, "sector_vehicles", "employee_id", "INTEGER")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS sector_equipment (
