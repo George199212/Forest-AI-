@@ -1346,6 +1346,75 @@ async def handle_worker_message(update: Update, context: ContextTypes.DEFAULT_TY
 
     raise ApplicationHandlerStop
 
+async def alert_dispatcher(context: ContextTypes.DEFAULT_TYPE, incident_id, text):
+    """Send a dispatcher alert, honestly logging what actually happened.
+    Returns True if the alert was sent, False otherwise (never raises)."""
+    dispatcher_chat_id = os.environ.get("DISPATCHER_CHAT_ID", "").strip()
+    if not dispatcher_chat_id:
+        print(f"DISPATCHER ALERT: DISPATCHER_CHAT_ID not set — incident {incident_id} has NO dispatcher alert")
+        add_risk_event(incident_id, "DISPATCHER_NOT_CONFIGURED", actor="system")
+        return False
+    try:
+        await context.bot.send_message(chat_id=int(dispatcher_chat_id), text=text)
+        add_risk_event(incident_id, "DISPATCHER_ALERTED", actor="system")
+        return True
+    except Exception as e:
+        print(f"DISPATCHER ALERT: failed to alert dispatcher for incident {incident_id}: {e}")
+        add_risk_event(incident_id, "DISPATCHER_ALERT_FAILED", actor="system", details=str(e))
+        return False
+
+
+async def repair_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    incident_id = int(query.data.split(":")[1])
+
+    keyboard = [
+        [InlineKeyboardButton("📞 Связаться с сервисом", callback_data=f"repair_choice:{incident_id}:service")],
+        [InlineKeyboardButton("🔧 Чинить самому", callback_data=f"repair_choice:{incident_id}:self")],
+        [InlineKeyboardButton("💬 Нужна консультация диспетчера", callback_data=f"repair_choice:{incident_id}:dispatcher")],
+    ]
+    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+    add_risk_event(incident_id, "REPAIR_MENU_OPENED", actor=f"employee:{update.effective_user.id}")
+
+
+async def repair_choice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    _, incident_id_str, choice = query.data.split(":")
+    incident_id = int(incident_id_str)
+    tg_id = update.effective_user.id
+
+    risk_row = db_fetchone("SELECT sector, reason, entity_id FROM risks WHERE id=?", (incident_id,))
+    sector, reason, entity_id = risk_row if risk_row else (None, None, None)
+
+    employee_name = "Неизвестный сотрудник"
+    if entity_id:
+        emp = db_fetchone("SELECT full_name FROM sector_employees WHERE id=?", (entity_id,))
+        if emp:
+            employee_name = emp[0]
+
+    if choice == "service":
+        add_risk_event(incident_id, "REPAIR_CHOICE_SERVICE", actor=f"employee:{tg_id}")
+        await query.message.reply_text("Заявка передана в сервисную службу.")
+        await alert_dispatcher(
+            context, incident_id,
+            f"🛠 ЗАПРОС НА РЕМОНТ (сервис)\n\n"
+            f"Сотрудник: {employee_name}\nСектор: {sector}\n\n{reason}"
+        )
+    elif choice == "self":
+        add_risk_event(incident_id, "REPAIR_CHOICE_SELF", actor=f"employee:{tg_id}")
+        await query.message.reply_text("Хорошо, отметьте, когда техника снова в рабочем состоянии.")
+    elif choice == "dispatcher":
+        add_risk_event(incident_id, "REPAIR_CHOICE_DISPATCHER_CONSULT", actor=f"employee:{tg_id}")
+        await query.message.reply_text("Диспетчер свяжется с вами в ближайшее время.")
+        await alert_dispatcher(
+            context, incident_id,
+            f"💬 ЗАПРОС КОНСУЛЬТАЦИИ ПО РЕМОНТУ\n\n"
+            f"Сотрудник: {employee_name}\nСектор: {sector}\n\n{reason}"
+        )
+
+
 async def emergency_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     employee_row = db_fetchone(
         "SELECT id, full_name, sector FROM sector_employees WHERE telegram_user_id=?",
@@ -1378,26 +1447,12 @@ async def emergency_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     add_risk_event(incident_id, "DETECTED", actor="worker_sos")
 
-    dispatcher_notified = False
-    dispatcher_chat_id = os.environ.get("DISPATCHER_CHAT_ID", "").strip()
-    if dispatcher_chat_id:
-        try:
-            await context.bot.send_message(
-                chat_id=int(dispatcher_chat_id),
-                text=(
-                    f"🆘🆘🆘 ЭКСТРЕННАЯ СИТУАЦИЯ 🆘🆘🆘\n\n"
-                    f"Сотрудник: {employee_name}\nСектор: {sector}\n\n"
-                    f"Требуется немедленное реагирование."
-                )
-            )
-            add_risk_event(incident_id, "DISPATCHER_ALERTED", actor="system")
-            dispatcher_notified = True
-        except Exception as e:
-            print(f"EMERGENCY: failed to alert dispatcher for incident {incident_id}: {e}")
-            add_risk_event(incident_id, "DISPATCHER_ALERT_FAILED", actor="system", details=str(e))
-    else:
-        print(f"EMERGENCY: DISPATCHER_CHAT_ID not set — incident {incident_id} has NO dispatcher alert")
-        add_risk_event(incident_id, "DISPATCHER_NOT_CONFIGURED", actor="system")
+    dispatcher_notified = await alert_dispatcher(
+        context, incident_id,
+        f"🆘🆘🆘 ЭКСТРЕННАЯ СИТУАЦИЯ 🆘🆘🆘\n\n"
+        f"Сотрудник: {employee_name}\nСектор: {sector}\n\n"
+        f"Требуется немедленное реагирование."
+    )
 
     status_line = "Диспетчер уведомлён." if dispatcher_notified else \
         "⚠ Не удалось автоматически уведомить диспетчера — пожалуйста, также свяжитесь по рации/телефону, если это возможно."
@@ -1455,6 +1510,8 @@ def main():
     app.add_handler(CallbackQueryHandler(vehicle_sector_callback, pattern="^vehgps_sector:"))
     app.add_handler(CallbackQueryHandler(vehicle_selected_callback, pattern="^vehgps_vehicle:"))
     app.add_handler(CallbackQueryHandler(plan_callback, pattern="^plan_"))
+    app.add_handler(CallbackQueryHandler(repair_menu_callback, pattern="^repair_menu:"))
+    app.add_handler(CallbackQueryHandler(repair_choice_callback, pattern="^repair_choice:"))
     app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))

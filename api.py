@@ -1116,15 +1116,18 @@ def approve_incident(incident_id: int, body: ApproveIn = ApproveIn(), username: 
         f"Sector: {incident['sector']}\nPriority: {incident['risk_level']}\n\n"
         f"{action_text}"
     )
+    if incident.get("rule_code") == "EQUIPMENT_BREAKDOWN":
+        button = {"text": "🛠 Ремонт техники", "callback_data": f"repair_menu:{incident_id}"}
+    else:
+        button = {"text": "✓ I HAVE RETURNED", "callback_data": f"confirm_return:{incident_id}"}
+
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     tg_response = requests.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
         json={
             "chat_id": telegram_user_id,
             "text": text,
-            "reply_markup": {"inline_keyboard": [[
-                {"text": "✓ I HAVE RETURNED", "callback_data": f"confirm_return:{incident_id}"}
-            ]]},
+            "reply_markup": {"inline_keyboard": [[button]]},
         },
         timeout=10,
     )
