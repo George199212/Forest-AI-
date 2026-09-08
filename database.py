@@ -91,6 +91,7 @@ def _migrate():
         ("telegram_message_id", "TEXT"),
     ]:
         _add_column_if_missing(cur, "risks", column, definition)
+    _add_column_if_missing(cur, "risks", "photo_path", "TEXT")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS risk_events (

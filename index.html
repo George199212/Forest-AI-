@@ -1589,6 +1589,12 @@ async function openRisk(id) {
     </div>
     <div style="margin-bottom:16px">${r.reason}</div>
 
+    ${r.photo_path ? `
+      <div class="card-head" style="margin-top:8px">📷 Фото</div>
+      <img src="${API}/api/risks/${r.id}/photo" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border);margin-bottom:16px;cursor:zoom-in"
+           onclick="openLightboxImg('${API}/api/risks/${r.id}/photo', '${r.sector}', 'Risk #${r.id}')" onerror="this.style.display='none'">
+    ` : ''}
+
     ${r.assigned_equipment ? `
       <div style="color:var(--text2);font-size:13px;margin-bottom:12px">
         🚜 Техника: <b>${r.assigned_equipment.type} ${r.assigned_equipment.brand||''} ${r.assigned_equipment.model||''}</b>
