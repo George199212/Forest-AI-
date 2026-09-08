@@ -92,6 +92,7 @@ def _migrate():
     ]:
         _add_column_if_missing(cur, "risks", column, definition)
     _add_column_if_missing(cur, "risks", "photo_path", "TEXT")
+    _add_column_if_missing(cur, "risks", "photo_path_2", "TEXT")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS risk_events (

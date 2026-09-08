@@ -1589,10 +1589,18 @@ async function openRisk(id) {
     </div>
     <div style="margin-bottom:16px">${(r.reason||'').replace(/\(водитель ([^)]+)\)/, '(водитель <b>$1</b>)')}</div>
 
-    ${r.photo_path ? `
+    ${(r.photo_path || r.photo_path_2) ? `
       <div class="card-head" style="margin-top:8px">📷 Фото</div>
-      <img src="${API}/api/risks/${r.id}/photo" style="width:150px;border-radius:var(--r);border:1px solid var(--border);margin-bottom:16px;cursor:zoom-in"
-           onclick="openLightboxImg('${API}/api/risks/${r.id}/photo', '${r.sector}', 'Risk #${r.id}')" onerror="this.style.display='none'">
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        ${r.photo_path ? `
+          <img src="${API}/api/risks/${r.id}/photo" style="width:150px;border-radius:var(--r);border:1px solid var(--border);cursor:zoom-in"
+               onclick="openLightboxImg('${API}/api/risks/${r.id}/photo', '${r.sector}', 'Risk #${r.id}')" onerror="this.style.display='none'">
+        ` : ''}
+        ${r.photo_path_2 ? `
+          <img src="${API}/api/risks/${r.id}/photo2" style="width:150px;border-radius:var(--r);border:1px solid var(--border);cursor:zoom-in"
+               onclick="openLightboxImg('${API}/api/risks/${r.id}/photo2', '${r.sector}', 'Risk #${r.id} (2)')" onerror="this.style.display='none'">
+        ` : ''}
+      </div>
     ` : ''}
 
     ${r.assigned_equipment ? `

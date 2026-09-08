@@ -1067,6 +1067,15 @@ def get_risk_photo(risk_id: int):
     return FileResponse(file_path)
 
 
+@app.get("/api/risks/{risk_id}/photo2")
+def get_risk_photo2(risk_id: int):
+    row = db1("SELECT photo_path_2 FROM risks WHERE id=?", (risk_id,))
+    file_path = row.get("photo_path_2")
+    if not file_path or not Path(file_path).exists():
+        return Response(status_code=404)
+    return FileResponse(file_path)
+
+
 # ── Incidents & Equipment (read-only) ──────────────────────────────────────────
 
 @app.get("/api/incidents")
