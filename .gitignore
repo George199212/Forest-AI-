@@ -6,3 +6,20 @@ data/
 *.log
 *.bak_*
 .claude/
+
+# Live SQLite data
+forest.db
+*.db
+
+# Diff/patch review artifacts (staged locally, not for git history)
+*.patch
+*.zip
+
+# Tool caches
+.serena/
+.headroom/
+
+# Ad-hoc diagnostic dumps
+diagnostic_dump.txt
+DIAGNOSTIC_DUMP.md
+LEAFLET_CHECK.txt
