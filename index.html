@@ -457,6 +457,16 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
       <!-- AI INSPECTOR -->
       <div class="section" id="sec-inspector">
         <div class="kpis" id="inspector-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <button class="btn" onclick="runOverallAnalysis()">🔍 Analyze All Sectors</button>
+        </div>
+        <div id="insp-analysis-overall" class="inspector-analysis" style="display:none;margin-bottom:16px;padding:14px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
+          <div class="insp-analysis-title" style="font-size:11px;font-family:var(--mono);font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">🤖 AI Анализ (все секторы)</div>
+          <div class="insp-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:8px"></div>
+          <div class="insp-text" style="white-space:pre-wrap;font-size:13px;line-height:1.5"></div>
+          <div class="insp-actions" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+          <div class="insp-error" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+        </div>
         <div style="margin-bottom:16px;">
           <div class="card-head" style="margin-bottom:12px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text2);">
             <span style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span> Sector risk analysis</span>
@@ -1882,6 +1892,7 @@ async function loadInspector() {
   const cards = sectors.sort((a,b)=>b.risk_score-a.risk_score).map(s=>{
     const score=s.risk_score, level=score>75?'CRITICAL':score>50?'HIGH':score>25?'MEDIUM':'LOW';
     const cls=level.toLowerCase(), col=level==='CRITICAL'?'var(--red)':level==='HIGH'?'#e07070':level==='MEDIUM'?'var(--amber)':'var(--green)';
+    const idSafe=s.name.replace(/[^a-zA-Z0-9_-]/g,'_');
     const sRisks=allRisks.filter(r=>r.sector===s.name), sGps=allGps.filter(r=>r.sector===s.name);
     const sTimber=allTimber.filter(r=>r.sector===s.name), sTrucks=allTrucks.filter(r=>r.sector===s.name);
     const rejected=sGps.filter(r=>r.approved==='NO').length, missing=sTimber.filter(r=>r.status==='MISSING_VOLUME').length;
@@ -1924,10 +1935,195 @@ async function loadInspector() {
       <div style="margin-top:10px;display:flex;gap:8px">
         <button class="btn" onclick="openSector('${s.name}')">View sector →</button>
         <button class="btn" onclick="window.open('/api/report/pdf/${s.name}','_blank')">↓ PDF</button>
+        <button class="btn" onclick="runSectorAnalysis('${s.name}')">🔍 Analyze</button>
+      </div>
+      <div id="insp-analysis-${idSafe}" class="inspector-analysis" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:var(--r);border:1px solid var(--border)">
+        <div class="insp-analysis-title" style="font-size:11px;font-family:var(--mono);font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">🤖 AI Анализ</div>
+        <div class="insp-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:6px"></div>
+        <div class="insp-text" style="white-space:pre-wrap;font-size:12px;line-height:1.5"></div>
+        <div class="insp-actions" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+        <div class="insp-error" style="color:var(--red);font-size:12px;margin-top:6px"></div>
       </div>
     </div>`;
   }).join('');
   document.getElementById('inspector-cards').innerHTML = cards||'<div class="empty">no sectors</div>';
+}
+
+// ── AI INSPECTOR: real streaming analysis (SSE over fetch + ReadableStream) ────
+// EventSource isn't used here: the whole API sits behind HTTP Basic Auth, and
+// while browsers do attach cached Basic credentials to EventSource requests
+// too, EventSource can't expose custom named events (`done`/`error`) the way
+// we need without ad-hoc string sniffing — fetch()+getReader() parses the
+// SSE framing explicitly instead.
+let inspectorAnalysisResults = {};
+
+// SSE chunks arrive at irregular sizes/intervals (normal network behavior),
+// so writing them straight to the DOM makes the text visibly stutter. We
+// decouple receiving from displaying, same idea as startTypewriter(): an
+// incoming chunk only grows a buffer, and a fixed-rate interval (same 15ms
+// step as startTypewriter) drains it into the DOM a little at a time —
+// smooth, constant-rhythm typing regardless of how the network delivered it.
+const TYPEWRITER_STEP_MS = 15;
+let inspectorTypewriters = {}; // boxId -> in-flight typewriter state
+
+function _inspBoxEls(boxId) {
+  const box = document.getElementById(boxId);
+  if (!box) return null;
+  return {
+    box,
+    status: box.querySelector('.insp-status'),
+    text: box.querySelector('.insp-text'),
+    actions: box.querySelector('.insp-actions'),
+    error: box.querySelector('.insp-error'),
+  };
+}
+
+function _renderSuggestedActions(els, resultKey, data) {
+  const actions = (data && Array.isArray(data.suggested_actions)) ? data.suggested_actions : [];
+  els.actions.innerHTML = actions.map((a, i) => `
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn" onclick="runSuggestedAction('${resultKey}', ${i}, this)">${a.label || 'Действие'}</button>
+      <span class="insp-action-error" style="color:var(--red);font-size:12px"></span>
+    </div>
+  `).join('');
+}
+
+async function runSuggestedAction(resultKey, idx, btnEl) {
+  const data = inspectorAnalysisResults[resultKey];
+  const action = data && data.suggested_actions && data.suggested_actions[idx];
+  if (!action) return;
+  const errorEl = btnEl.nextElementSibling;
+  const originalLabel = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = '⏳ ...';
+  if (errorEl) errorEl.textContent = '';
+  try {
+    const resp = await fetch('/api/inspector/actions/report-issue', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        equipment_id: action.equipment_id,
+        sector: action.sector,
+        rule_code: action.rule_code,
+        note: action.note,
+      }),
+    });
+    const result = await resp.json();
+    if (!resp.ok || !result.ok) {
+      btnEl.disabled = false;
+      btnEl.textContent = originalLabel;
+      if (errorEl) errorEl.textContent = '⚠ ' + (result.error || `HTTP ${resp.status}`);
+      return;
+    }
+    btnEl.textContent = `✅ Отправлено, инцидент #${result.incident_id}`;
+  } catch (e) {
+    btnEl.disabled = false;
+    btnEl.textContent = originalLabel;
+    if (errorEl) errorEl.textContent = '⚠ ' + (e.message || String(e));
+  }
+}
+
+async function runInspectorAnalysis(url, boxId, resultKey) {
+  const els = _inspBoxEls(boxId);
+  if (!els) return;
+
+  if (inspectorTypewriters[boxId]) {
+    clearInterval(inspectorTypewriters[boxId].timer);
+    delete inspectorTypewriters[boxId];
+  }
+
+  els.box.style.display = 'block';
+  els.text.textContent = '';
+  els.error.textContent = '';
+  els.actions.innerHTML = '';
+  els.status.textContent = '⏳ AI analyzing...';
+
+  const state = { buffer: '', streamEnded: false, doneData: null };
+
+  const finish = () => {
+    clearInterval(state.timer);
+    delete inspectorTypewriters[boxId];
+    els.status.textContent = '✓ Analysis complete';
+    if (state.doneData) {
+      inspectorAnalysisResults[resultKey] = state.doneData;
+      _renderSuggestedActions(els, resultKey, state.doneData);
+    }
+  };
+
+  const fail = (msg) => {
+    clearInterval(state.timer);
+    delete inspectorTypewriters[boxId];
+    els.status.textContent = '';
+    els.error.textContent = '⚠ ' + msg;
+  };
+
+  // Same fixed 15ms/char rhythm as startTypewriter(). If the network burst
+  // ahead by a lot (buffer keeps growing), drain a few extra chars per tick
+  // so a fast stream doesn't leave a long silent typing tail after it's done.
+  state.timer = setInterval(() => {
+    if (state.buffer.length > 0) {
+      const step = state.buffer.length > 200 ? 4 : 1;
+      els.text.textContent += state.buffer.slice(0, step);
+      state.buffer = state.buffer.slice(step);
+    } else if (state.streamEnded) {
+      finish();
+    }
+  }, TYPEWRITER_STEP_MS);
+  inspectorTypewriters[boxId] = state;
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok || !resp.body) { fail(`Request failed (HTTP ${resp.status})`); return; }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream:true});
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) !== -1) {
+        const rawEvent = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let eventType = 'message';
+        const dataLines = [];
+        rawEvent.split('\n').forEach(line => {
+          if (line.startsWith('event:')) eventType = line.slice(6).trim();
+          else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+        });
+        const dataStr = dataLines.join('\n');
+        if (!dataStr) continue;
+        let data;
+        try { data = JSON.parse(dataStr); } catch(e) { continue; }
+
+        if (eventType === 'done') {
+          state.doneData = data;
+          state.streamEnded = true;
+        } else if (eventType === 'error') {
+          fail(data.message || 'Unknown error');
+          return;
+        } else {
+          state.buffer += (data.chunk || '');
+        }
+      }
+    }
+    state.streamEnded = true;
+  } catch (e) {
+    fail(e.message || String(e));
+  }
+}
+
+function runSectorAnalysis(sectorName) {
+  const idSafe = sectorName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  runInspectorAnalysis(
+    `/api/inspector/analyze/${encodeURIComponent(sectorName)}`,
+    'insp-analysis-' + idSafe,
+    'sector:' + sectorName
+  );
+}
+
+function runOverallAnalysis() {
+  runInspectorAnalysis('/api/inspector/analyze-all', 'insp-analysis-overall', 'overall');
 }
 
 // ── INCIDENTS & EQUIPMENT (read-only) ──────────────────────────────────────────

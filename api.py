@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from database import (
     init_db, get_incidents, get_equipment, update_incident_status, add_risk_event,
-    add_inspector_analysis, get_inspector_analyses,
+    add_inspector_analysis, get_inspector_analyses, add_incident,
 )
 from services.ai_resolution import _get_client as _get_anthropic_client
 
@@ -175,6 +175,10 @@ def _collect_sector_inspector_data(sector_name: str) -> dict:
         "MEDIUM": n("SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='MEDIUM'", (sector_name,)),
         "LOW":    n("SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='LOW'", (sector_name,)),
     }
+    equipment = db(
+        "SELECT id, equipment_code, type, status, operator_employee_id "
+        "FROM sector_equipment WHERE sector=?", (sector_name,)
+    )
     return {
         "scope": "sector",
         "sector": sector_name,
@@ -186,6 +190,7 @@ def _collect_sector_inspector_data(sector_name: str) -> dict:
         "exposure_high": rs["exposure_high"],
         "exposure_label": rs["exposure_label"],
         "risk_counts": risk_counts,
+        "equipment": equipment,
         "rejected_gps_checkins": n(
             "SELECT COUNT(*) AS n FROM work_sessions WHERE sector=? AND approved='NO'", (sector_name,)
         ),
@@ -229,6 +234,10 @@ def _collect_overall_inspector_data() -> dict:
             "sector": s["name"], "risk_score": rs["score"], "risk_level": rs["level"],
             "exposure_label": rs["exposure_label"],
         })
+    equipment = db(
+        "SELECT id, equipment_code, type, status, operator_employee_id, sector "
+        "FROM sector_equipment ORDER BY sector"
+    )
     return {
         "scope": "overall",
         "sector_count": len(sectors),
@@ -239,6 +248,7 @@ def _collect_overall_inspector_data() -> dict:
         "total_exposure_high": total_exposure_high,
         "risk_counts": risk_counts,
         "sectors": sector_summaries,
+        "equipment": equipment,
     }
 
 
@@ -250,6 +260,14 @@ INSPECTOR_PROMPT_TEMPLATE = (
     "or events not present in this data), write a connected analysis of the "
     "situation in Russian (3-6 sentences), followed by 2-4 concrete, actionable "
     "recommendations for the dispatcher/management, in Russian.\n\n"
+    "Additionally, if — and only if — the equipment list included in the data "
+    "above contains a specific unit whose status clearly warrants a concrete "
+    "dispatcher action (e.g. reporting a breakdown to get a repair started), "
+    "propose it as a suggested action using that unit's exact `id` field from "
+    "the data above. suggested_actions may be an empty list if no specific "
+    "equipment issue is evident — never invent an equipment_id that is not "
+    "present in the equipment list given above, and never propose an action "
+    "for equipment that isn't in that list.\n\n"
     "After the analysis and recommendations, on its own line write exactly "
     "---JSON--- and then, with nothing else before or after it, a single JSON "
     "object (no markdown code fences) matching exactly this schema:\n\n"
@@ -257,7 +275,10 @@ INSPECTOR_PROMPT_TEMPLATE = (
     '  "risk_breakdown": {{"HIGH": n, "MEDIUM": n, "LOW": n}},\n'
     '  "exposure_low": n,\n'
     '  "exposure_high": n,\n'
-    '  "exposure_basis": "короткое (1 предложение) обоснование оценки на русском"\n'
+    '  "exposure_basis": "короткое (1 предложение) обоснование оценки на русском",\n'
+    '  "suggested_actions": [\n'
+    '    {{"label": "короткая метка кнопки на русском", "equipment_id": n, "sector": "...", "rule_code": "...", "note": "короткое обоснование на русском"}}\n'
+    "  ]\n"
     "}}"
 )
 
@@ -307,7 +328,14 @@ def _stream_inspector_analysis(scope: str, sector: Optional[str]):
         exposure_low   = parsed.get("exposure_low") if isinstance(parsed, dict) else None
         exposure_high  = parsed.get("exposure_high") if isinstance(parsed, dict) else None
         exposure_basis = parsed.get("exposure_basis") if isinstance(parsed, dict) else None
+        suggested_actions = parsed.get("suggested_actions") if isinstance(parsed, dict) else None
+        if not isinstance(suggested_actions, list):
+            suggested_actions = []
 
+        # suggested_actions is transient (drives the one-click action buttons
+        # right after this analysis finishes) — not persisted, so the
+        # ai_inspector_analyses schema from Stage 1 stays untouched. History
+        # only needs the analysis text/numbers, not the ephemeral action offers.
         add_inspector_analysis(
             scope=scope, sector=sector, summary_text=summary_text,
             risk_breakdown=risk_breakdown, exposure_low=exposure_low,
@@ -319,6 +347,7 @@ def _stream_inspector_analysis(scope: str, sector: Optional[str]):
             "exposure_low": exposure_low,
             "exposure_high": exposure_high,
             "exposure_basis": exposure_basis,
+            "suggested_actions": suggested_actions,
         }
         yield f"event: done\ndata: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
     except Exception as e:
@@ -341,6 +370,80 @@ def inspector_analyze_all():
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+class ReportIssueIn(BaseModel):
+    equipment_id: int
+    sector: str
+    rule_code: str
+    note: str
+
+
+@app.post("/api/inspector/actions/report-issue")
+def inspector_report_issue(body: ReportIssueIn):
+    """
+    One-click action from an AI Inspector suggested_action: creates an
+    incident AND immediately sends the Telegram alert to its operator, in a
+    single backend call (mirrors approve_incident()'s message/button format).
+    """
+    equipment = db1("SELECT operator_employee_id FROM sector_equipment WHERE id=?", (body.equipment_id,))
+    operator_employee_id = equipment.get("operator_employee_id") if equipment else None
+    if not operator_employee_id:
+        return Response(
+            content=json.dumps({"error": "Оператор техники не привязан к Telegram"}),
+            media_type="application/json", status_code=400,
+        )
+
+    employee = db1("SELECT telegram_user_id FROM sector_employees WHERE id=?", (operator_employee_id,))
+    telegram_user_id = employee.get("telegram_user_id") if employee else None
+    if not telegram_user_id:
+        return Response(
+            content=json.dumps({"error": "Оператор техники не привязан к Telegram"}),
+            media_type="application/json", status_code=400,
+        )
+
+    incident_id = add_incident(
+        sector=body.sector, risk_level="HIGH", reason=body.note,
+        entity_type="EMPLOYEE", entity_id=operator_employee_id, rule_code=body.rule_code,
+    )
+
+    text = (
+        f"🚨 FOREST AI — ACTION REQUIRED\n\n"
+        f"Risk: {body.note}\n"
+        f"Sector: {body.sector}\nPriority: HIGH\n\n"
+        f"{body.note}"
+    )
+    if body.rule_code == "EQUIPMENT_BREAKDOWN":
+        button = {"text": "🛠 Ремонт техники", "callback_data": f"repair_menu:{incident_id}"}
+    else:
+        button = {"text": "✓ I HAVE RETURNED", "callback_data": f"confirm_return:{incident_id}"}
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    tg_response = requests.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        json={
+            "chat_id": telegram_user_id,
+            "text": text,
+            "reply_markup": {"inline_keyboard": [[button]]},
+        },
+        timeout=10,
+    )
+    tg_data = tg_response.json()
+    if not tg_data.get("ok"):
+        # Incident is already created (OPEN) at this point — kept as-is so the
+        # dispatcher can see it in the incidents list and retry via the
+        # existing Approve flow; not rolled back on a Telegram send failure.
+        return Response(
+            content=json.dumps({"error": f"Telegram send failed: {tg_data.get('description', '')}"}),
+            media_type="application/json", status_code=502,
+        )
+
+    message_id = str(tg_data["result"]["message_id"])
+    update_incident_status(incident_id, "NOTIFIED", telegram_message_id=message_id)
+    add_risk_event(incident_id, "DETECTED", actor="ai_inspector")
+    add_risk_event(incident_id, "TELEGRAM_SENT", actor="system", details=body.note)
+
+    return {"ok": True, "incident_id": incident_id, "status": "NOTIFIED"}
 
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
