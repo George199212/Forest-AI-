@@ -1055,6 +1055,39 @@ def risks_by_sector():
         })
     return result
 
+@app.get("/api/risks/financial-breakdown")
+def risks_financial_breakdown():
+    """
+    Row-level breakdown backing the Overview "Финансовые риски" KPI —
+    same filter as calc_financial_risk_from_incidents() so the two stay
+    in sync, but returns one row per risk instead of just the total.
+    """
+    rows = db("SELECT id, sector, reason, ai_recommendation FROM risks "
+              "WHERE ai_recommendation IS NOT NULL AND ai_recommendation != ''")
+    result = []
+    for row in rows:
+        try:
+            rec = json.loads(row["ai_recommendation"])
+        except Exception:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        low = rec.get("estimated_exposure_eur_low")
+        high = rec.get("estimated_exposure_eur_high")
+        if low is None or high is None:
+            continue
+        result.append({
+            "id": row["id"],
+            "sector": row["sector"],
+            "reason": row["reason"],
+            "exposure_low": low,
+            "exposure_high": high,
+            "exposure_period": rec.get("exposure_period"),
+        })
+    result.sort(key=lambda r: r["exposure_high"], reverse=True)
+    return result
+
+
 @app.get("/api/risks/{risk_id}")
 def get_risk_detail(risk_id: int):
     risk = db1("SELECT * FROM risks WHERE id=?", (risk_id,))

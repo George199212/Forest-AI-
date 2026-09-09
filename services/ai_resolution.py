@@ -47,6 +47,17 @@ PROMPT_TEMPLATE = (
     "numbers, base the range on those; otherwise reason qualitatively from "
     "the violation type and severity (HIGH/MEDIUM). Keep the range realistic "
     "for a Latvian forestry operation.\n\n"
+    "Also estimate the period over which this exposure accumulates if the "
+    "situation is left unaddressed, based on the nature of the rule "
+    "triggered ({rule_code}): a one-off discrepancy discovered after the "
+    "fact (e.g. TIMBER_VOLUME_MISMATCH, TIMBER_UNEXPECTED_REMOVAL, "
+    "STORM_DAMAGE) has a short, fixed assessment/remediation window; a "
+    "stalled asset (e.g. EQUIPMENT_BREAKDOWN) accrues loss for as long as "
+    "it stays unfixed; an ongoing unauthorized activity (e.g. "
+    "UNAUTHORIZED_LOGGING, UNAUTHORIZED_FOREST_ROAD, "
+    "ZONE_VIOLATION_TECHNOLOGY) keeps accruing loss daily until stopped. "
+    "Phrase it as a short Russian phrase, e.g. 'в течение 2-4 недель' or "
+    "'ежедневно, пока не устранено'.\n\n"
     "Return ONLY valid JSON, no markdown code fences, no explanation outside "
     "the JSON object, matching exactly this schema:\n\n"
     "{{\n"
@@ -58,7 +69,8 @@ PROMPT_TEMPLATE = (
     '  "recommended_option_id": "contact_worker",\n'
     '  "estimated_exposure_eur_low": 1000,\n'
     '  "estimated_exposure_eur_high": 5000,\n'
-    '  "exposure_basis": "Короткое (1 предложение) обоснование оценки на русском"\n'
+    '  "exposure_basis": "Короткое (1 предложение) обоснование оценки на русском",\n'
+    '  "exposure_period": "короткая фраза на русском о периоде накопления потерь, если ситуацию не исправить — например \'в течение 2-4 недель\' или \'ежедневно, пока не устранено\'"\n'
     "}}"
 )
 
