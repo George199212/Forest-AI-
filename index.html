@@ -2023,6 +2023,18 @@ async function runSuggestedAction(resultKey, idx, btnEl) {
   }
 }
 
+const JSON_MARKER = '---JSON---';
+
+// If the stream ended (done event or reader closed) without the marker ever
+// being found, the held-back tail chars can no longer turn into a marker —
+// release them to the visible buffer so they aren't silently dropped.
+function _flushInspectorTail(state) {
+  if (state.jsonMarkerIndex === -1 && state.rawText.length > state.visibleQueuedLen) {
+    state.buffer += state.rawText.slice(state.visibleQueuedLen);
+    state.visibleQueuedLen = state.rawText.length;
+  }
+}
+
 async function runInspectorAnalysis(url, boxId, resultKey) {
   const els = _inspBoxEls(boxId);
   if (!els) return;
@@ -2038,7 +2050,16 @@ async function runInspectorAnalysis(url, boxId, resultKey) {
   els.actions.innerHTML = '';
   els.status.textContent = '⏳ AI analyzing...';
 
-  const state = { buffer: '', streamEnded: false, doneData: null };
+  // rawText accumulates the full stream from the start (untruncated) so the
+  // ---JSON--- marker can be detected even when it's split across two chunks
+  // (e.g. one chunk ends "---JS", the next starts "ON---"). Until the marker
+  // is found, we hold back the last (JSON_MARKER.length - 1) chars of
+  // rawText from the visible buffer, since those chars could still turn out
+  // to be the start of a not-yet-complete marker; they're released once
+  // enough further text arrives to prove they aren't. visibleQueuedLen
+  // tracks how much of rawText has already been queued into the visible
+  // `buffer`.
+  const state = { buffer: '', streamEnded: false, doneData: null, rawText: '', visibleQueuedLen: 0, jsonMarkerIndex: -1 };
 
   const finish = () => {
     clearInterval(state.timer);
@@ -2099,15 +2120,31 @@ async function runInspectorAnalysis(url, boxId, resultKey) {
         if (eventType === 'done') {
           state.doneData = data;
           state.streamEnded = true;
+          _flushInspectorTail(state);
         } else if (eventType === 'error') {
           fail(data.message || 'Unknown error');
           return;
         } else {
-          state.buffer += (data.chunk || '');
+          state.rawText += (data.chunk || '');
+          if (state.jsonMarkerIndex === -1) {
+            const markerIdx = state.rawText.indexOf(JSON_MARKER);
+            if (markerIdx !== -1) state.jsonMarkerIndex = markerIdx;
+          }
+          // Before the marker is found, only text that's definitely past
+          // where a marker could still be starting is safe to show — hold
+          // back the last (JSON_MARKER.length - 1) chars as a buffer.
+          const visibleTotal = state.jsonMarkerIndex !== -1
+            ? state.jsonMarkerIndex
+            : Math.max(0, state.rawText.length - (JSON_MARKER.length - 1));
+          if (visibleTotal > state.visibleQueuedLen) {
+            state.buffer += state.rawText.slice(state.visibleQueuedLen, visibleTotal);
+            state.visibleQueuedLen = visibleTotal;
+          }
         }
       }
     }
     state.streamEnded = true;
+    _flushInspectorTail(state);
   } catch (e) {
     fail(e.message || String(e));
   }
