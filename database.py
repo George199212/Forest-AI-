@@ -330,6 +330,22 @@ def _migrate():
     _add_column_if_missing(cur, "boundary_plans", "object_name", "TEXT")
     _add_column_if_missing(cur, "boundary_plans", "satellite_file_path", "TEXT")
 
+    # ── AI Inspector streaming analysis history ─────────────────────────────
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS ai_inspector_analyses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope TEXT NOT NULL,
+        sector TEXT,
+        summary_text TEXT,
+        risk_breakdown_json TEXT,
+        exposure_low REAL,
+        exposure_high REAL,
+        exposure_basis TEXT,
+        model TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -849,6 +865,41 @@ def get_sector_snapshots(sector):
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute("SELECT * FROM sector_snapshots WHERE sector=? ORDER BY snapshot_date, id", (sector,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def add_inspector_analysis(scope, sector, summary_text, risk_breakdown,
+                            exposure_low, exposure_high, exposure_basis, model):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    risk_breakdown_json = json.dumps(risk_breakdown) if risk_breakdown is not None else None
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO ai_inspector_analyses
+        (scope, sector, summary_text, risk_breakdown_json, exposure_low, exposure_high, exposure_basis, model, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (scope, sector, summary_text, risk_breakdown_json, exposure_low, exposure_high, exposure_basis, model, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+def get_inspector_analyses(scope=None, sector=None, limit=20):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    query = "SELECT * FROM ai_inspector_analyses WHERE 1=1"
+    params = []
+    if scope:
+        query += " AND scope=?"
+        params.append(scope)
+    if sector:
+        query += " AND sector=?"
+        params.append(sector)
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    cur.execute(query, params)
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows

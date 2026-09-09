@@ -12,7 +12,11 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
 
-from database import init_db, get_incidents, get_equipment, update_incident_status, add_risk_event
+from database import (
+    init_db, get_incidents, get_equipment, update_incident_status, add_risk_event,
+    add_inspector_analysis, get_inspector_analyses,
+)
+from services.ai_resolution import _get_client as _get_anthropic_client
 
 try:
     from PIL import Image, ImageDraw
@@ -155,6 +159,188 @@ def calc_risk_score(sector_name: str) -> dict:
         "truck_discrepancy": round(truck_discrepancy, 1),
         "rejected_gps": rejected_gps,
     }
+
+
+# ── AI Inspector: streaming analysis ─────────────────────────────────────────
+
+def _collect_sector_inspector_data(sector_name: str) -> dict:
+    """
+    Same aggregates loadInspector() computes client-side for one sector card,
+    gathered server-side so they can be handed to Claude as ground truth.
+    """
+    sector = db1("SELECT name, contractor, status FROM sectors WHERE name=?", (sector_name,))
+    rs = calc_risk_score(sector_name)
+    risk_counts = {
+        "HIGH":   n("SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='HIGH'", (sector_name,)),
+        "MEDIUM": n("SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='MEDIUM'", (sector_name,)),
+        "LOW":    n("SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='LOW'", (sector_name,)),
+    }
+    return {
+        "scope": "sector",
+        "sector": sector_name,
+        "contractor": sector.get("contractor"),
+        "status": sector.get("status"),
+        "risk_score": rs["score"],
+        "risk_level": rs["level"],
+        "exposure_low": rs["exposure_low"],
+        "exposure_high": rs["exposure_high"],
+        "exposure_label": rs["exposure_label"],
+        "risk_counts": risk_counts,
+        "rejected_gps_checkins": n(
+            "SELECT COUNT(*) AS n FROM work_sessions WHERE sector=? AND approved='NO'", (sector_name,)
+        ),
+        "total_gps_checkins": n(
+            "SELECT COUNT(*) AS n FROM work_sessions WHERE sector=?", (sector_name,)
+        ),
+        "timber_missing_volume_count": n(
+            "SELECT COUNT(*) AS n FROM timber_movements WHERE sector=? AND status='MISSING_VOLUME'", (sector_name,)
+        ),
+        "timber_movements_count": n(
+            "SELECT COUNT(*) AS n FROM timber_movements WHERE sector=?", (sector_name,)
+        ),
+        "truck_reports_count": n(
+            "SELECT COUNT(*) AS n FROM truck_reports WHERE sector=?", (sector_name,)
+        ),
+    }
+
+
+def _collect_overall_inspector_data() -> dict:
+    """Aggregate the same metrics across every sector, for the "Analyze All Sectors" mode."""
+    sectors = db("SELECT name FROM sectors ORDER BY name")
+    sector_summaries = []
+    total_exposure_low = total_exposure_high = 0
+    risk_counts = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+    critical_count = high_count = 0
+    scores = []
+    for s in sectors:
+        rs = calc_risk_score(s["name"])
+        scores.append(rs["score"])
+        total_exposure_low += rs["exposure_low"]
+        total_exposure_high += rs["exposure_high"]
+        if rs["score"] > 75:
+            critical_count += 1
+        elif rs["score"] > 50:
+            high_count += 1
+        for level in ("HIGH", "MEDIUM", "LOW"):
+            risk_counts[level] += n(
+                "SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level=?", (s["name"], level)
+            )
+        sector_summaries.append({
+            "sector": s["name"], "risk_score": rs["score"], "risk_level": rs["level"],
+            "exposure_label": rs["exposure_label"],
+        })
+    return {
+        "scope": "overall",
+        "sector_count": len(sectors),
+        "avg_risk_score": round(sum(scores) / len(scores)) if scores else 0,
+        "critical_sectors": critical_count,
+        "high_risk_sectors": high_count,
+        "total_exposure_low": total_exposure_low,
+        "total_exposure_high": total_exposure_high,
+        "risk_counts": risk_counts,
+        "sectors": sector_summaries,
+    }
+
+
+INSPECTOR_PROMPT_TEMPLATE = (
+    "You are an operations analyst for a forestry company. Review the following "
+    "aggregated data for {scope_desc}, already computed by the monitoring system:\n\n"
+    "{data_json}\n\n"
+    "Based ONLY on the information given above (do not invent sectors, numbers, "
+    "or events not present in this data), write a connected analysis of the "
+    "situation in Russian (3-6 sentences), followed by 2-4 concrete, actionable "
+    "recommendations for the dispatcher/management, in Russian.\n\n"
+    "After the analysis and recommendations, on its own line write exactly "
+    "---JSON--- and then, with nothing else before or after it, a single JSON "
+    "object (no markdown code fences) matching exactly this schema:\n\n"
+    "{{\n"
+    '  "risk_breakdown": {{"HIGH": n, "MEDIUM": n, "LOW": n}},\n'
+    '  "exposure_low": n,\n'
+    '  "exposure_high": n,\n'
+    '  "exposure_basis": "короткое (1 предложение) обоснование оценки на русском"\n'
+    "}}"
+)
+
+
+def _stream_inspector_analysis(scope: str, sector: Optional[str]):
+    """
+    SSE generator: streams Claude's analysis text chunk-by-chunk as it is
+    generated (real streaming, not a typewriter over a finished string), then
+    emits a final `done` event with the parsed JSON block, or an `error`
+    event on failure. Only writes to ai_inspector_analyses on success.
+    """
+    try:
+        if scope == "sector":
+            data = _collect_sector_inspector_data(sector)
+            scope_desc = f"сектора {sector}"
+        else:
+            data = _collect_overall_inspector_data()
+            scope_desc = "всей лесозаготовительной операции (все секторы сразу)"
+
+        prompt = INSPECTOR_PROMPT_TEMPLATE.format(
+            scope_desc=scope_desc,
+            data_json=json.dumps(data, ensure_ascii=False, indent=2),
+        )
+
+        model = "claude-sonnet-4-5"
+        client = _get_anthropic_client()
+        full_text = ""
+        with client.messages.stream(
+            model=model,
+            max_tokens=2048,
+            messages=[{"role": "user", "content": [{"type": "text", "text": prompt}]}],
+        ) as stream:
+            for chunk in stream.text_stream:
+                full_text += chunk
+                yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+
+        summary_text, _, json_part = full_text.partition("---JSON---")
+        summary_text = summary_text.strip()
+        parsed = None
+        if json_part.strip():
+            try:
+                parsed = json.loads(json_part.strip())
+            except Exception:
+                parsed = None
+
+        risk_breakdown = parsed.get("risk_breakdown") if isinstance(parsed, dict) else None
+        exposure_low   = parsed.get("exposure_low") if isinstance(parsed, dict) else None
+        exposure_high  = parsed.get("exposure_high") if isinstance(parsed, dict) else None
+        exposure_basis = parsed.get("exposure_basis") if isinstance(parsed, dict) else None
+
+        add_inspector_analysis(
+            scope=scope, sector=sector, summary_text=summary_text,
+            risk_breakdown=risk_breakdown, exposure_low=exposure_low,
+            exposure_high=exposure_high, exposure_basis=exposure_basis, model=model,
+        )
+
+        done_payload = {
+            "risk_breakdown": risk_breakdown,
+            "exposure_low": exposure_low,
+            "exposure_high": exposure_high,
+            "exposure_basis": exposure_basis,
+        }
+        yield f"event: done\ndata: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
+    except Exception as e:
+        yield f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
+
+
+@app.get("/api/inspector/analyze/{sector_name}")
+def inspector_analyze_sector(sector_name: str):
+    return StreamingResponse(
+        _stream_inspector_analysis("sector", sector_name),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/inspector/analyze-all")
+def inspector_analyze_all():
+    return StreamingResponse(
+        _stream_inspector_analysis("overall", None),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
