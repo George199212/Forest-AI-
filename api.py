@@ -14,9 +14,9 @@ from pydantic import BaseModel
 
 from database import (
     init_db, get_incidents, get_equipment, update_incident_status, add_risk_event,
-    add_inspector_analysis, get_inspector_analyses, add_incident,
+    add_inspector_analysis, get_inspector_analyses, add_incident, set_ai_recommendation,
 )
-from services.ai_resolution import _get_client as _get_anthropic_client
+from services.ai_resolution import _get_client as _get_anthropic_client, generate_incident_recommendation
 
 try:
     from PIL import Image, ImageDraw
@@ -407,11 +407,35 @@ def inspector_report_issue(body: ReportIssueIn):
         entity_type="EMPLOYEE", entity_id=operator_employee_id, rule_code=body.rule_code,
     )
 
+    # Same recommendation generator the auto-detect path uses (bot.py's
+    # handle_location()), so an Inspector-originated incident renders
+    # identically on Risk Detail (action-option cards, AI Recommendation
+    # section, estimated exposure) instead of just carrying raw `note` text.
+    # Synchronous Claude call — same pattern as bot.py, a few seconds is
+    # expected. generate_incident_recommendation() never raises (returns None
+    # on failure), so a fallback to the raw note keeps this endpoint from
+    # ever 500ing on an AI outage.
+    recommendation = generate_incident_recommendation({
+        "sector": body.sector, "reason": body.note,
+        "entity_type": "EMPLOYEE", "rule_code": body.rule_code,
+    })
+    action_text = body.note
+    if recommendation:
+        set_ai_recommendation(incident_id, recommendation)
+        add_risk_event(incident_id, "AI_RECOMMENDATION_GENERATED", actor="ai")
+        try:
+            rec = json.loads(recommendation)
+            options = {o["id"]: o for o in rec.get("options", [])}
+            chosen = options.get(rec.get("recommended_option_id"))
+            action_text = chosen["message_text"] if chosen else (rec.get("summary") or body.note)
+        except Exception:
+            action_text = body.note
+
     text = (
         f"🚨 FOREST AI — ACTION REQUIRED\n\n"
         f"Risk: {body.note}\n"
         f"Sector: {body.sector}\nPriority: HIGH\n\n"
-        f"{body.note}"
+        f"{action_text}"
     )
     if body.rule_code == "EQUIPMENT_BREAKDOWN":
         button = {"text": "🛠 Ремонт техники", "callback_data": f"repair_menu:{incident_id}"}
@@ -441,7 +465,7 @@ def inspector_report_issue(body: ReportIssueIn):
     message_id = str(tg_data["result"]["message_id"])
     update_incident_status(incident_id, "NOTIFIED", telegram_message_id=message_id)
     add_risk_event(incident_id, "DETECTED", actor="ai_inspector")
-    add_risk_event(incident_id, "TELEGRAM_SENT", actor="system", details=body.note)
+    add_risk_event(incident_id, "TELEGRAM_SENT", actor="system", details=action_text)
 
     return {"ok": True, "incident_id": incident_id, "status": "NOTIFIED"}
 
