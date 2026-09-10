@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Forest AI — Operations Platform</title>
+<link rel="icon" type="image/jpeg" href="/assets/logo.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -24,7 +25,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .sidebar{width:210px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;}
 .logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
 .logo-mark{display:flex;align-items:center;gap:8px;margin-bottom:2px;}
-.logo-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);}
 .logo-name{font-size:15px;font-weight:600;}
 .logo-sub{font-size:11px;color:var(--text3);font-family:var(--mono);padding-left:18px;}
 nav{flex:1;padding:8px 0;overflow-y:auto;}
@@ -210,7 +210,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="logo">
-      <div class="logo-mark" onclick="nav('overview')" style="cursor:pointer"><div class="logo-dot"></div><span class="logo-name">Forest AI</span></div>
+      <div class="logo-mark" onclick="nav('overview')" style="cursor:pointer"><img src="/assets/logo.jpg" alt="Forest AI" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:1px solid var(--border)"><span class="logo-name">Forest AI</span></div>
     </div>
     <nav>
       <div class="nav-group">Monitor</div>

@@ -484,6 +484,13 @@ def serve_photo_file(filename: str):
         return FileResponse(str(path))
     return Response(status_code=404)
 
+@app.get("/assets/{filename}")
+def serve_asset(filename: str):
+    path = Path("assets") / filename
+    if path.exists():
+        return FileResponse(str(path))
+    return Response(status_code=404)
+
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
@@ -571,6 +578,8 @@ def get_sectors():
         s["risk_score"]   = rs["score"]
         s["risk_level"]   = rs["level"]
         s["risk_color"]   = rs["color"]
+        s["exposure_low"]  = rs["exposure_low"]
+        s["exposure_high"] = rs["exposure_high"]
         s["exposure_label"] = rs["exposure_label"]
         s["gps_count"]    = n("SELECT COUNT(*) AS n FROM work_sessions WHERE sector=?", (s["name"],))
         s["photo_count"]  = n("SELECT COUNT(*) AS n FROM work_photos WHERE sector=?", (s["name"],))
