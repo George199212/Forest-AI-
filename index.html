@@ -461,11 +461,13 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
           <button class="btn" onclick="runOverallAnalysis()">🔍 Analyze All Sectors</button>
         </div>
         <div id="insp-analysis-overall" class="inspector-analysis" style="display:none;margin-bottom:16px;padding:14px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">
-          <div class="insp-analysis-title" style="font-size:11px;font-family:var(--mono);font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">🤖 AI Анализ (все секторы)</div>
-          <div class="insp-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:8px"></div>
-          <div class="insp-text" style="white-space:pre-wrap;font-size:13px;line-height:1.5"></div>
-          <div class="insp-actions" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
-          <div class="insp-error" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+          <div class="insp-analysis-title" style="font-size:11px;font-family:var(--mono);font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="_toggleInspBox('insp-analysis-overall')"><span class="insp-chevron">▾</span>🤖 AI Анализ (все секторы)</div>
+          <div class="insp-body">
+            <div class="insp-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:8px"></div>
+            <div class="insp-text" style="white-space:pre-wrap;font-size:13px;line-height:1.5"></div>
+            <div class="insp-actions" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+            <div class="insp-error" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+          </div>
         </div>
         <div style="margin-bottom:16px;">
           <div class="card-head" style="margin-bottom:12px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text2);">
@@ -1873,10 +1875,6 @@ function renderPhotos() {
 // ── AI INSPECTOR ──────────────────────────────────────────────────────────────
 async function loadInspector() {
   const sectors  = await api('/api/sectors');
-  const allRisks = await api('/api/risks');
-  const allGps   = await api('/api/gps');
-  const allTimber= await api('/api/timber');
-  const allTrucks= await api('/api/trucks');
   const totalScore = sectors.length ? Math.round(sectors.reduce((s,x)=>s+x.risk_score,0)/sectors.length) : 0;
   const critical = sectors.filter(s=>s.risk_score>75).length;
   const highRisk = sectors.filter(s=>s.risk_score>50&&s.risk_score<=75).length;
@@ -1889,6 +1887,25 @@ async function loadInspector() {
     <div class="kpi"><div class="kpi-label">Avg risk score</div><div class="kpi-value ${totalScore>60?'red':totalScore>30?'amber':'green'}">${totalScore}</div><div class="kpi-sub">из 100</div></div>
     <div class="kpi"><div class="kpi-label">Критические</div><div class="kpi-value ${critical>0?'red':'green'}">${critical}</div><div class="kpi-sub">score > 75</div></div>
     <div class="kpi"><div class="kpi-label">Высокий риск</div><div class="kpi-value ${highRisk>0?'amber':'green'}">${highRisk}</div><div class="kpi-sub">score 51–75</div></div>`;
+
+  // Rebuilding #inspector-cards below replaces the whole DOM subtree,
+  // wiping any in-flight typewriter (inspectorTypewriters) or already-shown
+  // result (inspectorAnalysisResults) for insp-analysis-* blocks inside it —
+  // including ones the periodic auto-refresh (setInterval, ~line 2910) or a
+  // repeat nav('inspector') click triggers behind the user's back. Once any
+  // analysis is active or has completed this page session, skip the card
+  // rebuild entirely so that DOM is left alone; KPIs above still refresh
+  // from live data either way. Explicit "Analyze" clicks are unaffected —
+  // they target existing insp-analysis-* elements directly, not through
+  // this function.
+  if (Object.keys(inspectorTypewriters).length > 0 || Object.keys(inspectorAnalysisResults).length > 0) {
+    return;
+  }
+
+  const allRisks = await api('/api/risks');
+  const allGps   = await api('/api/gps');
+  const allTimber= await api('/api/timber');
+  const allTrucks= await api('/api/trucks');
   const cards = sectors.sort((a,b)=>b.risk_score-a.risk_score).map(s=>{
     const score=s.risk_score, level=score>75?'CRITICAL':score>50?'HIGH':score>25?'MEDIUM':'LOW';
     const cls=level.toLowerCase(), col=level==='CRITICAL'?'var(--red)':level==='HIGH'?'#e07070':level==='MEDIUM'?'var(--amber)':'var(--green)';
@@ -1938,11 +1955,13 @@ async function loadInspector() {
         <button class="btn" onclick="runSectorAnalysis('${s.name}')">🔍 Analyze</button>
       </div>
       <div id="insp-analysis-${idSafe}" class="inspector-analysis" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:var(--r);border:1px solid var(--border)">
-        <div class="insp-analysis-title" style="font-size:11px;font-family:var(--mono);font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">🤖 AI Анализ</div>
-        <div class="insp-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:6px"></div>
-        <div class="insp-text" style="white-space:pre-wrap;font-size:12px;line-height:1.5"></div>
-        <div class="insp-actions" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
-        <div class="insp-error" style="color:var(--red);font-size:12px;margin-top:6px"></div>
+        <div class="insp-analysis-title" style="font-size:11px;font-family:var(--mono);font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="_toggleInspBox('insp-analysis-${idSafe}')"><span class="insp-chevron">▾</span>🤖 AI Анализ</div>
+        <div class="insp-body">
+          <div class="insp-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:6px"></div>
+          <div class="insp-text" style="white-space:pre-wrap;font-size:12px;line-height:1.5"></div>
+          <div class="insp-actions" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+          <div class="insp-error" style="color:var(--red);font-size:12px;margin-top:6px"></div>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1971,11 +1990,25 @@ function _inspBoxEls(boxId) {
   if (!box) return null;
   return {
     box,
+    body: box.querySelector('.insp-body'),
+    chevron: box.querySelector('.insp-chevron'),
     status: box.querySelector('.insp-status'),
     text: box.querySelector('.insp-text'),
     actions: box.querySelector('.insp-actions'),
     error: box.querySelector('.insp-error'),
   };
+}
+
+// Collapse/expand toggle for the AI analysis block's title row. Only hides
+// the body (status/text/actions/error) — the title+chevron row stays put so
+// there's always something to click to reopen it. Streaming (if any is in
+// flight) keeps running in the background while collapsed.
+function _toggleInspBox(boxId) {
+  const els = _inspBoxEls(boxId);
+  if (!els || !els.body) return;
+  const collapsed = els.body.style.display === 'none';
+  els.body.style.display = collapsed ? '' : 'none';
+  if (els.chevron) els.chevron.textContent = collapsed ? '▾' : '▸';
 }
 
 function _renderSuggestedActions(els, resultKey, data) {
@@ -2045,6 +2078,10 @@ async function runInspectorAnalysis(url, boxId, resultKey) {
   }
 
   els.box.style.display = 'block';
+  // Re-running "Analyze" always re-expands the block, even if the user
+  // collapsed a previous result first.
+  if (els.body) els.body.style.display = '';
+  if (els.chevron) els.chevron.textContent = '▾';
   els.text.textContent = '';
   els.error.textContent = '';
   els.actions.innerHTML = '';
@@ -2083,7 +2120,7 @@ async function runInspectorAnalysis(url, boxId, resultKey) {
   // so a fast stream doesn't leave a long silent typing tail after it's done.
   state.timer = setInterval(() => {
     if (state.buffer.length > 0) {
-      const step = state.buffer.length > 200 ? 4 : 1;
+      const step = Math.min(6, Math.max(1, Math.ceil(state.buffer.length / 60)));
       els.text.textContent += state.buffer.slice(0, step);
       state.buffer = state.buffer.slice(step);
     } else if (state.streamEnded) {
