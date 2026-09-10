@@ -694,8 +694,9 @@ async function loadOverview() {
 
   document.getElementById('kpis').innerHTML = `
     <div class="kpi" style="cursor:pointer;border-color:${summary.exposure_low>0?'rgba(201,64,64,0.3)':'var(--border)'}" onclick="openFinancialBreakdown()">
-      <div class="kpi-label">⚠ Финансовые риски</div>
+      <div class="kpi-label">⚠ Риск по инцидентам <span title="Основано на AI-анализе конкретных зарегистрированных инцидентов" style="cursor:help">ⓘ</span></div>
       <div class="kpi-value ${summary.exposure_low>0?'red':'green'}" style="font-size:18px">${summary.exposure_label||'€0'}</div>
+      <div class="kpi-sub">AI-оценка по ${summary.incidents_counted||0} зарегистрированным инцидентам</div>
       <div class="kpi-sub">${summary.vol_at_risk||0} m³ под риском</div>
     </div>
     <div class="kpi" style="cursor:pointer" onclick="nav('sectors')"><div class="kpi-label">Секторы</div><div class="kpi-value green">${summary.sectors}</div><div class="kpi-sub">${summary.red_sectors||0} критических</div></div>
@@ -1880,9 +1881,9 @@ async function loadInspector() {
   const highRisk = sectors.filter(s=>s.risk_score>50&&s.risk_score<=75).length;
   document.getElementById('inspector-kpis').innerHTML = `
     <div class="kpi" style="border-color:rgba(201,64,64,0.3)">
-      <div class="kpi-label">⚠ Общий финансовый риск</div>
+      <div class="kpi-label">⚠ Расчётный риск по операции <span title="Базовая формула риска по всем секторам, включая те, где ещё не зарегистрировано инцидентов" style="cursor:help">ⓘ</span></div>
       <div class="kpi-value red" style="font-size:16px">${sectors.reduce((s,x)=>s+(x.exposure_low||0),0).toLocaleString('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0})} – ${sectors.reduce((s,x)=>s+(x.exposure_high||0),0).toLocaleString('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0})}</div>
-      <div class="kpi-sub">оценка потерь</div>
+      <div class="kpi-sub">агрегированная оценка по всем ${sectors.length} секторам</div>
     </div>
     <div class="kpi"><div class="kpi-label">Avg risk score</div><div class="kpi-value ${totalScore>60?'red':totalScore>30?'amber':'green'}">${totalScore}</div><div class="kpi-sub">из 100</div></div>
     <div class="kpi"><div class="kpi-label">Критические</div><div class="kpi-value ${critical>0?'red':'green'}">${critical}</div><div class="kpi-sub">score > 75</div></div>

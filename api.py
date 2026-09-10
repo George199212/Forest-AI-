@@ -522,11 +522,12 @@ def calc_financial_risk_from_incidents() -> dict:
         total_high += high
         counted += 1
     if counted == 0:
-        return {"exposure_low": 0, "exposure_high": 0, "exposure_label": "€0"}
+        return {"exposure_low": 0, "exposure_high": 0, "exposure_label": "€0", "incidents_counted": 0}
     return {
         "exposure_low": total_low,
         "exposure_high": total_high,
         "exposure_label": f"€{total_low:,}–€{total_high:,}" if total_low > 0 else "€0",
+        "incidents_counted": counted,
     }
 
 
@@ -553,6 +554,7 @@ def summary():
         "exposure_low":     financial_risk["exposure_low"],
         "exposure_high":    financial_risk["exposure_high"],
         "exposure_label":   financial_risk["exposure_label"],
+        "incidents_counted": financial_risk["incidents_counted"],
         "vol_at_risk":      round(total_vol_risk, 1),
         "active_operations":    n("SELECT COUNT(DISTINCT sector) AS n FROM work_sessions WHERE finish_time='' OR finish_time IS NULL"),
         "field_checkins_today": n("""
