@@ -19,6 +19,7 @@ from .models import (
 )
 from .risk_score import compute_satellite_monitoring_score
 from .decision_engine import decide_tier, decide_and_request
+from . import events
 
 __all__ = [
     "SatelliteImage", "CommercialRequest",
@@ -26,4 +27,5 @@ __all__ = [
     "TIER_LABELS",
     "compute_satellite_monitoring_score",
     "decide_tier", "decide_and_request",
+    "events",
 ]

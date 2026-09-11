@@ -24,6 +24,13 @@ import database
 from .models import TIER_1_BASELINE, TIER_2_FREQUENT, TIER_3A_OPTICAL_HIGHRES, TIER_3B_SAR_HIGHRES, TIER_LABELS
 from .risk_score import compute_satellite_monitoring_score, BAND_NORMAL, BAND_WATCH, BAND_MEDIUM, BAND_HIGH, BAND_CRITICAL
 
+# Band ranking, for enforcing a minimum-tier floor. Some event types (a newly
+# detected road, a fire) are domain-known to warrant at least a given tier
+# regardless of how the generic weighted score happens to land — see events.py.
+# This is a distinct mechanism from the score bands themselves: the score
+# number shown to the user is never altered, only which tier gets requested.
+_BAND_RANK = {BAND_NORMAL: 0, BAND_WATCH: 1, BAND_MEDIUM: 2, BAND_HIGH: 3, BAND_CRITICAL: 4}
+
 # Illustrative planning-level cost estimates — NOT a live price quote from any
 # provider (none of PlanetScope/SkySat/ICEYE are connected — see providers/
 # commercial.py). Used only so the demo and the UI can show cost control
@@ -74,13 +81,24 @@ def optical_is_viable(cloud_cover_pct=None, night=False, urgent_all_weather=Fals
 
 
 def decide_tier(score_result: dict, cloud_cover_pct=None, night=False, urgent_all_weather=False,
-                 planetscope_configured=False) -> dict:
+                 planetscope_configured=False, min_band=None) -> dict:
     """Map a satellite_monitoring_score result to a tier decision. Pure
     function — no DB access, no side effects — so it's trivially unit-testable
     and reusable from both the orchestrator below and the demo seed.
+
+    `min_band`, when given, floors the EFFECTIVE band used for the tier
+    decision below — it never rewrites score_result itself or the score number
+    shown to the user, only which tier gets requested. Used by event triggers
+    (events.py) that are domain-known to warrant at least a given tier — e.g. a
+    newly detected road always deserves at least a Level 2 look, independent of
+    how the generic weighted score happens to land.
     """
-    band = score_result["band"]
     score = score_result["score"]
+    band = score_result["band"]
+    floored = min_band and _BAND_RANK[min_band] > _BAND_RANK[band]
+    if floored:
+        band = min_band
+    floor_note = f" (floored to {band} — this event type always warrants at least that level)" if floored else ""
 
     if band in (BAND_NORMAL, BAND_WATCH):
         return {
@@ -94,13 +112,13 @@ def decide_tier(score_result: dict, cloud_cover_pct=None, night=False, urgent_al
             return {
                 "tier": TIER_2_FREQUENT, "provider": "planetscope", "commercial": True,
                 "immediate": False, "combinable": True,
-                "reason": f"Score {score} (MEDIUM) — frequent monitoring via PlanetScope.",
+                "reason": f"Score {score} (MEDIUM){floor_note} — frequent monitoring via PlanetScope.",
             }
         return {
             "tier": TIER_1_BASELINE, "provider": "sentinel2", "commercial": False,
             "immediate": False, "combinable": False,
             "increase_frequency": True,
-            "reason": f"Score {score} (MEDIUM) but PlanetScope is not configured — "
+            "reason": f"Score {score} (MEDIUM){floor_note} but PlanetScope is not configured — "
                       f"falling back to increased Level 1 (Sentinel) analysis frequency only.",
         }
 
@@ -122,7 +140,7 @@ def decide_tier(score_result: dict, cloud_cover_pct=None, night=False, urgent_al
         "tier": tier, "provider": provider, "commercial": True,
         "immediate": band == BAND_CRITICAL,
         "combinable": band == BAND_HIGH,
-        "reason": f"Score {score} ({band}) — {TIER_LABELS[tier]} requested, {cloud_note}.",
+        "reason": f"Score {score} ({band}){floor_note} — {TIER_LABELS[tier]} requested, {cloud_note}.",
     }
 
 
@@ -219,7 +237,7 @@ def find_combinable_request(sector_center, provider: str):
 
 
 def decide_and_request(sector_name: str, signals: dict = None, sector_center=None,
-                        planetscope_configured=False, source="LIVE") -> dict:
+                        planetscope_configured=False, min_band=None) -> dict:
     """
     Full orchestration for one sector: compute the satellite monitoring score,
     persist it (+ a timeline event), decide the tier, and — only for
@@ -240,6 +258,7 @@ def decide_and_request(sector_name: str, signals: dict = None, sector_center=Non
         night=bool(signals.get("night")),
         urgent_all_weather=bool(signals.get("urgent_all_weather")),
         planetscope_configured=planetscope_configured,
+        min_band=min_band,
     )
 
     database.add_satellite_score(

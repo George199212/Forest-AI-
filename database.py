@@ -1118,6 +1118,14 @@ def update_satellite_request_status(request_id, approval_status, fulfilled_obser
     conn.close()
 
 
+def link_satellite_request_incident(request_id, incident_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("UPDATE satellite_requests SET linked_incident_id=? WHERE id=?", (incident_id, request_id))
+    conn.commit()
+    conn.close()
+
+
 def get_satellite_requests(sector=None, approval_status=None, limit=100):
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
