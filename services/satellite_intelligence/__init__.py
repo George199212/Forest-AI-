@@ -17,9 +17,13 @@ from .models import (
     TIER_1_BASELINE, TIER_2_FREQUENT, TIER_3A_OPTICAL_HIGHRES, TIER_3B_SAR_HIGHRES,
     TIER_LABELS,
 )
+from .risk_score import compute_satellite_monitoring_score
+from .decision_engine import decide_tier, decide_and_request
 
 __all__ = [
     "SatelliteImage", "CommercialRequest",
     "TIER_1_BASELINE", "TIER_2_FREQUENT", "TIER_3A_OPTICAL_HIGHRES", "TIER_3B_SAR_HIGHRES",
     "TIER_LABELS",
+    "compute_satellite_monitoring_score",
+    "decide_tier", "decide_and_request",
 ]

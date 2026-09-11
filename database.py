@@ -346,6 +346,80 @@ def _migrate():
     )
     """)
 
+    # ── Satellite Intelligence Engine ───────────────────────────────────────
+    # Additive to the existing satellite_file_path columns on sectors/
+    # boundary_plans (manual uploads) and independent of the risks table's
+    # dual-purpose pattern — these are new concepts (tiered acquisitions,
+    # commercial requests, a separate satellite risk score, a timeline feed),
+    # not a fit for overloading an existing table.
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS satellite_observations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        satellite TEXT,
+        tier TEXT NOT NULL,
+        acquisition_date TEXT,
+        resolution_m REAL,
+        cloud_cover_pct REAL,
+        bbox_json TEXT,
+        image_id TEXT,
+        image_ref TEXT,
+        source TEXT DEFAULT 'LIVE',
+        cost_eur REAL,
+        risk_score REAL,
+        ai_analysis_ref TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS satellite_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        tier TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        estimated_cost_eur REAL,
+        reason TEXT,
+        justification TEXT NOT NULL,
+        satellite_risk_score REAL,
+        requested_resolution_m REAL,
+        aoi_area_ha REAL,
+        approval_status TEXT DEFAULT 'PENDING',
+        combined_group_id TEXT,
+        linked_incident_id INTEGER,
+        fulfilled_observation_id INTEGER,
+        created_at TEXT NOT NULL,
+        fulfilled_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS sector_satellite_scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        score REAL NOT NULL,
+        band TEXT NOT NULL,
+        tier_recommended TEXT,
+        inputs_json TEXT,
+        computed_at TEXT NOT NULL
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS satellite_timeline_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        label TEXT,
+        detail TEXT,
+        ref_table TEXT,
+        ref_id INTEGER,
+        occurred_at TEXT NOT NULL
+    )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -957,3 +1031,190 @@ def remove_snapshot_risk(snapshot_id, risk_id):
     affected = cur.rowcount
     conn.close()
     return affected > 0
+
+
+# ── Satellite Intelligence Engine ───────────────────────────────────────────
+
+def add_satellite_observation(sector, provider, tier, satellite=None, acquisition_date=None,
+                               resolution_m=None, cloud_cover_pct=None, bbox=None, image_id=None,
+                               image_ref=None, source="LIVE", cost_eur=None, risk_score=None,
+                               ai_analysis_ref=None):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO satellite_observations
+        (sector, provider, satellite, tier, acquisition_date, resolution_m, cloud_cover_pct,
+         bbox_json, image_id, image_ref, source, cost_eur, risk_score, ai_analysis_ref, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (sector, provider, satellite, tier, acquisition_date, resolution_m, cloud_cover_pct,
+          json.dumps(bbox) if bbox else None, image_id, image_ref, source, cost_eur, risk_score,
+          ai_analysis_ref, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+
+def get_satellite_observations(sector=None, provider=None, limit=100):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    query = "SELECT * FROM satellite_observations WHERE 1=1"
+    params = []
+    if sector:
+        query += " AND sector=?"
+        params.append(sector)
+    if provider:
+        query += " AND provider=?"
+        params.append(provider)
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    cur.execute(query, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_latest_satellite_observation(sector, provider=None):
+    obs = get_satellite_observations(sector=sector, provider=provider, limit=1)
+    return obs[0] if obs else None
+
+
+def add_satellite_request(sector, tier, provider, justification, estimated_cost_eur=None,
+                           reason=None, satellite_risk_score=None, requested_resolution_m=None,
+                           aoi_area_ha=None, approval_status="PENDING", combined_group_id=None,
+                           linked_incident_id=None):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO satellite_requests
+        (sector, tier, provider, estimated_cost_eur, reason, justification, satellite_risk_score,
+         requested_resolution_m, aoi_area_ha, approval_status, combined_group_id,
+         linked_incident_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (sector, tier, provider, estimated_cost_eur, reason, justification, satellite_risk_score,
+          requested_resolution_m, aoi_area_ha, approval_status, combined_group_id,
+          linked_incident_id, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+
+def update_satellite_request_status(request_id, approval_status, fulfilled_observation_id=None):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    if approval_status == "FULFILLED":
+        cur.execute(
+            "UPDATE satellite_requests SET approval_status=?, fulfilled_observation_id=?, fulfilled_at=? WHERE id=?",
+            (approval_status, fulfilled_observation_id, now, request_id),
+        )
+    else:
+        cur.execute("UPDATE satellite_requests SET approval_status=? WHERE id=?", (approval_status, request_id))
+    conn.commit()
+    conn.close()
+
+
+def get_satellite_requests(sector=None, approval_status=None, limit=100):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    query = "SELECT * FROM satellite_requests WHERE 1=1"
+    params = []
+    if sector:
+        query += " AND sector=?"
+        params.append(sector)
+    if approval_status:
+        query += " AND approval_status=?"
+        params.append(approval_status)
+    # created_at has 1-second resolution — id DESC breaks ties deterministically
+    # (needed because decide_and_request() can insert two requests, e.g. a
+    # MEDIUM PlanetScope request followed immediately by a HIGH SkySat one for
+    # the same sector, within the same second).
+    query += " ORDER BY created_at DESC, id DESC LIMIT ?"
+    params.append(limit)
+    cur.execute(query, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_satellite_request(request_id):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM satellite_requests WHERE id=?", (request_id,))
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def add_satellite_score(sector, score, band, tier_recommended=None, inputs=None):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO sector_satellite_scores (sector, score, band, tier_recommended, inputs_json, computed_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (sector, score, band, tier_recommended, json.dumps(inputs) if inputs is not None else None, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+
+def get_latest_satellite_score(sector):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM sector_satellite_scores WHERE sector=? ORDER BY computed_at DESC, id DESC LIMIT 1",
+        (sector,)
+    )
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_satellite_score_history(sector, limit=20):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM sector_satellite_scores WHERE sector=? ORDER BY computed_at DESC, id DESC LIMIT ?",
+        (sector, limit)
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def add_satellite_timeline_event(sector, event_type, label=None, detail=None, ref_table=None,
+                                  ref_id=None, occurred_at=None):
+    now = occurred_at or datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO satellite_timeline_events (sector, event_type, label, detail, ref_table, ref_id, occurred_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (sector, event_type, label, detail, ref_table, ref_id, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+
+def get_satellite_timeline(sector, limit=100):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM satellite_timeline_events WHERE sector=? ORDER BY occurred_at ASC, id ASC LIMIT ?",
+        (sector, limit)
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
