@@ -32,6 +32,7 @@ PROMPT_TEMPLATE = (
     "Event: {reason}\n"
     "Entity type: {entity_type}\n"
     "Rule triggered: {rule_code}\n\n"
+    "{satellite_block}"
     "Based ONLY on the information given above (do not invent distances, "
     "durations, or any other numbers not provided), produce a detailed "
     "summary and 2-4 concrete response options for the dispatcher handling "
@@ -79,17 +80,33 @@ def generate_incident_recommendation(incident: dict) -> str:
     """
     incident: dict with at least sector, reason, entity_type, rule_code keys
     (the fields actually populated by database.add_incident()).
+
+    An optional `satellite_context` string key extends the prompt with satellite
+    intelligence evidence (provider/tier requested, satellite risk score, the
+    justification for ordering that imagery, and the underlying signal flags —
+    see services/satellite_intelligence/inspector_bridge.py, which builds this
+    string for satellite-triggered incidents). This is the ONLY change here for
+    satellite support: no second recommendation engine, no new schema — a
+    satellite-triggered incident (entity_type="SATELLITE") goes through the
+    exact same call, output schema, and dispatcher workflow as any other
+    incident; callers that don't set it (bot.py's SECTOR_EXIT/EMERGENCY,
+    api.py's report-issue) are completely unaffected.
+
     Returns a JSON string ({"summary", "options", "recommended_option_id"}),
     or None on any failure (missing API key, API error, etc.) — errors are
     logged via print(), never raised, so a failure here never breaks the
     caller. Callers must be defensive when parsing: the model can still
     return malformed JSON.
     """
+    satellite_context = incident.get("satellite_context")
+    satellite_block = f"Satellite intelligence context:\n{satellite_context}\n\n" if satellite_context else ""
+
     prompt = PROMPT_TEMPLATE.format(
         sector=incident.get("sector") or "unknown",
         reason=incident.get("reason") or "unknown",
         entity_type=incident.get("entity_type") or "unknown",
         rule_code=incident.get("rule_code") or "unknown",
+        satellite_block=satellite_block,
     )
 
     try:

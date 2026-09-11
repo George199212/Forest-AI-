@@ -17,6 +17,7 @@ from database import (
     add_inspector_analysis, get_inspector_analyses, add_incident, set_ai_recommendation,
 )
 from services.ai_resolution import _get_client as _get_anthropic_client, generate_incident_recommendation
+from services.satellite_intelligence import collect_satellite_inspector_fields
 
 try:
     from PIL import Image, ImageDraw
@@ -179,7 +180,7 @@ def _collect_sector_inspector_data(sector_name: str) -> dict:
         "SELECT id, equipment_code, type, status, operator_employee_id "
         "FROM sector_equipment WHERE sector=?", (sector_name,)
     )
-    return {
+    data = {
         "scope": "sector",
         "sector": sector_name,
         "contractor": sector.get("contractor"),
@@ -207,6 +208,13 @@ def _collect_sector_inspector_data(sector_name: str) -> dict:
             "SELECT COUNT(*) AS n FROM truck_reports WHERE sector=?", (sector_name,)
         ),
     }
+    # satellite_monitoring_score/band are intentionally separate from
+    # risk_score/risk_level above (calc_risk_score()) — see
+    # services/satellite_intelligence/risk_score.py's module docstring for why
+    # they're never merged. {} when this sector has no satellite activity on
+    # record yet, so it adds no noise to the prompt for untouched sectors.
+    data.update(collect_satellite_inspector_fields(sector_name))
+    return data
 
 
 def _collect_overall_inspector_data() -> dict:
@@ -238,6 +246,22 @@ def _collect_overall_inspector_data() -> dict:
         "SELECT id, equipment_code, type, status, operator_employee_id, sector "
         "FROM sector_equipment ORDER BY sector"
     )
+    # Portfolio-level satellite summary — deliberately separate from
+    # risk_counts/exposure above (calc_risk_score()); demonstrates the core
+    # principle ("AI decides where expensive imagery is actually necessary")
+    # at the fleet level: how many sectors are elevated, and what commercial
+    # imagery is actually pending and why, not spent everywhere by default.
+    pending_requests = db(
+        "SELECT sector, provider, tier, estimated_cost_eur, justification "
+        "FROM satellite_requests WHERE approval_status='PENDING' ORDER BY created_at DESC LIMIT 10"
+    )
+    satellite_elevated = n(
+        "SELECT COUNT(*) AS n FROM ("
+        "  SELECT sector, score FROM sector_satellite_scores s1"
+        "  WHERE computed_at = (SELECT MAX(computed_at) FROM sector_satellite_scores s2 WHERE s2.sector=s1.sector)"
+        "  AND score >= 50"
+        ")"
+    )
     return {
         "scope": "overall",
         "sector_count": len(sectors),
@@ -249,6 +273,9 @@ def _collect_overall_inspector_data() -> dict:
         "risk_counts": risk_counts,
         "sectors": sector_summaries,
         "equipment": equipment,
+        "satellite_elevated_sectors": satellite_elevated,
+        "satellite_pending_requests": pending_requests,
+        "satellite_pending_total_cost_eur": round(sum(r["estimated_cost_eur"] or 0 for r in pending_requests), 2),
     }
 
 

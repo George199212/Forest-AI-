@@ -21,27 +21,37 @@ UNAUTHORIZED_FOREST_ROAD, TIMBER_VOLUME_MISMATCH, ZONE_VIOLATION_TECHNOLOGY)
 where one exists, so the exposure-period reasoning already built into that
 prompt template applies unchanged.
 
-Satellite context is NOT yet fed into generate_incident_recommendation() here
-— that wiring is a separate, later stage (AI Inspector integration) so this
-stage stays scoped to "did the trigger fire, and what imagery does it need".
+Each incident that gets created here also gets a recommendation from the
+EXACT same pipeline every other Forest AI incident uses
+(services/ai_resolution.py's generate_incident_recommendation(), via
+inspector_bridge.attach_satellite_recommendation()) — with satellite evidence
+folded in as extra context, not a second recommendation engine.
 """
 
 import database
 from .decision_engine import decide_and_request
 from .risk_score import BAND_MEDIUM, BAND_HIGH, BAND_CRITICAL
+from .inspector_bridge import attach_satellite_recommendation
 
 
-def _create_satellite_incident(sector_name, rule_code, reason, risk_level, request_id=None):
+def _create_satellite_incident(sector_name, rule_code, reason, risk_level, request=None, score_result=None):
     incident_id = database.add_incident(
         sector=sector_name, risk_level=risk_level, reason=reason,
         entity_type="SATELLITE", entity_id=None, rule_code=rule_code,
     )
     database.add_risk_event(incident_id, "DETECTED", actor="satellite_intelligence", details=reason)
-    if request_id:
-        database.link_satellite_request_incident(request_id, incident_id)
+    if request:
+        database.link_satellite_request_incident(request["id"], incident_id)
     database.add_satellite_timeline_event(
         sector_name, "TRIGGER", label=f"Incident #{incident_id} created ({rule_code})",
         detail=reason, ref_table="risks", ref_id=incident_id,
+    )
+    # Same recommendation pipeline every other incident type uses — never
+    # raises, so a failure here (e.g. no ANTHROPIC_API_KEY) never blocks
+    # incident creation; the incident still lands OPEN for a dispatcher.
+    attach_satellite_recommendation(
+        incident_id, sector_name, reason, entity_type="SATELLITE", rule_code=rule_code,
+        request=request, score_result=score_result,
     )
     return incident_id
 
@@ -72,7 +82,7 @@ def trigger_storm(sector_name, sector_center, affected_area_ha, ndvi_change_pct=
     incident_id = _create_satellite_incident(
         sector_name, "STORM_DAMAGE", reason,
         "HIGH" if decision["score_result"]["band"] in (BAND_HIGH, BAND_CRITICAL) else "MEDIUM",
-        request_id=request["id"] if request else None,
+        request=request, score_result=decision["score_result"],
     )
     return {"fired": True, "reason": reason, "decision": decision, "incident_id": incident_id}
 
@@ -90,7 +100,7 @@ def trigger_fire(sector_name, sector_center, cloud_cover_pct=None, night=False,
     request = decision.get("request")
     incident_id = _create_satellite_incident(
         sector_name, "FIRE_DAMAGE", reason, "HIGH",
-        request_id=request["id"] if request else None,
+        request=request, score_result=decision["score_result"],
     )
     return {"fired": True, "reason": reason, "decision": decision, "incident_id": incident_id}
 
@@ -116,7 +126,7 @@ def trigger_suspected_illegal_logging(sector_name, sector_center, ndvi_change_pc
     request = decision.get("request")
     incident_id = _create_satellite_incident(
         sector_name, "UNAUTHORIZED_LOGGING", reason, "HIGH",
-        request_id=request["id"] if request else None,
+        request=request, score_result=decision["score_result"],
     )
     return {"fired": True, "reason": reason, "decision": decision, "incident_id": incident_id}
 
@@ -139,7 +149,7 @@ def trigger_new_road(sector_name, sector_center, cloud_cover_pct=None, ai_detect
     request = decision.get("request")
     incident_id = _create_satellite_incident(
         sector_name, "UNAUTHORIZED_FOREST_ROAD", reason, "MEDIUM",
-        request_id=request["id"] if request else None,
+        request=request, score_result=decision["score_result"],
     )
     return {"fired": True, "reason": reason, "decision": decision, "incident_id": incident_id}
 
@@ -195,7 +205,7 @@ def trigger_timber_shortage(sector_name, sector_center, planned_volume, actual_v
     incident_id = _create_satellite_incident(
         sector_name, "TIMBER_VOLUME_MISMATCH", reason,
         "HIGH" if mismatch_pct >= 25 else "MEDIUM",
-        request_id=request["id"] if request else None,
+        request=request, score_result=decision["score_result"],
     )
     return {"fired": True, "reason": reason, "decision": decision, "incident_id": incident_id}
 
@@ -221,6 +231,6 @@ def trigger_contractor_outside_boundary(sector_name, sector_center, activity_pla
     request = decision.get("request")
     incident_id = _create_satellite_incident(
         sector_name, "ZONE_VIOLATION_TECHNOLOGY", reason, "MEDIUM",
-        request_id=request["id"] if request else None,
+        request=request, score_result=decision["score_result"],
     )
     return {"fired": True, "reason": reason, "decision": decision, "incident_id": incident_id}
