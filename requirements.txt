@@ -1,0 +1,18 @@
+# Forest AI — dependencies, pinned to what the production environment
+# (system python3, not the unused venv/ directory) actually has installed
+# as of this audit. See ARCHITECTURE.md — no requirements.txt existed
+# before; this was a documented gap.
+
+fastapi==0.136.3
+uvicorn==0.52.4
+pydantic==2.13.5
+python-telegram-bot==22.8
+anthropic==0.116.0
+requests==2.34.2
+Pillow==12.2.0
+
+# Integration Layer (services/integrations/) — credential encryption
+cryptography==50.0.1
+
+# Dev/test only
+pytest>=9.1.1

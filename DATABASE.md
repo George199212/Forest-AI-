@@ -45,6 +45,21 @@
 `REFERENCES`/`FOREIGN KEY` в DDL — SQLite это не enforce'ит без явного
 `PRAGMA foreign_keys=ON`, которого в коде нет).
 
+### 2.1 Integration Layer — добавлено 2026-09-24 (`services/integrations/`)
+
+Восемь новых таблиц, все `CREATE TABLE IF NOT EXISTS` в конце `_migrate()`:
+`organizations` (с сидом одной default-организации id=1), `integrations`
+(метаданные подключений — `category`/`provider`/`connection_status`/
+`sync_status`/`is_demo`/`records_received`), `integration_credentials`
+(Fernet-зашифрованное значение, ключ из `INTEGRATION_CREDENTIALS_KEY`),
+`integration_sync_runs`, `integration_logs`, `integration_records`
+(staging/дедупликация — `deduplication_key TEXT UNIQUE`),
+`integration_webhook_events` (`payload_hash TEXT UNIQUE`, защита от
+повторной обработки webhook), `weighbridge_records` (единственная новая
+доменная сущность — остальные normalized-сущности пишутся в уже
+существующие таблицы, см. `services/integrations/categories.py`). Подробности
+и известные ограничения — INTEGRATIONS.md §6.
+
 ## 3. `vehicle_gps_pings` — managed rebuild (не просто ALTER)
 
 Изначально `vehicle_id` был `NOT NULL` (таблица создавалась только для

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Forest AI — Operations Platform</title>
-<link rel="icon" type="image/jpeg" href="/assets/logo.jpg">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -210,7 +210,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="logo">
-      <div class="logo-mark" onclick="nav('overview')" style="cursor:pointer"><img src="/assets/logo.jpg" alt="Forest AI" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:1px solid var(--border)"><span class="logo-name">Forest AI</span></div>
+      <div class="logo-mark" onclick="nav('overview')" style="cursor:pointer"><img src="/assets/logo.png" alt="Forest AI" style="width:32px;height:32px;border:1px solid var(--border)"><span class="logo-name">Forest AI</span></div>
     </div>
     <nav>
       <div class="nav-group">Monitor</div>
@@ -227,6 +227,8 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
       <div class="nav-group">AI</div>
       <div class="nav-item" onclick="nav('inspector')"><span class="nav-icon">◆</span> AI Inspector</div>
       <div class="nav-item" onclick="nav('satellite')"><span class="nav-icon">🛰</span> Satellite</div>
+      <div class="nav-group">Admin</div>
+      <div class="nav-item" onclick="nav('integrations')"><span class="nav-icon">🔌</span> Integrations</div>
     </nav>
     <div class="sidebar-foot" id="last-update">–</div>
   </div>
@@ -546,6 +548,37 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   </div>
       </div><!-- /sec-satellite -->
 
+      <!-- INTEGRATIONS -->
+      <div class="section" id="sec-integrations">
+        <div class="kpis" id="int-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px"></div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="filter-btn active" data-cat="" onclick="setIntCategoryFilter('')">All</button>
+            <button class="filter-btn" data-cat="machine" onclick="setIntCategoryFilter('machine')">Machines</button>
+            <button class="filter-btn" data-cat="fleet" onclick="setIntCategoryFilter('fleet')">Fleet</button>
+            <button class="filter-btn" data-cat="gis" onclick="setIntCategoryFilter('gis')">GIS</button>
+            <button class="filter-btn" data-cat="satellite" onclick="setIntCategoryFilter('satellite')">Satellite</button>
+            <button class="filter-btn" data-cat="timber" onclick="setIntCategoryFilter('timber')">Timber</button>
+            <button class="filter-btn" data-cat="weighbridge" onclick="setIntCategoryFilter('weighbridge')">Weighbridge</button>
+            <button class="filter-btn" data-cat="worker" onclick="setIntCategoryFilter('worker')">Workers</button>
+            <button class="filter-btn" data-cat="erp" onclick="setIntCategoryFilter('erp')">ERP</button>
+            <button class="filter-btn" data-cat="audit" onclick="setIntCategoryFilter('audit')">Audit</button>
+          </div>
+        </div>
+        <div id="int-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px"></div>
+      </div><!-- /sec-integrations -->
+
+      <!-- INTEGRATION DETAIL (opened via click, not in nav menu) -->
+      <div class="section" id="sec-integration-detail">
+        <div class="card">
+          <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
+            <span id="int-detail-title">Integration</span>
+            <button class="btn" onclick="nav('integrations')">← Back</button>
+          </div>
+          <div id="int-detail-body"></div>
+        </div>
+      </div><!-- /sec-integration-detail -->
+
       <!-- RISK DETAIL (opened via click, not in nav menu) -->
       <div class="section" id="sec-risk-detail">
         <div class="card">
@@ -666,7 +699,7 @@ function tbl(headers, keys, rows) {
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
-const titles = {overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor'};
+const titles = {overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor',integrations:'Integrations','integration-detail':'Integration'};
 
 function nav(id, push=true) {
   currentSection = id;
@@ -674,7 +707,7 @@ function nav(id, push=true) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el = document.getElementById('sec-'+id);
   if (el) el.classList.add('active');
-  const navMap = {overview:0,objects:1,sectors:2,map:3,risks:4,gps:5,trucks:6,timber:7,photos:8,inspector:9,satellite:10};
+  const navMap = {overview:0,objects:1,sectors:2,map:3,risks:4,gps:5,trucks:6,timber:7,photos:8,inspector:9,satellite:10,integrations:11};
   const items = document.querySelectorAll('.nav-item');
   if (navMap[id]!==undefined) items[navMap[id]].classList.add('active');
   document.getElementById('page-title').textContent = titles[id]||id;
@@ -690,6 +723,8 @@ const loaders = {
   risks: loadRisks, gps: loadGPS, trucks: loadTrucks, timber: loadTimber,
   photos: loadPhotos, inspector: () => Promise.all([loadInspector(), loadIncidentsEquipment()]), satellite: loadSatellite,
   'risk-detail': () => currentRiskId && openRisk(currentRiskId, false),
+  integrations: loadIntegrations,
+  'integration-detail': () => currentIntegrationId && openIntegration(currentIntegrationId, false),
 };
 
 function load(id) {
@@ -3017,6 +3052,194 @@ async function saveForestNotes(sector) {
   } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
 }
 
+// ── INTEGRATIONS ────────────────────────────────────────────────────────────
+let currentIntegrationId = null;
+let intCategoryFilter = '';
+
+function statusBadgeClass(status) {
+  if (status === 'CONNECTED') return 'b-green';
+  if (status === 'ERROR') return 'b-red';
+  if (status === 'SYNCING') return 'b-amber';
+  if (status === 'Demo') return 'b-amber';
+  if (status === 'Available') return 'b-gray';
+  return 'b-gray';
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: body!==undefined ? JSON.stringify(body) : undefined});
+  clearCache();
+  let data = {};
+  try { data = await r.json(); } catch(e) {}
+  if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+  return data;
+}
+async function apiPatch(path, body) {
+  const r = await fetch(path, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  clearCache();
+  let data = {};
+  try { data = await r.json(); } catch(e) {}
+  if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+  return data;
+}
+
+function setIntCategoryFilter(cat, el) {
+  intCategoryFilter = cat;
+  document.querySelectorAll('#sec-integrations .filter-btn').forEach(b=>b.classList.remove('active'));
+  (el || document.querySelector(`#sec-integrations .filter-btn[data-cat="${cat}"]`))?.classList.add('active');
+  renderIntegrationCards();
+}
+
+let _intCatalogCache = [];
+
+async function loadIntegrations() {
+  const data = await api('/api/integrations');
+  _intCatalogCache = data.integrations;
+  const connected = _intCatalogCache.filter(e=>e.integration && e.integration.connection_status==='CONNECTED').length;
+  const demo = _intCatalogCache.filter(e=>e.integration && e.integration.is_demo).length;
+  const totalRecords = _intCatalogCache.reduce((s,e)=> s + (e.integration ? (e.integration.records_received||0) : 0), 0);
+  const errors = _intCatalogCache.filter(e=>e.integration && e.integration.connection_status==='ERROR').length;
+  document.getElementById('int-kpis').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Подключено</div><div class="kpi-value green">${connected}</div><div class="kpi-sub">из ${_intCatalogCache.length} в каталоге</div></div>
+    <div class="kpi"><div class="kpi-label">Demo-интеграции</div><div class="kpi-value">${demo}</div><div class="kpi-sub">не смешиваются с продакшеном</div></div>
+    <div class="kpi"><div class="kpi-label">Получено записей</div><div class="kpi-value">${totalRecords}</div><div class="kpi-sub">по всем интеграциям</div></div>
+    <div class="kpi"><div class="kpi-label ${errors>0?'red':''}">Ошибки</div><div class="kpi-value ${errors>0?'red':'green'}">${errors}</div><div class="kpi-sub">требуют внимания</div></div>
+  `;
+  renderIntegrationCards();
+}
+
+function renderIntegrationCards() {
+  const grid = document.getElementById('int-cards-grid');
+  const list = intCategoryFilter ? _intCatalogCache.filter(e=>e.category===intCategoryFilter) : _intCatalogCache;
+  if (!list.length) { grid.innerHTML = '<div class="card" style="color:var(--text3)">Нет интеграций в этой категории.</div>'; return; }
+  grid.innerHTML = list.map(e => {
+    const status = e.display_status;
+    const conn = e.integration;
+    return `
+    <div class="card" style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-weight:600;font-size:14px">${e.display_name}</div>
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${e.vendor||''} · ${e.category}</div>
+        </div>
+        ${badge(status, statusBadgeClass(status))}
+      </div>
+      ${e.confirmed_customer_use ? `<div style="font-size:11px;color:var(--text3);background:var(--bg3);padding:6px 8px;border-radius:var(--r)">ℹ ${e.confirmed_customer_use}</div>` : ''}
+      ${conn ? `
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">
+          Последняя синхронизация: ${conn.last_sync_at || '—'}<br>
+          Записей получено: ${conn.records_received||0}
+          ${conn.error_message ? `<br><span style="color:var(--red)">⚠ ${conn.error_message}</span>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          <button class="btn" style="padding:4px 10px;font-size:11px" onclick="openIntegration(${conn.id})">Configure</button>
+          <button class="btn" style="padding:4px 10px;font-size:11px" onclick="testIntegrationAction(${conn.id})">Test Connection</button>
+          <button class="btn" style="padding:4px 10px;font-size:11px" onclick="syncIntegrationAction(${conn.id})">Sync Now</button>
+          <button class="btn" style="padding:4px 10px;font-size:11px" onclick="openIntegration(${conn.id})">View Logs</button>
+          ${conn.is_demo ? `<button class="btn" style="padding:4px 10px;font-size:11px" onclick="resetDemoAction(${conn.id})">Reset Demo Data</button>` : ''}
+          <button class="btn" style="padding:4px 10px;font-size:11px;color:var(--red)" onclick="disconnectIntegrationAction(${conn.id})">Disconnect</button>
+        </div>
+      ` : e.implemented ? `
+        <div style="font-size:11px;color:var(--text3)">${e.demo_available ? 'Demo mode available — no real credentials required.' : ''}</div>
+        <button class="btn" style="padding:4px 10px;font-size:11px;align-self:flex-start" onclick="connectIntegrationAction('${e.provider}', ${e.demo_available})">Connect</button>
+      ` : `
+        <div style="font-size:11px;color:var(--text3)">${e.notes || 'No adapter implemented yet — planned integration.'}</div>
+      `}
+    </div>`;
+  }).join('');
+}
+
+async function connectIntegrationAction(provider, demoAvailable) {
+  try {
+    const row = await apiPost('/api/integrations', {provider, is_demo: demoAvailable});
+    await apiPost(`/api/integrations/${row.id}/test`);
+    await loadIntegrations();
+  } catch(e) { alert('Connect failed: ' + e.message); }
+}
+async function testIntegrationAction(id) {
+  try { const r = await apiPost(`/api/integrations/${id}/test`); alert(r.ok ? '✅ ' + r.message : '❌ ' + r.message); await loadIntegrations(); }
+  catch(e) { alert('Test failed: ' + e.message); }
+}
+async function syncIntegrationAction(id) {
+  try {
+    const r = await apiPost(`/api/integrations/${id}/sync`);
+    alert(r.ok ? `✅ Sync OK — fetched ${r.fetched}, saved ${r.saved}, deduplicated ${r.deduplicated}` : `❌ Sync failed: ${r.error}`);
+    await loadIntegrations();
+    if (currentSection==='integration-detail') openIntegration(id);
+  } catch(e) { alert('Sync failed: ' + e.message); }
+}
+async function resetDemoAction(id) {
+  if (!confirm('Сбросить demo-данные этой интеграции? Реальные операционные данные не затрагиваются.')) return;
+  try {
+    const r = await apiPost(`/api/integrations/${id}/reset-demo`);
+    alert(`🔄 Reset OK — удалено записей: ${r.deleted_records}, инцидентов: ${r.deleted_incidents}`);
+    await loadIntegrations();
+    if (currentSection==='integration-detail') openIntegration(id);
+  } catch(e) { alert('Reset failed: ' + e.message); }
+}
+async function disconnectIntegrationAction(id) {
+  if (!confirm('Отключить интеграцию? История синхронизации и логи сохранятся — подключить можно снова в любой момент.')) return;
+  try {
+    await apiPatch(`/api/integrations/${id}`, {connection_status: 'NOT_CONNECTED'});
+    await loadIntegrations();
+    if (currentSection==='integration-detail') openIntegration(id);
+  } catch(e) { alert('Disconnect failed: ' + e.message); }
+}
+
+async function openIntegration(id, push=true) {
+  currentIntegrationId = id;
+  currentSection = 'integration-detail';
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-integration-detail').classList.add('active');
+  document.getElementById('page-title').textContent = 'Integration';
+  if (push) history.pushState({type:'integration', id}, '', '#integration-detail');
+
+  const [detail, logsData, recordsData] = await Promise.all([
+    fetch(`/api/integrations/${id}`).then(r=>r.json()),
+    fetch(`/api/integrations/${id}/logs?limit=30`).then(r=>r.json()),
+    fetch(`/api/integrations/${id}/records?limit=20`).then(r=>r.json()),
+  ]);
+
+  document.getElementById('int-detail-title').textContent = `${detail.catalog?.display_name || detail.provider} (${detail.category})`;
+  document.getElementById('int-detail-body').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin:8px 0 16px">
+      ${badge(detail.connection_status, statusBadgeClass(detail.connection_status))}
+      ${detail.is_demo ? badge('DEMO MODE', 'b-amber') : badge('PRODUCTION', 'b-green')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px">
+      <div class="info-cell"><div class="info-cell-label">Sync status</div><div class="info-cell-value">${detail.sync_status}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Sync frequency</div><div class="info-cell-value">${detail.sync_frequency_minutes} min</div></div>
+      <div class="info-cell"><div class="info-cell-label">Last sync</div><div class="info-cell-value">${detail.last_sync_at||'—'}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Last success</div><div class="info-cell-value">${detail.last_success_at||'—'}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Records received</div><div class="info-cell-value">${detail.records_received}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Credentials</div><div class="info-cell-value">${detail.has_credentials===false ? 'not set' : (detail.credentials_reference ? 'configured' : 'none required (demo)')}</div></div>
+    </div>
+    ${detail.error_message ? `<div style="color:var(--red);font-size:12px;margin-bottom:16px">⚠ ${detail.error_message}</div>` : ''}
+    ${detail.catalog?.confirmed_customer_use ? `<div style="font-size:12px;color:var(--text3);background:var(--bg3);padding:8px;border-radius:var(--r);margin-bottom:16px">ℹ ${detail.catalog.confirmed_customer_use}</div>` : ''}
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+      <button class="btn" onclick="testIntegrationAction(${id})">Test Connection</button>
+      <button class="btn" onclick="syncIntegrationAction(${id})">Sync Now</button>
+      ${detail.is_demo ? `<button class="btn" onclick="resetDemoAction(${id})">Reset Demo Data</button>` : ''}
+      <button class="btn" style="color:var(--red)" onclick="disconnectIntegrationAction(${id})">Disconnect</button>
+    </div>
+
+    <div class="card-head" style="padding:0;margin-bottom:8px"><span>Sync log</span></div>
+    <table class="tbl" style="margin-bottom:20px"><thead><tr><th>Started</th><th>Trigger</th><th>Status</th><th>Fetched</th><th>Saved</th><th>Dedup</th></tr></thead><tbody>
+      ${(logsData.sync_runs||[]).map(s=>`<tr><td>${s.started_at}</td><td>${s.trigger||''}</td><td>${badge(s.status, s.status==='SUCCESS'?'b-green':s.status==='ERROR'?'b-red':'b-amber')}</td><td>${s.records_fetched}</td><td>${s.records_saved}</td><td>${s.records_deduplicated}</td></tr>`).join('') || '<tr><td colspan="6" style="color:var(--text3)">No sync runs yet.</td></tr>'}
+    </tbody></table>
+
+    <div class="card-head" style="padding:0;margin-bottom:8px"><span>Recent log messages</span></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text3);max-height:200px;overflow:auto;margin-bottom:20px">
+      ${(logsData.logs||[]).map(l=>`<div style="padding:3px 0;border-bottom:1px solid var(--border)">[${l.created_at}] <span style="color:${l.level==='ERROR'?'var(--red)':'inherit'}">${l.level}</span> ${l.message}</div>`).join('') || '<div>No log entries yet.</div>'}
+    </div>
+
+    <div class="card-head" style="padding:0;margin-bottom:8px"><span>Recent normalized records</span></div>
+    <table class="tbl"><thead><tr><th>Received</th><th>Entity</th><th>External ID</th><th>Sector</th><th>Validation</th></tr></thead><tbody>
+      ${(recordsData.records||[]).map(r=>`<tr><td>${r.received_at}</td><td>${r.entity_type}</td><td>${r.external_id}</td><td>${r.sector||''}</td><td>${badge(r.validation_status, r.validation_status==='VALID'?'b-green':'b-gray')}</td></tr>`).join('') || '<tr><td colspan="5" style="color:var(--text3)">No records synced yet.</td></tr>'}
+    </tbody></table>
+  `;
+}
+
 // ── AUTO REFRESH every 30s ────────────────────────────────────────────────────
 setInterval(()=>{ if(currentSection&&currentSection!=='detail'){ clearCache(); load(currentSection); } }, 30000);
 
@@ -3028,6 +3251,7 @@ window.addEventListener('popstate', e=>{
   else if (state.type==='sector') openSector(state.name, false);
   else if (state.type==='risk') openRisk(state.id, false);
   else if (state.type==='financial-breakdown') openFinancialBreakdown(false);
+  else if (state.type==='integration') openIntegration(state.id, false);
 });
 
 // INIT

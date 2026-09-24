@@ -12,6 +12,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event, set_ai_recommendation, get_active_incident_for_employee
 from services.robez_ocr_vision import analyze_robez_plan_ocr_vision
 from services.ai_resolution import generate_incident_recommendation
+from services import demo_scenarios
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
@@ -786,6 +787,17 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.edited_message or update.message
     loc = msg.location
 
+    # Route to a demo breakdown incident awaiting evidence (Scenario 1's
+    # 📍 Send Location button) — logged on the incident, not a new GPS ping.
+    demo_incident_id = context.user_data.pop("demo_brk_loc_incident", None) if not is_edit else None
+    if demo_incident_id:
+        add_risk_event(
+            demo_incident_id, "LOCATION_RECEIVED", actor=f"telegram:{update.effective_user.id}",
+            details=f"{loc.latitude:.5f}, {loc.longitude:.5f}"
+        )
+        await update.message.reply_text("✅ Геолокация получена и прикреплена к инциденту.")
+        return
+
     if is_edit:
         # Live-location update (Telegram edits the original message every
         # few seconds) — only refresh live_locations, never re-run the
@@ -997,6 +1009,25 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Route to robez plan OCR handler
     if context.user_data.get("waiting_robez_plan"):
         await handle_robez_plan_photo(update, context)
+        return
+
+    # Route to a demo breakdown incident awaiting evidence (Scenario 1's
+    # 📷 Send Photo button) — reuses risks.photo_path/photo_path_2, the same
+    # columns the Risk Detail page already renders (/api/risks/{id}/photo).
+    demo_incident_id = context.user_data.pop("demo_brk_photo_incident", None)
+    if demo_incident_id:
+        photo = update.message.photo[-1]
+        file = await photo.get_file()
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        photos_dir = Path("data/risk_photos")
+        photos_dir.mkdir(parents=True, exist_ok=True)
+        image_path = photos_dir / f"risk{demo_incident_id}_{timestamp}.jpg"
+        await file.download_to_drive(str(image_path))
+        existing = db_fetchone("SELECT photo_path FROM risks WHERE id=?", (demo_incident_id,))
+        column = "photo_path_2" if (existing and existing[0]) else "photo_path"
+        db_execute(f"UPDATE risks SET {column}=? WHERE id=?", (str(image_path), demo_incident_id))
+        add_risk_event(demo_incident_id, "PHOTO_RECEIVED", actor=f"telegram:{update.effective_user.id}")
+        await update.message.reply_text("✅ Фото получено и прикреплено к инциденту.")
         return
 
     session = context.user_data.get("active_work_session")
@@ -1476,6 +1507,130 @@ async def emergency_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from database import update_incident_status
     update_incident_status(incident_id, "NOTIFIED", telegram_message_id=str(sent.message_id))
 
+# ── Demo control (Rīgas meži presentation) ────────────────────────────────────
+# Five reliable, admin-only trigger commands + their button callbacks. All
+# business logic lives in services/demo_scenarios.py so api.py's backend
+# demo endpoints can call the exact same functions. Restricted to
+# demo_scenarios.is_demo_admin() (defaults to DISPATCHER_CHAT_ID) so these
+# can't be fired by a random Telegram user.
+
+async def _demo_guard(update: Update) -> bool:
+    if not demo_scenarios.is_demo_admin(update.effective_user.id):
+        await update.message.reply_text("❌ Demo commands are restricted to the demo admin account.")
+        return False
+    return True
+
+async def _run_demo_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE, fn, label):
+    if not await _demo_guard(update):
+        return
+    await update.message.reply_text(f"⏳ Running demo scenario: {label} ...")
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(None, fn)
+        status = "✅ Telegram sent" if result.get("telegram_sent") else "⚠️ Incident created, Telegram send FAILED (check logs)"
+        await update.message.reply_text(
+            f"{status}\nIncident #{result.get('incident_id')}\nSee it on the dashboard under Risks."
+        )
+    except Exception as e:
+        print(f"DEMO TRIGGER ERROR ({label}): {e}")
+        await update.message.reply_text(f"❌ Demo trigger failed: {e}")
+
+async def demo_breakdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _run_demo_trigger(update, context, demo_scenarios.trigger_breakdown, "Equipment breakdown")
+
+async def demo_worker_exit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _run_demo_trigger(update, context, demo_scenarios.trigger_worker_exit, "Worker sector exit")
+
+async def demo_volume_mismatch_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _run_demo_trigger(update, context, demo_scenarios.trigger_volume_mismatch, "Timber volume mismatch")
+
+async def demo_wetland_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _run_demo_trigger(update, context, demo_scenarios.trigger_wetland, "Wetland proximity")
+
+async def demo_logging_boundary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _run_demo_trigger(update, context, demo_scenarios.trigger_logging_boundary, "Logging boundary")
+
+async def demo_reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _demo_guard(update):
+        return
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(None, demo_scenarios.reset_demo)
+        await update.message.reply_text(f"🔄 Demo reset complete. Cleared {result['cleared_incidents']} demo incident(s).")
+    except Exception as e:
+        print(f"DEMO RESET ERROR: {e}")
+        await update.message.reply_text(f"❌ Demo reset failed: {e}")
+
+async def demo_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """One handler for every scenario's action buttons (brk_action, sxt_action,
+    wtl_action, vol_action, log_action) — same callback_data shape
+    '<prefix>:<incident_id>:<action>' across all five, dispatched by prefix."""
+    query = update.callback_query
+    await query.answer()
+    prefix, incident_id_str, action = query.data.split(":")
+    incident_id = int(incident_id_str)
+    actor = f"telegram:{update.effective_user.id}"
+
+    handler_map = {
+        "brk_action": demo_scenarios.handle_breakdown_action,
+        "sxt_action": demo_scenarios.handle_sector_exit_action,
+        "wtl_action": demo_scenarios.handle_wetland_action,
+        "vol_action": demo_scenarios.handle_volume_action,
+        "log_action": demo_scenarios.handle_logging_action,
+    }
+    fn = handler_map.get(prefix)
+    if not fn:
+        return
+    try:
+        reply_text, buttons = fn(incident_id, action, actor)
+    except Exception as e:
+        print(f"DEMO ACTION ERROR ({prefix}:{action} on #{incident_id}): {e}")
+        await query.message.reply_text(f"❌ Error handling action: {e}")
+        return
+    if reply_text:
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton(b["text"], callback_data=b["callback_data"]) for b in row]
+                                        for row in buttons]) if buttons else None
+        await query.message.reply_text(reply_text, reply_markup=markup)
+
+    # Keep photo/location follow-ups scoped to the incident that asked for
+    # them (Scenario 1's 📷 Send Photo / 📍 Send Location buttons) — the
+    # very next photo/location message from this chat is routed to
+    # handle_photo()/handle_location() below.
+    if prefix == "brk_action" and action == "photo":
+        context.user_data["demo_brk_photo_incident"] = incident_id
+    if prefix == "brk_action" and action == "loc":
+        context.user_data["demo_brk_loc_incident"] = incident_id
+
+async def demo_diagnostics_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    _, incident_id_str, problem_key = query.data.split(":")
+    incident_id = int(incident_id_str)
+    actor = f"telegram:{update.effective_user.id}"
+    reply_text, buttons = demo_scenarios.handle_breakdown_diagnostics(incident_id, problem_key, actor)
+    markup = InlineKeyboardMarkup([[InlineKeyboardButton(b["text"], callback_data=b["callback_data"]) for b in row]
+                                    for row in buttons]) if buttons else None
+    await query.message.reply_text(reply_text, reply_markup=markup)
+
+async def confirm_return_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the '✓ I HAVE RETURNED' button api.py's approve_incident()/
+    inspector_report_issue() already attach to non-EQUIPMENT_BREAKDOWN
+    incidents — previously sent with no registered handler at all (clicking
+    it did nothing). Generic: marks the incident resolved regardless of
+    rule_code."""
+    query = update.callback_query
+    await query.answer()
+    incident_id = int(query.data.split(":")[1])
+    actor = f"telegram:{update.effective_user.id}"
+    add_risk_event(incident_id, "CONFIRMED_RETURN", actor=actor)
+    from database import update_incident_status
+    update_incident_status(incident_id, "RESOLVED")
+    add_risk_event(incident_id, "RESOLVED", actor=actor)
+    await query.message.reply_text("✅ Спасибо за подтверждение. Инцидент закрыт.")
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     print("BOT ERROR:", context.error)
     if update and hasattr(update, "effective_message") and update.effective_message:
@@ -1505,6 +1660,13 @@ def main():
     app.add_handler(CommandHandler("report", report))
     app.add_handler(CommandHandler("export_report", export_report))
 
+    app.add_handler(CommandHandler("demo_breakdown", demo_breakdown_command))
+    app.add_handler(CommandHandler("demo_worker_exit", demo_worker_exit_command))
+    app.add_handler(CommandHandler("demo_volume_mismatch", demo_volume_mismatch_command))
+    app.add_handler(CommandHandler("demo_wetland", demo_wetland_command))
+    app.add_handler(CommandHandler("demo_logging_boundary", demo_logging_boundary_command))
+    app.add_handler(CommandHandler("demo_reset", demo_reset_command))
+
     app.add_handler(CallbackQueryHandler(sector_selected_callback, pattern="^checkin_sector:"))
     app.add_handler(CallbackQueryHandler(link_employee_callback, pattern="^linkemp:"))
     app.add_handler(CallbackQueryHandler(vehicle_sector_callback, pattern="^vehgps_sector:"))
@@ -1512,6 +1674,9 @@ def main():
     app.add_handler(CallbackQueryHandler(plan_callback, pattern="^plan_"))
     app.add_handler(CallbackQueryHandler(repair_menu_callback, pattern="^repair_menu:"))
     app.add_handler(CallbackQueryHandler(repair_choice_callback, pattern="^repair_choice:"))
+    app.add_handler(CallbackQueryHandler(confirm_return_callback, pattern="^confirm_return:"))
+    app.add_handler(CallbackQueryHandler(demo_diagnostics_callback, pattern="^brk_diag:"))
+    app.add_handler(CallbackQueryHandler(demo_action_callback, pattern="^(brk_action|sxt_action|wtl_action|vol_action|log_action):"))
     app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))

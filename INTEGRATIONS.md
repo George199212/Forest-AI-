@@ -99,7 +99,74 @@ DB_PATH                    # default: data/forest_ai.db
 PHOTOS_DIR                 # default: data/work_photos
 ```
 
-## 6. Netlify
+## 6. Integration Layer (added 2026-09-24) — `services/integrations/`
+
+Generic adapter framework for external forestry-company systems (machine
+telematics, fleet GPS, GIS, satellite, timber/weighbridge, worker, ERP,
+audit). See `services/integrations/base.py::IntegrationAdapter` for the
+lifecycle interface, `registry.py` for the full provider catalog, and
+`demo/` for the three stage-1 implemented adapters (Fleet GPS, Sentinel,
+Weighbridge — all synthetic, no network calls).
+
+**Implemented (stage 1):** `fleet_gps_demo`, `sentinel_demo`,
+`weighbridge_demo` — demo-only, `is_demo=1`, deterministic synthetic data.
+**Everything else in the catalog (PONSSE, John Deere ×2, Komatsu ×3, ZF
+SCALAR, LVM GEO, PlanetScope/SkySat/Maxar/ICEYE, TIMBRO Audit, generic
+ERP/GIS/timber/weighbridge) is catalog-only** — no adapter code exists,
+`implemented=False`, never shown as Connected. KRAUZERS (fleet/telematics)
+and TIMBRO (forest audit) have a `confirmed_customer_use` note attached
+(see `registry.py`) but no confirmed vendor/API — do not name a specific
+product for either in any client-facing material until confirmed.
+
+New tables (additive, see database.py `_migrate()`): `organizations`,
+`integrations`, `integration_credentials` (Fernet-encrypted via
+`INTEGRATION_CREDENTIALS_KEY`), `integration_sync_runs`, `integration_logs`,
+`integration_records` (staging/dedup, `deduplication_key UNIQUE`),
+`integration_webhook_events` (replay protection), `weighbridge_records`.
+Existing domain tables (`sectors`, `vehicle_gps_pings`, `timber_movements`,
+`satellite_observations`, `risks`) are reused, not duplicated — see
+`categories.py` docstrings for which category writes which table.
+
+**Tenant isolation caveat:** every new table carries `organization_id`, and
+a `Default Organization` (id=1) is seeded, but this is schema-ready, not
+enforced — the app still authenticates with one shared `DASHBOARD_USERNAME`/
+`DASHBOARD_PASSWORD` HTTP Basic login (§3 above), so there is currently no
+way for two different companies' users to get different views. Real
+multi-tenant isolation needs per-user/per-org auth, which does not exist in
+this codebase yet.
+
+Risk Engine bridge: `services/integrations/risk_rules.py` reuses
+`database.add_incident()`/`add_risk_event()`/`generate_incident_recommendation()`
+exactly as `bot.py`'s live geofence flow and `services/demo_scenarios.py`
+already do — not a second risk engine. New `rule_code` values:
+`FLEET_SECTOR_EXIT`, `SATELLITE_UNREGISTERED_CHANGE`,
+`WEIGHBRIDGE_WAYBILL_MISMATCH`, `TIMBER_VOLUME_OVER_PERMIT`. Dedup uses
+`database.get_active_incident_by_rule()`, the generalized form of the
+inline check `bot.py` already does for `SECTOR_EXIT`/`EMERGENCY`.
+
+API: `/api/integrations/*` (CRUD, test/sync/reset-demo/logs/records) behind
+the same `verify_credentials` global dependency as every other route.
+`/api/webhooks/{provider}` is mounted as a separate sub-application
+(`webhook_app`, see api.py) specifically because the app-level
+`dependencies=[Depends(verify_credentials)]` on the main `FastAPI(...)`
+cannot be exempted per-route — external webhook senders can't do this
+dashboard's HTTP Basic login anyway. Webhook authenticity instead comes
+from an HMAC-SHA256 signature (`WEBHOOK_SECRET_<PROVIDER>` env var) plus
+`integration_webhook_events.payload_hash UNIQUE` replay protection.
+
+Tests: `tests/test_integrations.py` (30 tests — migrations, dedup, demo/
+production isolation, risk engine wiring, API routes, webhook signature +
+replay). Run with `python3 -m pytest tests/test_integrations.py -v`.
+
+**Known limitation:** demo adapter data generation and the Fleet GPS
+"signal lost" / worker / wetland-proximity / machine-breakdown risk
+scenarios from the spec are not wired yet — they need normalized data from
+categories with no stage-1 demo adapter (worker, machine, GIS zones) and,
+for signal-loss detection specifically, a periodic background scheduler
+(no APScheduler/cron-in-process exists in this codebase yet — sync is
+triggered manually via the UI/API today, not on a timer).
+
+## 7. Netlify
 
 Не подтверждается кодом или git-историей этого репозитория — упоминается
 только в памяти проекта как отдельный статический сайт для

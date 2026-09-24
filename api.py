@@ -23,6 +23,8 @@ from services.satellite_intelligence import collect_satellite_inspector_fields
 from services.satellite_intelligence.providers import ALL_PROVIDERS
 from services.satellite_intelligence.models import TIER_LABELS
 from services.satellite_intelligence.risk_score import BAND_COLORS
+from services.integrations import manager as integrations_manager
+from services.integrations import registry as integrations_registry
 
 try:
     from PIL import Image, ImageDraw
@@ -1396,7 +1398,13 @@ def get_sector_detail(name: str):
 
 @app.get("/api/risks")
 def get_risks():
-    return db("SELECT * FROM risks ORDER BY CASE risk_level WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, id DESC")
+    return db("""
+        SELECT * FROM risks
+        ORDER BY CASE WHEN pinned_order IS NOT NULL THEN 0 ELSE 1 END,
+                 pinned_order ASC,
+                 CASE risk_level WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END,
+                 id DESC
+    """)
 
 @app.get("/api/risks/by-sector")
 def risks_by_sector():
@@ -1599,6 +1607,48 @@ def send_risk_message(risk_id: int, body: SendMessageIn, username: str = Depends
     add_risk_event(risk_id, "DISPATCHER_MESSAGE", actor=username, details=body.text.strip())
 
     return {"ok": True}
+
+
+# ── Demo control (Rīgas meži presentation) ──────────────────────────────────
+# Backend fallback for the five Telegram /demo_* commands (bot.py) — same
+# underlying functions in services/demo_scenarios.py, same incidents/AI
+# recommendation/Telegram-message pipeline. Already behind the app-wide
+# HTTP Basic Auth (Depends(verify_credentials) on the whole app), so no
+# separate admin check is needed here the way the Telegram commands need
+# demo_scenarios.is_demo_admin().
+
+from services import demo_scenarios as _demo
+
+_DEMO_TRIGGERS = {
+    "breakdown": _demo.trigger_breakdown,
+    "worker-exit": _demo.trigger_worker_exit,
+    "volume-mismatch": _demo.trigger_volume_mismatch,
+    "wetland": _demo.trigger_wetland,
+    "logging-boundary": _demo.trigger_logging_boundary,
+}
+
+@app.post("/api/demo/reset")
+def demo_reset_route(username: str = Depends(verify_credentials)):
+    try:
+        return _demo.reset_demo()
+    except Exception as e:
+        print(f"DEMO RESET ERROR: {e}")
+        return Response(content=json.dumps({"error": str(e)}), media_type="application/json", status_code=500)
+
+@app.post("/api/demo/{scenario}")
+def run_demo_scenario(scenario: str, username: str = Depends(verify_credentials)):
+    fn = _DEMO_TRIGGERS.get(scenario)
+    if not fn:
+        return Response(
+            content=json.dumps({"error": f"Unknown demo scenario '{scenario}'. Valid: {list(_DEMO_TRIGGERS)}"}),
+            media_type="application/json", status_code=404,
+        )
+    try:
+        result = fn(triggered_by=f"dashboard:{username}")
+        return result
+    except Exception as e:
+        print(f"DEMO TRIGGER ERROR ({scenario}): {e}")
+        return Response(content=json.dumps({"error": str(e)}), media_type="application/json", status_code=500)
 
 
 # ── GPS ───────────────────────────────────────────────────────────────────────
@@ -2291,3 +2341,215 @@ def satellite_intel_sector_detail(sector_name: str):
         "observations": get_satellite_observations(sector=sector_name, limit=20),
         "timeline": get_satellite_timeline(sector_name, limit=100),
     }
+
+
+# ── Integration Layer — API ─────────────────────────────────────────────────
+# Thin routes over services/integrations/manager.py, mirroring the existing
+# split (services/demo_scenarios.py holds logic, api.py just calls into it).
+# organization_id is schema-ready (every integrations/integration_records row
+# carries it) but NOT an enforced access boundary yet — this app still
+# authenticates with one shared HTTP Basic login (verify_credentials), so
+# every dashboard user currently sees organization_id=1 (the single seeded
+# default org). Real multi-tenant isolation needs per-user/per-org auth,
+# which does not exist in this codebase yet — see INTEGRATIONS.md.
+DEFAULT_ORG_ID = 1
+
+
+class CreateIntegrationIn(BaseModel):
+    provider: str
+    is_demo: Optional[bool] = None
+    display_name: Optional[str] = None
+    configuration: Optional[dict] = None
+
+
+class UpdateIntegrationIn(BaseModel):
+    display_name: Optional[str] = None
+    configuration: Optional[dict] = None
+    sync_frequency_minutes: Optional[int] = None
+    connection_status: Optional[str] = None
+    credentials: Optional[dict] = None  # plaintext in the request body only — encrypted before storage, never returned
+
+
+# In-memory fixed-window limiter — single uvicorn worker (no Redis in this
+# stack), same "no new infra dependency" pattern as the rest of the app.
+# Resets naturally on process restart; that's acceptable for its purpose
+# (blunt abuse protection on the webhook endpoint, not billing-grade limits).
+_webhook_rate_state: dict = {}
+
+
+def _rate_limited(key: str, max_per_minute: int = 30) -> bool:
+    now = datetime.utcnow()
+    window = now.strftime("%Y-%m-%dT%H:%M")
+    bucket_key = f"{key}:{window}"
+    count = _webhook_rate_state.get(bucket_key, 0) + 1
+    _webhook_rate_state[bucket_key] = count
+    if len(_webhook_rate_state) > 2000:  # cheap cleanup, avoids unbounded growth
+        cutoff = (now.timestamp() // 60) - 5
+        for k in list(_webhook_rate_state.keys()):
+            try:
+                _, ts = k.rsplit(":", 1)
+                if datetime.strptime(ts, "%Y-%m-%dT%H:%M").timestamp() // 60 < cutoff:
+                    del _webhook_rate_state[k]
+            except ValueError:
+                pass
+    return count > max_per_minute
+
+
+@app.get("/api/integrations")
+def list_integrations_route(category: Optional[str] = None, username: str = Depends(verify_credentials)):
+    return {
+        "integrations": integrations_manager.list_catalog(organization_id=DEFAULT_ORG_ID)
+        if category is None else
+        [e for e in integrations_manager.list_catalog(organization_id=DEFAULT_ORG_ID) if e["category"] == category],
+    }
+
+
+@app.post("/api/integrations")
+def create_integration_route(body: CreateIntegrationIn, username: str = Depends(verify_credentials)):
+    try:
+        row = integrations_manager.create_integration(
+            body.provider, organization_id=DEFAULT_ORG_ID, is_demo=body.is_demo,
+            configuration=body.configuration, display_name=body.display_name,
+        )
+        return row
+    except integrations_manager.ProviderUnknown as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/integrations/health")
+def integrations_health_route(username: str = Depends(verify_credentials)):
+    return integrations_manager.health()
+
+
+@app.get("/api/integrations/{integration_id}")
+def get_integration_route(integration_id: int, username: str = Depends(verify_credentials)):
+    try:
+        row = integrations_manager.get_integration_or_raise(integration_id, organization_id=DEFAULT_ORG_ID)
+    except integrations_manager.IntegrationNotFound:
+        raise HTTPException(status_code=404, detail="Integration not found")
+    entry = integrations_registry.get_provider_entry(row["provider"])
+    row["catalog"] = {
+        "display_name": entry.display_name, "vendor": entry.vendor, "implemented": entry.implemented,
+        "confirmed_customer_use": entry.confirmed_customer_use, "notes": entry.notes,
+    } if entry else None
+    return row
+
+
+@app.patch("/api/integrations/{integration_id}")
+def update_integration_route(integration_id: int, body: UpdateIntegrationIn,
+                              username: str = Depends(verify_credentials)):
+    try:
+        integrations_manager.get_integration_or_raise(integration_id, organization_id=DEFAULT_ORG_ID)
+    except integrations_manager.IntegrationNotFound:
+        raise HTTPException(status_code=404, detail="Integration not found")
+    fields = {}
+    if body.display_name is not None:
+        fields["display_name"] = body.display_name
+    if body.configuration is not None:
+        fields["configuration_json"] = json.dumps(body.configuration)
+    if body.sync_frequency_minutes is not None:
+        fields["sync_frequency_minutes"] = body.sync_frequency_minutes
+    if body.connection_status is not None:
+        fields["connection_status"] = body.connection_status
+    if fields:
+        from database import update_integration as _update_integration
+        _update_integration(integration_id, **fields)
+    if body.credentials is not None:
+        adapter_cls = integrations_registry.get_adapter_class(
+            integrations_manager.get_integration_or_raise(integration_id, organization_id=DEFAULT_ORG_ID)["provider"]
+        )
+        if adapter_cls:
+            row = integrations_manager.get_integration_or_raise(integration_id, organization_id=DEFAULT_ORG_ID)
+            adapter_cls(row).set_credentials(body.credentials)
+    return integrations_manager.get_integration_or_raise(integration_id, organization_id=DEFAULT_ORG_ID)
+
+
+@app.delete("/api/integrations/{integration_id}")
+def delete_integration_route(integration_id: int, username: str = Depends(verify_credentials)):
+    try:
+        integrations_manager.delete_integration(integration_id, organization_id=DEFAULT_ORG_ID)
+    except integrations_manager.IntegrationNotFound:
+        raise HTTPException(status_code=404, detail="Integration not found")
+    return {"ok": True}
+
+
+@app.post("/api/integrations/{integration_id}/test")
+def test_integration_route(integration_id: int, username: str = Depends(verify_credentials)):
+    try:
+        return integrations_manager.test_connection(integration_id, organization_id=DEFAULT_ORG_ID)
+    except integrations_manager.IntegrationNotFound:
+        raise HTTPException(status_code=404, detail="Integration not found")
+
+
+@app.post("/api/integrations/{integration_id}/sync")
+def sync_integration_route(integration_id: int, username: str = Depends(verify_credentials)):
+    try:
+        return integrations_manager.run_sync(integration_id, organization_id=DEFAULT_ORG_ID,
+                                              trigger=f"dashboard:{username}")
+    except integrations_manager.IntegrationNotFound:
+        raise HTTPException(status_code=404, detail="Integration not found")
+    except integrations_manager.ProviderUnknown as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/integrations/{integration_id}/logs")
+def get_integration_logs_route(integration_id: int, limit: int = 100,
+                                username: str = Depends(verify_credentials)):
+    try:
+        return {"logs": integrations_manager.get_logs(integration_id, organization_id=DEFAULT_ORG_ID, limit=limit),
+                "sync_runs": integrations_manager.get_sync_history(integration_id, organization_id=DEFAULT_ORG_ID)}
+    except integrations_manager.IntegrationNotFound:
+        raise HTTPException(status_code=404, detail="Integration not found")
+
+
+@app.get("/api/integrations/{integration_id}/records")
+def get_integration_records_route(integration_id: int, limit: int = 50,
+                                   username: str = Depends(verify_credentials)):
+    try:
+        return {"records": integrations_manager.get_records(integration_id, organization_id=DEFAULT_ORG_ID, limit=limit)}
+    except integrations_manager.IntegrationNotFound:
+        raise HTTPException(status_code=404, detail="Integration not found")
+
+
+@app.post("/api/integrations/{integration_id}/reset-demo")
+def reset_integration_demo_route(integration_id: int, username: str = Depends(verify_credentials)):
+    try:
+        return integrations_manager.reset_demo(integration_id, organization_id=DEFAULT_ORG_ID)
+    except integrations_manager.IntegrationNotFound:
+        raise HTTPException(status_code=404, detail="Integration not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# app = FastAPI(dependencies=[Depends(verify_credentials)]) applies
+# verify_credentials to every route on `app`, with no per-route way to
+# exempt one — and external webhook senders (GitHub/Stripe-style HMAC
+# signers) can't supply this dashboard's HTTP Basic login anyway. So the
+# webhook endpoint lives on its own mounted sub-application instead, with
+# its own (signature-based) authenticity check — everything else in this
+# file is completely unaffected, still behind the same global Basic Auth.
+webhook_app = FastAPI(title="Forest AI Webhooks")
+
+
+@webhook_app.post("/{provider}")
+async def integration_webhook_route(provider: str, request: Request):
+    """Authenticity comes from the per-provider HMAC signature
+    (WEBHOOK_SECRET_<PROVIDER> env var, checked in
+    manager.handle_webhook) plus payload-hash replay protection. Unsigned
+    providers (no secret configured) are accepted but flagged
+    signature_valid=NULL — visible in integration_webhook_events, not
+    silently trusted."""
+    client_ip = request.client.host if request.client else "unknown"
+    if _rate_limited(f"webhook:{provider}:{client_ip}"):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    raw_body = await request.body()
+    secret = os.environ.get(f"WEBHOOK_SECRET_{provider.upper()}")
+    signature_header = request.headers.get("X-Signature") or request.headers.get("X-Hub-Signature-256")
+    result = integrations_manager.handle_webhook(provider, raw_body, signature_header=signature_header,
+                                                  webhook_secret=secret)
+    if not result.get("ok") and result.get("reason") == "invalid_signature":
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    return result
+
+
+app.mount("/api/webhooks", webhook_app)

@@ -93,6 +93,15 @@ def _migrate():
         _add_column_if_missing(cur, "risks", column, definition)
     _add_column_if_missing(cur, "risks", "photo_path", "TEXT")
     _add_column_if_missing(cur, "risks", "photo_path_2", "TEXT")
+    # Demo scenarios (Rīgas meži presentation): rows created by
+    # services/demo_scenarios.py are flagged is_demo=1 so /demo_reset can
+    # clear them without ever touching real operational data.
+    _add_column_if_missing(cur, "risks", "is_demo", "INTEGER DEFAULT 0")
+    # NULL by default (every existing/future risk is unpinned). A small
+    # integer sets a fixed presentation order for a handful of rows a
+    # presenter wants pinned to the top of GET /api/risks, without
+    # affecting relative order among the rest (see get_risks_route()).
+    _add_column_if_missing(cur, "risks", "pinned_order", "INTEGER DEFAULT NULL")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS risk_events (
@@ -158,6 +167,7 @@ def _migrate():
         created_at TEXT
     )
     """)
+    _add_column_if_missing(cur, "sector_equipment", "is_demo", "INTEGER DEFAULT 0")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS vehicle_fuel_logs (
@@ -301,6 +311,7 @@ def _migrate():
         difference_volume REAL, status TEXT, note TEXT, created_at TEXT
     )
     """)
+    _add_column_if_missing(cur, "timber_movements", "is_demo", "INTEGER DEFAULT 0")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS truck_reports (
@@ -419,6 +430,157 @@ def _migrate():
         occurred_at TEXT NOT NULL
     )
     """)
+
+    # ── Integration Layer (external systems: machines, fleet GPS, GIS,
+    # satellite, timber/weighbridge, workers, ERP, audit) — see
+    # services/integrations/. Additive only, mirrors the satellite_*
+    # tables above: one metadata table per integration instance, a
+    # generic staging/dedup table for normalized records (most domain
+    # data still lands in the existing sectors/risks/vehicle_gps_pings/
+    # timber_movements tables via the same add_*() functions bot.py and
+    # api.py already use), plus sync/log/webhook bookkeeping.
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS organizations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        slug TEXT UNIQUE,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS integrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        organization_id INTEGER NOT NULL DEFAULT 1,
+        category TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        integration_type TEXT,
+        display_name TEXT,
+        connection_status TEXT NOT NULL DEFAULT 'NOT_CONNECTED',
+        sync_status TEXT NOT NULL DEFAULT 'IDLE',
+        is_demo INTEGER NOT NULL DEFAULT 0,
+        credentials_reference TEXT,
+        configuration_json TEXT,
+        sync_frequency_minutes INTEGER DEFAULT 60,
+        last_sync_at TEXT,
+        next_sync_at TEXT,
+        last_success_at TEXT,
+        last_error_at TEXT,
+        error_message TEXT,
+        records_received INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS integration_credentials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        integration_id INTEGER NOT NULL,
+        encrypted_value TEXT NOT NULL,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS integration_sync_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        integration_id INTEGER NOT NULL,
+        trigger TEXT,
+        status TEXT NOT NULL DEFAULT 'RUNNING',
+        records_fetched INTEGER DEFAULT 0,
+        records_saved INTEGER DEFAULT 0,
+        records_deduplicated INTEGER DEFAULT 0,
+        error_message TEXT,
+        started_at TEXT,
+        finished_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS integration_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        integration_id INTEGER NOT NULL,
+        sync_run_id INTEGER,
+        level TEXT NOT NULL DEFAULT 'INFO',
+        message TEXT NOT NULL,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS integration_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        integration_id INTEGER NOT NULL,
+        organization_id INTEGER NOT NULL DEFAULT 1,
+        source_provider TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        sector TEXT,
+        source_timestamp TEXT,
+        received_at TEXT NOT NULL,
+        raw_payload_json TEXT,
+        normalized_payload_json TEXT,
+        validation_status TEXT NOT NULL DEFAULT 'PENDING',
+        processing_status TEXT NOT NULL DEFAULT 'PENDING',
+        deduplication_key TEXT NOT NULL UNIQUE,
+        linked_table TEXT,
+        linked_id INTEGER,
+        is_demo INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS integration_webhook_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        integration_id INTEGER,
+        payload_hash TEXT NOT NULL UNIQUE,
+        signature_valid INTEGER,
+        status TEXT NOT NULL DEFAULT 'RECEIVED',
+        received_at TEXT NOT NULL,
+        processed_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS weighbridge_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        integration_id INTEGER,
+        sector TEXT,
+        vehicle_plate TEXT,
+        driver TEXT,
+        trip_number TEXT,
+        destination TEXT,
+        species TEXT,
+        assortment TEXT,
+        weighed_at TEXT,
+        weight_gross_kg REAL,
+        weight_tare_kg REAL,
+        weight_net_kg REAL,
+        declared_volume_m3 REAL,
+        actual_volume_m3 REAL,
+        document_number TEXT,
+        photo_path TEXT,
+        acceptance_status TEXT DEFAULT 'PENDING',
+        is_demo INTEGER NOT NULL DEFAULT 0,
+        source_record_id INTEGER,
+        created_at TEXT
+    )
+    """)
+
+    # Seed exactly one default organization so every existing (pre-multi-tenant)
+    # row and every new integration has somewhere to point organization_id=1 —
+    # see services/integrations/registry.py docstring for the tenant-isolation
+    # caveat (this app still authenticates with one shared HTTP Basic login).
+    cur.execute("SELECT COUNT(*) FROM organizations")
+    if cur.fetchone()[0] == 0:
+        cur.execute(
+            "INSERT INTO organizations (id, name, slug, created_at) VALUES (1, ?, ?, ?)",
+            ("Default Organization", "default", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")),
+        )
 
     conn.commit()
     conn.close()
@@ -905,6 +1067,33 @@ def get_risk_by_telegram_message_id(message_id):
     conn.close()
     return dict(row) if row else None
 
+def get_active_incident_by_rule(rule_code, entity_type=None, entity_id=None, sector=None):
+    """Generalized version of the dedup lookup bot.py's handle_location()
+    already does inline for SECTOR_EXIT/EMERGENCY (open incident with the
+    same rule_code+entity) — used by services/integrations/risk_rules.py so
+    integration-sourced risk events don't spam duplicate incidents on every
+    sync the way a naive re-trigger would."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    query = "SELECT * FROM risks WHERE rule_code=? AND status IN ('OPEN','NOTIFIED')"
+    params = [rule_code]
+    if entity_type is not None:
+        query += " AND entity_type=?"
+        params.append(entity_type)
+    if entity_id is not None:
+        query += " AND entity_id=?"
+        params.append(entity_id)
+    if sector is not None:
+        query += " AND sector=?"
+        params.append(sector)
+    query += " ORDER BY id DESC LIMIT 1"
+    cur.execute(query, params)
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def get_active_incident_for_employee(employee_id):
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
@@ -1226,3 +1415,406 @@ def get_satellite_timeline(sector, limit=100):
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
+
+
+# ── Integration Layer ────────────────────────────────────────────────────────
+# Backing store for services/integrations/. Same conventions as the
+# satellite_* functions above: one connection per call, sqlite3.Row for
+# dict-shaped reads, UTC "%Y-%m-%d %H:%M:%S UTC" timestamps.
+
+def _now():
+    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def create_integration(organization_id, category, provider, integration_type=None,
+                        display_name=None, is_demo=False, configuration=None,
+                        sync_frequency_minutes=60):
+    now = _now()
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO integrations
+        (organization_id, category, provider, integration_type, display_name,
+         connection_status, sync_status, is_demo, configuration_json,
+         sync_frequency_minutes, records_received, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'NOT_CONNECTED', 'IDLE', ?, ?, ?, 0, ?, ?)
+    """, (organization_id, category, provider, integration_type, display_name,
+          1 if is_demo else 0, json.dumps(configuration) if configuration else None,
+          sync_frequency_minutes, now, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+
+def get_integrations(organization_id=None, category=None):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    query = "SELECT * FROM integrations WHERE 1=1"
+    params = []
+    if organization_id is not None:
+        query += " AND organization_id=?"
+        params.append(organization_id)
+    if category:
+        query += " AND category=?"
+        params.append(category)
+    query += " ORDER BY category, provider"
+    cur.execute(query, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_integration(integration_id, organization_id=None):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    query = "SELECT * FROM integrations WHERE id=?"
+    params = [integration_id]
+    if organization_id is not None:
+        query += " AND organization_id=?"
+        params.append(organization_id)
+    cur.execute(query, params)
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_integration_by_provider(provider, organization_id=1):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM integrations WHERE provider=? AND organization_id=? ORDER BY id LIMIT 1",
+        (provider, organization_id),
+    )
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_integration(integration_id, **fields):
+    """Generic column-value patch, restricted to a known-safe allowlist so
+    callers can't accidentally write to arbitrary columns from user input."""
+    allowed = {
+        "connection_status", "sync_status", "credentials_reference", "configuration_json",
+        "sync_frequency_minutes", "last_sync_at", "next_sync_at", "last_success_at",
+        "last_error_at", "error_message", "records_received", "display_name", "integration_type",
+    }
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return
+    updates["updated_at"] = _now()
+    set_clause = ", ".join(f"{k}=?" for k in updates)
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(f"UPDATE integrations SET {set_clause} WHERE id=?", (*updates.values(), integration_id))
+    conn.commit()
+    conn.close()
+
+
+def increment_integration_records(integration_id, count):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE integrations SET records_received = records_received + ?, updated_at=? WHERE id=?",
+        (count, _now(), integration_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_integration(integration_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM integrations WHERE id=?", (integration_id,))
+    cur.execute("DELETE FROM integration_credentials WHERE integration_id=?", (integration_id,))
+    conn.commit()
+    conn.close()
+
+
+def set_integration_credential(integration_id, encrypted_value):
+    now = _now()
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM integration_credentials WHERE integration_id=?", (integration_id,))
+    existing = cur.fetchone()
+    if existing:
+        cur.execute(
+            "UPDATE integration_credentials SET encrypted_value=?, updated_at=? WHERE integration_id=?",
+            (encrypted_value, now, integration_id),
+        )
+    else:
+        cur.execute(
+            "INSERT INTO integration_credentials (integration_id, encrypted_value, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?)",
+            (integration_id, encrypted_value, now, now),
+        )
+    conn.commit()
+    conn.close()
+
+
+def get_integration_credential(integration_id):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM integration_credentials WHERE integration_id=?", (integration_id,))
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def start_sync_run(integration_id, trigger="manual"):
+    now = _now()
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO integration_sync_runs (integration_id, trigger, status, started_at) "
+        "VALUES (?, ?, 'RUNNING', ?)",
+        (integration_id, trigger, now),
+    )
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+
+def finish_sync_run(sync_run_id, status, records_fetched=0, records_saved=0,
+                     records_deduplicated=0, error_message=None):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    UPDATE integration_sync_runs
+    SET status=?, records_fetched=?, records_saved=?, records_deduplicated=?,
+        error_message=?, finished_at=?
+    WHERE id=?
+    """, (status, records_fetched, records_saved, records_deduplicated, error_message, _now(), sync_run_id))
+    conn.commit()
+    conn.close()
+
+
+def get_sync_runs(integration_id, limit=20):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM integration_sync_runs WHERE integration_id=? ORDER BY started_at DESC, id DESC LIMIT ?",
+        (integration_id, limit),
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def add_integration_log(integration_id, message, level="INFO", sync_run_id=None):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO integration_logs (integration_id, sync_run_id, level, message, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (integration_id, sync_run_id, level, message, _now()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_integration_logs(integration_id, limit=100):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM integration_logs WHERE integration_id=? ORDER BY created_at DESC, id DESC LIMIT ?",
+        (integration_id, limit),
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def upsert_integration_record(integration_id, organization_id, source_provider, entity_type,
+                               external_id, deduplication_key, sector=None, source_timestamp=None,
+                               raw_payload=None, normalized_payload=None, validation_status="VALID",
+                               processing_status="PROCESSED", linked_table=None, linked_id=None,
+                               is_demo=False):
+    """Idempotent upsert keyed on deduplication_key (UNIQUE column) — re-running
+    a sync never creates duplicate rows for the same
+    organization_id/source_provider/external_id/source_timestamp combination.
+    Returns (record_id, created: bool)."""
+    now = _now()
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM integration_records WHERE deduplication_key=?", (deduplication_key,))
+    existing = cur.fetchone()
+    raw_json = json.dumps(raw_payload) if raw_payload is not None else None
+    norm_json = json.dumps(normalized_payload) if normalized_payload is not None else None
+    if existing:
+        cur.execute("""
+        UPDATE integration_records
+        SET raw_payload_json=?, normalized_payload_json=?, validation_status=?,
+            processing_status=?, linked_table=?, linked_id=?, received_at=?
+        WHERE id=?
+        """, (raw_json, norm_json, validation_status, processing_status, linked_table, linked_id,
+              now, existing["id"]))
+        conn.commit()
+        record_id = existing["id"]
+        created = False
+    else:
+        cur.execute("""
+        INSERT INTO integration_records
+            (integration_id, organization_id, source_provider, entity_type, external_id, sector,
+             source_timestamp, received_at, raw_payload_json, normalized_payload_json,
+             validation_status, processing_status, deduplication_key, linked_table, linked_id,
+             is_demo, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (integration_id, organization_id, source_provider, entity_type, external_id, sector,
+              source_timestamp, now, raw_json, norm_json, validation_status, processing_status,
+              deduplication_key, linked_table, linked_id, 1 if is_demo else 0, now))
+        conn.commit()
+        record_id = cur.lastrowid
+        created = True
+    conn.close()
+    return record_id, created
+
+
+def get_integration_records(integration_id, limit=50):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM integration_records WHERE integration_id=? ORDER BY received_at DESC, id DESC LIMIT ?",
+        (integration_id, limit),
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def count_integration_records(integration_id, is_demo=None):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    query = "SELECT COUNT(*) FROM integration_records WHERE integration_id=?"
+    params = [integration_id]
+    if is_demo is not None:
+        query += " AND is_demo=?"
+        params.append(1 if is_demo else 0)
+    cur.execute(query, params)
+    count = cur.fetchone()[0]
+    conn.close()
+    return count
+
+
+def delete_demo_integration_records(integration_id):
+    """Reset Demo Data for one integration — removes only is_demo=1 rows it
+    created, never touches production records or other integrations."""
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM integration_records WHERE integration_id=? AND is_demo=1", (integration_id,))
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return deleted
+
+
+def record_webhook_event(provider, payload_hash, integration_id=None, signature_valid=None):
+    """Returns (event_id, is_new). is_new=False means this exact payload was
+    already processed — caller should skip re-processing (webhook replay
+    protection), relying on payload_hash UNIQUE for atomicity."""
+    now = _now()
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+        INSERT INTO integration_webhook_events
+            (provider, integration_id, payload_hash, signature_valid, status, received_at)
+        VALUES (?, ?, ?, ?, 'RECEIVED', ?)
+        """, (provider, integration_id, payload_hash, signature_valid, now))
+        conn.commit()
+        event_id = cur.lastrowid
+        conn.close()
+        return event_id, True
+    except sqlite3.IntegrityError:
+        conn.close()
+        existing = db1_raw("SELECT id FROM integration_webhook_events WHERE payload_hash=?", (payload_hash,))
+        return (existing["id"] if existing else None), False
+
+
+def mark_webhook_processed(event_id, status="PROCESSED"):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE integration_webhook_events SET status=?, processed_at=? WHERE id=?",
+        (status, _now(), event_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def db1_raw(sql, params=()):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(sql, params)
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def add_weighbridge_record(sector, vehicle_plate=None, driver=None, trip_number=None,
+                            destination=None, species=None, assortment=None, weighed_at=None,
+                            weight_gross_kg=None, weight_tare_kg=None, declared_volume_m3=None,
+                            actual_volume_m3=None, document_number=None, photo_path=None,
+                            acceptance_status="PENDING", integration_id=None, is_demo=False,
+                            source_record_id=None):
+    weight_net_kg = None
+    if weight_gross_kg is not None and weight_tare_kg is not None:
+        weight_net_kg = weight_gross_kg - weight_tare_kg
+    now = _now()
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO weighbridge_records
+        (integration_id, sector, vehicle_plate, driver, trip_number, destination, species,
+         assortment, weighed_at, weight_gross_kg, weight_tare_kg, weight_net_kg,
+         declared_volume_m3, actual_volume_m3, document_number, photo_path, acceptance_status,
+         is_demo, source_record_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (integration_id, sector, vehicle_plate, driver, trip_number, destination, species,
+          assortment, weighed_at, weight_gross_kg, weight_tare_kg, weight_net_kg,
+          declared_volume_m3, actual_volume_m3, document_number, photo_path, acceptance_status,
+          1 if is_demo else 0, source_record_id, now))
+    conn.commit()
+    last_id = cur.lastrowid
+    conn.close()
+    return last_id
+
+
+def get_weighbridge_records(sector=None, integration_id=None, limit=100):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    query = "SELECT * FROM weighbridge_records WHERE 1=1"
+    params = []
+    if sector:
+        query += " AND sector=?"
+        params.append(sector)
+    if integration_id is not None:
+        query += " AND integration_id=?"
+        params.append(integration_id)
+    query += " ORDER BY created_at DESC, id DESC LIMIT ?"
+    params.append(limit)
+    cur.execute(query, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def delete_demo_weighbridge_records(integration_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM weighbridge_records WHERE integration_id=? AND is_demo=1", (integration_id,))
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return deleted
