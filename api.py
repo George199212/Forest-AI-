@@ -15,9 +15,14 @@ from pydantic import BaseModel
 from database import (
     init_db, get_incidents, get_equipment, update_incident_status, add_risk_event,
     add_inspector_analysis, get_inspector_analyses, add_incident, set_ai_recommendation,
+    get_latest_satellite_score, get_satellite_requests, get_satellite_observations,
+    get_satellite_timeline,
 )
 from services.ai_resolution import _get_client as _get_anthropic_client, generate_incident_recommendation
 from services.satellite_intelligence import collect_satellite_inspector_fields
+from services.satellite_intelligence.providers import ALL_PROVIDERS
+from services.satellite_intelligence.models import TIER_LABELS
+from services.satellite_intelligence.risk_score import BAND_COLORS
 
 try:
     from PIL import Image, ImageDraw
@@ -2193,3 +2198,96 @@ function evaluatePixel(sample) {
             return Response(content=img_data, media_type="image/jpeg")
     except Exception as e:
         return Response(content=f'{{"error":"{str(e)}"}}', media_type="application/json", status_code=500)
+
+
+# ── Satellite Intelligence Engine — API ─────────────────────────────────────
+# Read-only aggregation endpoints over services/satellite_intelligence/ — the
+# decision engine itself runs from event triggers (events.py) and the demo
+# seed, not from these endpoints; these just expose what's already on record
+# for the UI (stage e). Entirely additive: none of the existing /api/satellite/*
+# endpoints above are touched.
+
+def _days_since(date_str):
+    if not date_str:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S UTC", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return (datetime.utcnow() - datetime.strptime(date_str, fmt)).days
+        except ValueError:
+            continue
+    return None
+
+
+@app.get("/api/satellite-intel/providers")
+def satellite_intel_providers():
+    """Global per-provider status: last observation on record (if any) and
+    whether it's actually configured. Baseline providers (Sentinel-1/2,
+    Landsat) check the same Copernicus token /api/satellite/token-check
+    already checks; commercial providers (PlanetScope/SkySat/ICEYE) report
+    their env-var configuration state and never fake a live check."""
+    result = []
+    for key, provider in ALL_PROVIDERS.items():
+        last_obs = db1(
+            "SELECT acquisition_date, created_at FROM satellite_observations "
+            "WHERE provider=? ORDER BY created_at DESC LIMIT 1", (provider.name,)
+        )
+        result.append({
+            "key": key, "name": provider.name, "satellite": provider.satellite,
+            "tier": provider.tier, "tier_label": TIER_LABELS.get(provider.tier),
+            "commercial": provider.commercial,
+            "configured": provider.is_configured(),
+            "last_observation_date": last_obs.get("acquisition_date") if last_obs else None,
+            "days_since_last_observation": _days_since(last_obs.get("created_at")) if last_obs else None,
+        })
+    return result
+
+
+@app.get("/api/satellite-intel/sectors")
+def satellite_intel_sectors():
+    """Per-sector satellite monitoring summary for the global Satellite
+    Intelligence section — distinct from /api/satellite/sectors (the Sentinel-2
+    imagery browser above) and from calc_risk_score() (operational risk)."""
+    sectors = db("SELECT name, contractor FROM sectors ORDER BY name")
+    out = []
+    for s in sectors:
+        latest = get_latest_satellite_score(s["name"])
+        pending = get_satellite_requests(sector=s["name"], approval_status="PENDING", limit=1)
+        last_obs = db1(
+            "SELECT created_at, cloud_cover_pct FROM satellite_observations "
+            "WHERE sector=? ORDER BY created_at DESC LIMIT 1", (s["name"],)
+        )
+        tier = latest.get("tier_recommended") if latest else None
+        pending_req = pending[0] if pending else None
+        out.append({
+            "sector": s["name"], "contractor": s.get("contractor"),
+            "satellite_score": latest.get("score") if latest else None,
+            "satellite_band": latest.get("band") if latest else None,
+            "satellite_color": BAND_COLORS.get(latest.get("band")) if latest else None,
+            "tier_recommended": tier,
+            "tier_label": TIER_LABELS.get(tier) if tier else None,
+            "days_since_last_observation": _days_since(last_obs.get("created_at")) if last_obs else None,
+            "cloud_cover_pct": last_obs.get("cloud_cover_pct") if last_obs else None,
+            "recommended_action": pending_req["justification"] if pending_req else (
+                "No commercial imagery warranted — baseline monitoring only." if latest else
+                "No satellite activity on record yet."
+            ),
+            "pending_request": pending_req,
+        })
+    return out
+
+
+@app.get("/api/satellite-intel/sector/{sector_name}")
+def satellite_intel_sector_detail(sector_name: str):
+    """Full satellite intelligence detail for one sector: latest score,
+    every request/observation on record, and the chronological timeline —
+    feeds the sector-detail satellite tab's timeline view."""
+    latest = get_latest_satellite_score(sector_name)
+    if latest:
+        latest["color"] = BAND_COLORS.get(latest.get("band"))
+    return {
+        "sector": sector_name,
+        "latest_score": latest,
+        "requests": get_satellite_requests(sector=sector_name, limit=20),
+        "observations": get_satellite_observations(sector=sector_name, limit=20),
+        "timeline": get_satellite_timeline(sector_name, limit=100),
+    }

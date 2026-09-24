@@ -46,6 +46,16 @@ def _create_satellite_incident(sector_name, rule_code, reason, risk_level, reque
         sector_name, "TRIGGER", label=f"Incident #{incident_id} created ({rule_code})",
         detail=reason, ref_table="risks", ref_id=incident_id,
     )
+    # Explicit human-review checkpoint on the timeline — the incident starts
+    # OPEN, not confirmed; per CODING_RULES.md an AI-detected finding never
+    # gets promoted to confirmed without a dispatcher acting on it via the
+    # normal incident workflow (same Approve/Dismiss flow every other
+    # incident goes through).
+    database.add_satellite_timeline_event(
+        sector_name, "HUMAN_REVIEW", label=f"Awaiting dispatcher review (incident #{incident_id})",
+        detail="Not auto-confirmed — requires a human decision via the normal incident workflow.",
+        ref_table="risks", ref_id=incident_id,
+    )
     # Same recommendation pipeline every other incident type uses — never
     # raises, so a failure here (e.g. no ANTHROPIC_API_KEY) never blocks
     # incident creation; the incident still lands OPEN for a dispatcher.

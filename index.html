@@ -534,6 +534,16 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
     <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--amber)"></span> Анализ секторов</span></div>
     <div id="sat-sectors-list"></div>
   </div>
+
+  <!-- Satellite Intelligence Engine — tiered escalation, distinct from the Sentinel-2 browser above -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-head">
+      <span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--green)"></span> Satellite Intelligence Engine</span>
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono);font-style:italic">AI decides where expensive imagery is actually necessary</div>
+    </div>
+    <div id="sat-intel-providers" class="kpis" style="margin-bottom:16px"></div>
+    <div id="sat-intel-sectors"></div>
+  </div>
       </div><!-- /sec-satellite -->
 
       <!-- RISK DETAIL (opened via click, not in nav menu) -->
@@ -1396,7 +1406,15 @@ function detailTab(tab) {
       <div id="ds-image-wrap" style="border-radius:var(--r);overflow:hidden;background:var(--bg3);height:420px;display:flex;align-items:center;justify-content:center">
         <div style="text-align:center;font-family:var(--mono);color:var(--text3)"><div style="font-size:24px;margin-bottom:8px">🛰</div>Нажми Загрузить</div>
       </div>
-      <div id="ds-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:8px"></div>`;
+      <div id="ds-status" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:8px"></div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--green)"></span> Satellite Intelligence</span></div>
+        <div id="ds-sat-intel-summary" style="margin-bottom:14px"></div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Timeline</div>
+        <div id="ds-sat-intel-timeline"></div>
+      </div>`;
+    loadDetailSatelliteIntel(s.name);
 
   } else if (tab==='history') {
     const snaps = d.snapshots || [];
@@ -2400,6 +2418,44 @@ async function loadSatellite() {
       if (bounds.length > 0) satLeafMap.fitBounds(bounds, {padding:[40,40]});
     }
   });
+
+  loadSatelliteIntel();
+}
+
+function satBandBadge(band) {
+  if (!band) return '<span class="badge b-gray">—</span>';
+  const cls = (band==='CRITICAL'||band==='HIGH') ? 'b-red' : band==='MEDIUM' ? 'b-amber' : 'b-green';
+  return `<span class="badge ${cls}">${band}</span>`;
+}
+
+async function loadSatelliteIntel() {
+  const [providers, sectors] = await Promise.all([
+    api('/api/satellite-intel/providers'),
+    api('/api/satellite-intel/sectors'),
+  ]);
+
+  document.getElementById('sat-intel-providers').innerHTML = providers.map(p => `
+    <div class="kpi">
+      <div class="kpi-label">${p.name}</div>
+      <div class="kpi-value ${p.configured?'green':'red'}">${p.configured?'Online':'Not configured'}</div>
+      <div class="kpi-sub">${p.last_observation_date
+        ? fmt(p.last_observation_date) + (p.days_since_last_observation!=null ? ` · ${p.days_since_last_observation}d` : '')
+        : (p.commercial ? 'no credentials' : 'no image yet')}</div>
+    </div>`).join('');
+
+  document.getElementById('sat-intel-sectors').innerHTML = `
+    <table class="tbl"><thead><tr>
+      <th>Сектор</th><th>Satellite Score</th><th>Band</th><th>Tier</th><th>Дней с посл. снимка</th><th>Рекомендация</th>
+    </tr></thead><tbody>
+    ${sectors.map(s=>`<tr>
+      <td><strong style="color:var(--gbright);font-family:var(--mono)">${s.sector}</strong></td>
+      <td>${s.satellite_score!=null ? riskScoreBar(s.satellite_score, s.satellite_color) : '<span class="mono" style="color:var(--text3)">—</span>'}</td>
+      <td>${satBandBadge(s.satellite_band)}</td>
+      <td class="mono" style="font-size:11px">${s.tier_label || 'Baseline monitoring'}</td>
+      <td class="mono" style="font-size:11px">${s.days_since_last_observation!=null ? s.days_since_last_observation : '–'}</td>
+      <td style="font-size:11px;color:var(--text2);max-width:360px">${s.recommended_action}</td>
+    </tr>`).join('')}
+    </tbody></table>`;
 }
 
 function selectSatSector(name) {
@@ -2646,6 +2702,45 @@ async function loadDetailSatellite() {
     if (status) status.textContent = `✓ ${currentSector} · ${dsSatMode==='ndvi'?'NDVI':'True Color'} · ${dateFrom}–${dateTo}`;
   } catch(e) {
     wrap.innerHTML=`<div class="empty" style="color:var(--red)">⚠ ${e.message}</div>`;
+  }
+}
+
+async function loadDetailSatelliteIntel(sectorName) {
+  const detail = await api(`/api/satellite-intel/sector/${encodeURIComponent(sectorName)}`);
+  const latest = detail.latest_score;
+  const summaryEl = document.getElementById('ds-sat-intel-summary');
+  if (summaryEl) {
+    summaryEl.innerHTML = latest ? `
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <div>
+          <div class="kpi-label">Satellite Risk Score</div>
+          <div style="margin-top:6px">${riskScoreBar(latest.score, latest.color)}</div>
+        </div>
+        <div>
+          <div class="kpi-label">Band</div>
+          <div style="margin-top:6px">${satBandBadge(latest.band)}</div>
+        </div>
+        <div>
+          <div class="kpi-label">Recommended Tier</div>
+          <div class="mono" style="font-size:12px;margin-top:8px;color:var(--text2)">${latest.tier_recommended ? 'Tier ' + latest.tier_recommended : 'Baseline monitoring'}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:10px">Обновлено: ${fmt(latest.computed_at)} · отдельно от операционного риска сектора</div>
+    ` : '<div class="empty">Нет данных спутникового мониторинга для этого сектора</div>';
+  }
+
+  const timelineEl = document.getElementById('ds-sat-intel-timeline');
+  if (timelineEl) {
+    const events = detail.timeline || [];
+    timelineEl.innerHTML = events.length ? events.map(e => `
+      <div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div class="mono" style="font-size:10px;color:var(--text3);white-space:nowrap;min-width:140px">${fmt(e.occurred_at)}</div>
+        <div style="flex:1">
+          <span class="badge b-gray" style="margin-right:8px">${e.event_type}</span>
+          <span style="font-size:12px;color:var(--text2)">${e.label||''}</span>
+          ${e.detail ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${e.detail}</div>` : ''}
+        </div>
+      </div>`).join('') : '<div class="empty">Нет событий в истории мониторинга</div>';
   }
 }
 
