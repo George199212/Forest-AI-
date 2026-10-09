@@ -154,6 +154,11 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 .lightbox-close{position:absolute;top:20px;right:24px;font-size:24px;color:var(--text2);cursor:pointer;font-family:var(--mono);}
 .lightbox-close:hover{color:var(--text);}
 .lightbox-meta{margin-top:12px;font-size:13px;color:var(--text2);font-family:var(--mono);}
+.lightbox-nav{position:absolute;top:50%;transform:translateY(-50%);width:56px;height:96px;display:flex;align-items:center;justify-content:center;font-size:40px;color:var(--text2);cursor:pointer;font-family:var(--mono);user-select:none;}
+.lightbox-nav:hover{color:var(--text);}
+.lightbox-prev{left:16px;}
+.lightbox-next{right:16px;}
+.lightbox-missing{font-size:15px;color:var(--text3);font-family:var(--mono);padding:60px 0;}
 
 /* MAP */
 #map-container{height:500px;border-radius:var(--r);overflow:hidden;background:var(--bg3);display:flex;align-items:center;justify-content:center;}
@@ -612,6 +617,9 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <span class="lightbox-close">✕</span>
+  <span class="lightbox-nav lightbox-prev" id="lightbox-prev" style="display:none" onclick="event.stopPropagation();stepLightbox(-1)">‹</span>
+  <span class="lightbox-nav lightbox-next" id="lightbox-next" style="display:none" onclick="event.stopPropagation();stepLightbox(1)">›</span>
+  <div class="lightbox-missing" id="lightbox-missing" style="display:none">📷 Photo not available</div>
   <img id="lightbox-img" src="" alt="">
   <div class="lightbox-meta" id="lightbox-meta"></div>
 </div>
@@ -936,8 +944,9 @@ async function objDetailTab(tab) {
     const names = (obj.sectors||[]).map(s=>s.name);
     const allPhotos = await api('/api/photos');
     const photos = allPhotos.filter(p => names.includes(p.sector));
-    content.innerHTML = photos.length ? `<div class="photo-grid">${photos.map(p=>`
-      <div class="photo-card" onclick="openLightbox('${p.filename||''}','${p.sector}','${p.photo_type} · ${fmt(p.uploaded_at)}')">
+    photoLists.object = photos;
+    content.innerHTML = photos.length ? `<div class="photo-grid">${photos.map((p,i)=>`
+      <div class="photo-card" onclick="openPhotoViewer('object', ${i})">
         ${photoThumbHTML(p)}
         <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${photoLocalTime(p.uploaded_at)}</div></div>
       </div>`).join('')}</div>` : '<div class="empty">no photos</div>';
@@ -1220,8 +1229,9 @@ function detailTab(tab) {
 
   } else if (tab==='photos') {
     if (!d.photos.length) { el.innerHTML='<div class="empty">no photos</div>'; return; }
-    el.innerHTML = `<div class="photo-grid">${d.photos.map(p=>`
-      <div class="photo-card" onclick="openLightbox('${photoFileName(p)}','${p.sector}','${p.photo_type}')">
+    photoLists.sector = d.photos;
+    el.innerHTML = `<div class="photo-grid">${d.photos.map((p,i)=>`
+      <div class="photo-card" onclick="openPhotoViewer('sector', ${i})">
         ${photoThumbHTML(p)}
         <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${photoLocalTime(p.uploaded_at)}</div></div>
       </div>`).join('')}</div>`;
@@ -1929,8 +1939,9 @@ function renderPhotos() {
     document.getElementById('photo-pagination').innerHTML = '';
     return;
   }
-  document.getElementById('photos-grid').innerHTML = slice.map(p=>`
-    <div class="photo-card" onclick="openLightbox('${p.filename||''}','${p.sector}','${p.photo_type} · #${p.session_id} · ${fmt(p.uploaded_at)}')">
+  photoLists.global = photos;
+  document.getElementById('photos-grid').innerHTML = slice.map((p,i)=>`
+    <div class="photo-card" onclick="openPhotoViewer('global', ${photoPage*PHOTOS_PER_PAGE + i})">
       ${photoThumbHTML(p)}
       <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${photoLocalTime(p.uploaded_at)}</div></div>
     </div>`).join('');
@@ -2307,17 +2318,43 @@ async function loadIncidentsEquipment() {
 }
 
 // ── LIGHTBOX ──────────────────────────────────────────────────────────────────
-function openLightbox(filename, sector, meta) {
-  if (filename) {
-    document.getElementById('lightbox-img').src = API + '/photos/file/' + filename;
-    document.getElementById('lightbox-img').style.display = 'block';
-  } else {
-    document.getElementById('lightbox-img').style.display = 'none';
-  }
-  document.getElementById('lightbox-meta').textContent = sector + ' · ' + meta;
+// Photo lists the viewer steps through, keyed by the view that opened it, in tile order.
+let photoLists = {};
+let lightboxSource = null, lightboxList = [], lightboxIndex = 0;
+function openPhotoViewer(source, index) {
+  lightboxSource = source;
+  lightboxList = photoLists[source] || [];
+  document.addEventListener('keydown', lightboxKeys);
+  showLightboxPhoto(index);
   document.getElementById('lightbox').classList.add('open');
 }
-function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+function showLightboxPhoto(index) {
+  const p = lightboxList[index];
+  if (!p) return;                       // out of range: no wrap-around, no-op
+  lightboxIndex = index;
+  const img = document.getElementById('lightbox-img'), missing = document.getElementById('lightbox-missing');
+  const f = photoFileName(p);
+  img.onerror = () => { img.style.display = 'none'; missing.style.display = 'block'; };
+  img.style.display = f ? 'block' : 'none';
+  missing.style.display = f ? 'none' : 'block';
+  if (f) img.src = API + '/photos/file/' + encodeURIComponent(f);
+  document.getElementById('lightbox-meta').textContent =
+    `${p.sector} · ${p.photo_type}${lightboxSource === 'global' ? ' · #' + p.session_id : ''} · ${photoLocalTime(p.uploaded_at)} · ${index + 1} / ${lightboxList.length}`;
+  document.getElementById('lightbox-prev').style.display = index > 0 ? 'flex' : 'none';
+  document.getElementById('lightbox-next').style.display = index < lightboxList.length - 1 ? 'flex' : 'none';
+}
+function stepLightbox(d) { showLightboxPhoto(lightboxIndex + d); }
+function lightboxKeys(e) {
+  if (e.key === 'ArrowLeft') { e.preventDefault(); stepLightbox(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
+  else if (e.key === 'Escape') closeLightbox();
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.removeEventListener('keydown', lightboxKeys);
+  document.getElementById('lightbox-img').onerror = null;  // single-image viewers (risk/satellite) keep their old behaviour
+  ['lightbox-prev', 'lightbox-next', 'lightbox-missing'].forEach(id => document.getElementById(id).style.display = 'none');
+}
 
 // Photo file name: /api/photos rows carry `filename`; sector-detail rows only `image_path`.
 function photoFileName(p) { return p.filename || (p.image_path||'').split('/').pop(); }
