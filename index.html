@@ -3243,9 +3243,49 @@ async function openIntegration(id, push=true) {
 // ── AUTO REFRESH every 30s ────────────────────────────────────────────────────
 setInterval(()=>{ if(currentSection&&currentSection!=='detail'){ clearCache(); load(currentSection); } }, 30000);
 
+// Resolve a history route from location.hash (inverse of the hashes written by
+// nav/openSector/openObject/openRisk). Unknown or malformed hashes resolve to Overview.
+function routeFromHash() {
+  const h = location.hash.slice(1);
+  let m;
+  if ((m = h.match(/^sector-(.+)$/))) {
+    try { return {type:'sector', name: decodeURIComponent(m[1])}; }
+    catch(e) { return {type:'nav', id:'overview'}; }
+  }
+  if ((m = h.match(/^object-(\d+)$/))) return {type:'object', id: parseInt(m[1], 10)};
+  if ((m = h.match(/^risk\/(\d+)$/))) return {type:'risk', id: parseInt(m[1], 10)};
+  if (h === 'financial-breakdown') return {type:'financial-breakdown'};
+  if (h === 'integration-detail') return {type:'nav', id:'integrations'};
+  if (h !== 'risk-detail' && Object.prototype.hasOwnProperty.call(loaders, h)) return {type:'nav', id: h};
+  return {type:'nav', id:'overview'};
+}
+
+// Open a hash-derived route without pushing history. A sector/object/risk that
+// no longer exists (or a failed API call) falls back to its list page.
+function openRoute(route) {
+  const fallback = id => { history.replaceState({type:'nav', id}, '', '#'+id); nav(id, false); };
+  if (route.type==='sector') {
+    openSector(route.name, false).catch(() => {
+      if (currentSection==='detail' && currentSector===route.name) fallback('sectors');
+    });
+  } else if (route.type==='object') {
+    api('/api/objects').then(objs => {
+      if (objs.some(o => o.boundary_plan_id === route.id)) openObject(route.id, false);
+      else fallback('objects');
+    }).catch(() => fallback('objects'));
+  } else if (route.type==='risk') {
+    api('/api/risks').then(rows => {
+      if (rows.some(r => r.id === route.id)) openRisk(route.id, false).catch(() => fallback('risks'));
+      else fallback('risks');
+    }).catch(() => fallback('risks'));
+  } else if (route.type==='financial-breakdown') {
+    openFinancialBreakdown(false).catch(() => fallback('overview'));
+  } else nav(route.id, false);
+}
+
 window.addEventListener('popstate', e=>{
   const state = e.state;
-  if (!state) { nav('overview', false); return; }
+  if (!state) { openRoute(routeFromHash()); return; }
   if (state.type==='nav') nav(state.id, false);
   else if (state.type==='object') openObject(state.id, false);
   else if (state.type==='sector') openSector(state.name, false);
@@ -3255,8 +3295,9 @@ window.addEventListener('popstate', e=>{
 });
 
 // INIT
-history.replaceState({type:'nav', id:'overview'}, '', '#overview');
-nav('overview', false);
+const initRoute = routeFromHash();
+history.replaceState(initRoute, '', location.hash || '#overview');
+openRoute(initRoute);
 document.getElementById('last-update').innerHTML = '<span class="auto-refresh-badge"><span class="pulse"></span> live · v2.1</span>';
 </script>
 </body>
