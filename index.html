@@ -938,8 +938,8 @@ async function objDetailTab(tab) {
     const photos = allPhotos.filter(p => names.includes(p.sector));
     content.innerHTML = photos.length ? `<div class="photo-grid">${photos.map(p=>`
       <div class="photo-card" onclick="openLightbox('${p.filename||''}','${p.sector}','${p.photo_type} · ${fmt(p.uploaded_at)}')">
-        <div class="photo-thumb-placeholder">📷</div>
-        <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${fmt(p.uploaded_at)}</div></div>
+        ${photoThumbHTML(p)}
+        <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${photoLocalTime(p.uploaded_at)}</div></div>
       </div>`).join('')}</div>` : '<div class="empty">no photos</div>';
   } else if (tab === 'risks') {
     const names = (obj.sectors||[]).map(s=>s.name);
@@ -1221,9 +1221,9 @@ function detailTab(tab) {
   } else if (tab==='photos') {
     if (!d.photos.length) { el.innerHTML='<div class="empty">no photos</div>'; return; }
     el.innerHTML = `<div class="photo-grid">${d.photos.map(p=>`
-      <div class="photo-card" onclick="openLightbox('${p.filename||''}','${p.sector}','${p.photo_type}')">
-        <div class="photo-thumb-placeholder">📷</div>
-        <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${fmt(p.uploaded_at)}</div></div>
+      <div class="photo-card" onclick="openLightbox('${photoFileName(p)}','${p.sector}','${p.photo_type}')">
+        ${photoThumbHTML(p)}
+        <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${photoLocalTime(p.uploaded_at)}</div></div>
       </div>`).join('')}</div>`;
 
   } else if (tab==='risks') {
@@ -1931,8 +1931,8 @@ function renderPhotos() {
   }
   document.getElementById('photos-grid').innerHTML = slice.map(p=>`
     <div class="photo-card" onclick="openLightbox('${p.filename||''}','${p.sector}','${p.photo_type} · #${p.session_id} · ${fmt(p.uploaded_at)}')">
-      <div class="photo-thumb-placeholder">📷</div>
-      <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${fmt(p.uploaded_at)}</div></div>
+      ${photoThumbHTML(p)}
+      <div class="photo-info"><div class="sector">${p.sector}</div><div class="type">${p.photo_type} · ${photoLocalTime(p.uploaded_at)}</div></div>
     </div>`).join('');
   const pg = document.getElementById('photo-pagination');
   if (pages<=1){pg.innerHTML='';return;}
@@ -2318,6 +2318,22 @@ function openLightbox(filename, sector, meta) {
   document.getElementById('lightbox').classList.add('open');
 }
 function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+
+// Photo file name: /api/photos rows carry `filename`; sector-detail rows only `image_path`.
+function photoFileName(p) { return p.filename || (p.image_path||'').split('/').pop(); }
+// Tile image; falls back to the camera placeholder if there is no file or it fails to load.
+function photoThumbHTML(p) {
+  const f = photoFileName(p);
+  if (!f) return '<div class="photo-thumb-placeholder">📷</div>';
+  return `<img class="photo-thumb" loading="lazy" alt="" src="${API}/photos/file/${encodeURIComponent(f)}"
+    onerror="this.onerror=null;this.outerHTML='<div class=&quot;photo-thumb-placeholder&quot;>📷</div>'">`;
+}
+// Photo caption time in the viewer's local time (stored as "YYYY-MM-DD HH:MM:SS UTC").
+function photoLocalTime(s) {
+  if (!s) return '–';
+  const d = new Date(s.replace(' UTC', 'Z').replace(' ', 'T'));
+  return isNaN(d) ? fmt(s) : d.toLocaleString([], {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+}
 
 
 // ── SATELLITE MONITOR ────────────────────────────────────────────────────────
