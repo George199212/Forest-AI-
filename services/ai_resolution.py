@@ -73,10 +73,11 @@ PROMPT_TEMPLATE = (
     '  "exposure_basis": "Короткое (1 предложение) обоснование оценки на русском",\n'
     '  "exposure_period": "короткая фраза на русском о периоде накопления потерь, если ситуацию не исправить — например \'в течение 2-4 недель\' или \'ежедневно, пока не устранено\'"\n'
     "}}"
+    "{extra_block}"
 )
 
 
-def generate_incident_recommendation(incident: dict) -> str:
+def generate_incident_recommendation(incident: dict, model: str = None) -> str:
     """
     incident: dict with at least sector, reason, entity_type, rule_code keys
     (the fields actually populated by database.add_incident()).
@@ -97,6 +98,11 @@ def generate_incident_recommendation(incident: dict) -> str:
     logged via print(), never raised, so a failure here never breaks the
     caller. Callers must be defensive when parsing: the model can still
     return malformed JSON.
+
+    An optional `extra_prompt_block` string key is appended after the JSON
+    schema (services/risk_ai_worker.py uses it for extra context and
+    truthfulness rules), and `model` overrides the default model. Callers
+    that set neither get exactly the same prompt and model as before.
     """
     satellite_context = incident.get("satellite_context")
     satellite_block = f"Satellite intelligence context:\n{satellite_context}\n\n" if satellite_context else ""
@@ -107,12 +113,13 @@ def generate_incident_recommendation(incident: dict) -> str:
         entity_type=incident.get("entity_type") or "unknown",
         rule_code=incident.get("rule_code") or "unknown",
         satellite_block=satellite_block,
+        extra_block=incident.get("extra_prompt_block") or "",
     )
 
     try:
         client = _get_client()
         response = client.messages.create(
-            model="claude-sonnet-4-5",
+            model=model or "claude-sonnet-4-5",
             max_tokens=2048,
             messages=[
                 {

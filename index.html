@@ -1733,7 +1733,13 @@ async function openRisk(id, push=true) {
     <div class="card" style="background:var(--bg2);margin-bottom:16px">
       <div class="card-head">🤖 AI Recommendation</div>
       <div style="padding:12px">
-        <div id="ai-summary" style="white-space:pre-wrap">${aiText ? '' : 'AI analysis not yet available for this risk.'}</div>
+        <div id="ai-summary" style="white-space:pre-wrap">${aiText ? '' :
+          r.ai_state === 'in_progress' ? 'AI analysis in progress' :
+          r.ai_state === 'failed' ? `AI analysis failed <button class="btn" style="margin-left:10px;padding:3px 10px" onclick="retryRiskAI(${r.id})">↻ Retry</button>` :
+          'AI analysis not yet available for this risk.'}</div>
+        ${(rec && rec.estimated_exposure_eur_low == null && rec.estimated_exposure_eur_high == null && rec.exposure_basis) ? `
+          <div style="margin-top:12px;font-size:12px;color:var(--text3)">Financial exposure: not estimated — ${rec.exposure_basis}</div>
+        ` : ''}
         ${(rec && rec.estimated_exposure_eur_low != null && rec.estimated_exposure_eur_high != null) ? `
           <div style="margin-top:12px;padding:10px 12px;background:rgba(201,64,64,0.08);border-radius:var(--r);border:1px solid rgba(201,64,64,0.2)">
             <div style="font-size:13px;font-weight:600;color:var(--red);font-family:var(--mono)">⚠ ESTIMATED FINANCIAL EXPOSURE: €${rec.estimated_exposure_eur_low.toLocaleString('de-DE')}–€${rec.estimated_exposure_eur_high.toLocaleString('de-DE')}</div>
@@ -1808,6 +1814,17 @@ async function openFinancialBreakdown(push=true) {
       `).join('')}
     </tbody></table>
   ` : '<div class="empty">No financial risk data</div>');
+}
+
+async function retryRiskAI(id) {
+  try {
+    const resp = await fetch(`/api/risks/${id}/ai-retry`, {method:'POST'});
+    let data = null;
+    try { data = await resp.json(); } catch(e) {}
+    if (!resp.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + resp.status));
+    if (data.note) alert(data.note);
+  } catch(e) { alert('⚠ Retry failed: ' + e.message); return; }
+  openRisk(id, false);
 }
 
 async function approveRisk(id, optionId) {

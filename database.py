@@ -102,6 +102,10 @@ def _migrate():
     # presenter wants pinned to the top of GET /api/risks, without
     # affecting relative order among the rest (see get_risks_route()).
     _add_column_if_missing(cur, "risks", "pinned_order", "INTEGER DEFAULT NULL")
+    # Background AI analysis state (services/risk_ai_worker.py): NULL for
+    # every existing row; the worker sets REQUESTED/RUNNING/DONE/FAILED.
+    _add_column_if_missing(cur, "risks", "ai_status", "TEXT")
+    _add_column_if_missing(cur, "risks", "ai_attempts", "INTEGER DEFAULT 0")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS risk_events (

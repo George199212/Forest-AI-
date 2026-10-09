@@ -19,6 +19,7 @@ from database import (
     get_satellite_timeline,
 )
 from services.ai_resolution import _get_client as _get_anthropic_client, generate_incident_recommendation
+from services import risk_ai_worker
 from services.satellite_intelligence import collect_satellite_inspector_fields
 from services.satellite_intelligence.providers import ALL_PROVIDERS
 from services.satellite_intelligence.models import TIER_LABELS
@@ -66,6 +67,7 @@ app = FastAPI(title="Forest AI API", dependencies=[Depends(verify_credentials)])
 @app.on_event("startup")
 def _init_db_on_startup():
     init_db()
+    risk_ai_worker.start()
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -1459,6 +1461,7 @@ def get_risk_detail(risk_id: int):
         return Response(content='{"error":"Not found"}', media_type="application/json", status_code=404)
     from database import get_risk_events
     risk["events"] = get_risk_events(risk_id)
+    risk["ai_state"] = risk_ai_worker.ai_state(risk)
     if risk.get("entity_type") == "EMPLOYEE" and risk.get("entity_id"):
         employee = db1("SELECT full_name, telegram_user_id FROM sector_employees WHERE id=?", (risk["entity_id"],))
         risk["employee_name"] = employee.get("full_name") if employee else None
@@ -1488,6 +1491,14 @@ def get_risk_detail(risk_id: int):
         if vehicle.get("plate"):
             risk["assigned_vehicle"] = vehicle
     return risk
+
+
+@app.post("/api/risks/{risk_id}/ai-retry")
+def retry_risk_ai(risk_id: int):
+    """Queue a risk for the background AI worker (manual Retry). No AI call
+    here; the worker's daily cap still applies."""
+    code, payload = risk_ai_worker.request_retry(risk_id)
+    return Response(content=json.dumps(payload, ensure_ascii=False), media_type="application/json", status_code=code)
 
 
 @app.get("/api/risks/{risk_id}/photo")
