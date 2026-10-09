@@ -634,6 +634,7 @@ let currentRiskId = null;
 let currentDetailData = null;
 let currentDetailTab = 'gps';
 let selectedSnapshotId = null;
+let satImgVersion = Date.now();
 let allPhotos = [];
 let mapLoaded = false;
 let charts = {};
@@ -972,8 +973,18 @@ async function uploadSectorSatellite(sectorName, ev) {
   if (!file) return;
   const fd = new FormData();
   fd.append('file', file);
-  await fetch(`/api/sectors/${encodeURIComponent(sectorName)}/satellite`, {method:'POST', body: fd});
-  openSector(sectorName);
+  try {
+    const resp = await fetch(`/api/sectors/${encodeURIComponent(sectorName)}/satellite`, {method:'POST', body: fd});
+    let data = null;
+    try { data = await resp.json(); } catch(e) {}
+    if (!resp.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + resp.status));
+  } catch(e) { alert('⚠ Upload failed: ' + e.message); return; }
+  clearCache();
+  satImgVersion = Date.now();
+  await openSector(sectorName, false);
+  detailTab('satellite');
+  const status = document.getElementById('ds-status');
+  if (status) { status.style.color = 'var(--green)'; status.textContent = '✓ Uploaded: ' + file.name; }
 }
 
 // ── Polygon drawing tool (plain JS + SVG overlay, no libraries) ──────────────
@@ -1423,6 +1434,10 @@ function detailTab(tab) {
 
   } else if (tab==='satellite') {
     el.innerHTML = `
+      ${s.satellite_file_path ? `<div class="card" style="margin-bottom:16px">
+        <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Загруженный снимок</span></div>
+        <img src="/api/sectors/${encodeURIComponent(s.name)}/satellite-image?v=${satImgVersion}" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border)" alt="uploaded satellite">
+      </div>` : ''}
       <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
         <div>
           <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase">Дата от</div>
@@ -1480,7 +1495,7 @@ function detailTab(tab) {
         <div class="photo-card${sn.id===selectedSnapshotId?' selected':''}">
           <img class="photo-thumb" src="${API}/api/sectors/snapshots/${sn.id}/image" onclick="toggleSnapshotSelection(${sn.id})">
           <div class="photo-info">
-            <div class="sector">${formatSnapshotDateTime(sn.uploaded_at)} ${riskBadge(sn.risk_level)}</div>
+            <div class="sector">${sn.snapshot_date || formatSnapshotDateTime(sn.uploaded_at)} ${riskBadge(sn.risk_level)}</div>
             <div class="type">${sn.label||''}${sn.note?' · '+sn.note:''}</div>
           </div>
           <div style="padding:6px 8px;text-align:right">
@@ -3014,15 +3029,18 @@ async function addSectorSnapshot(sector) {
     fd.append('note', note);
     fd.append('risk_level', risk);
     const resp = await fetch('/api/sectors/'+encodeURIComponent(sector)+'/snapshots', {method:'POST', body: fd});
-    const data = await resp.json();
+    let data = null;
+    try { data = await resp.json(); } catch(e) {}
+    if (!resp.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + resp.status));
     if (data.ok) {
       if(msg){msg.style.color='var(--green)';msg.textContent='✓ Snapshot added';}
+      clearCache();
       const data2 = await api('/api/sectors/'+encodeURIComponent(sector));
       currentDetailData = data2;
       detailTab('history');
       openSnapshotRisksEditor(data.id);
     }
-  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
+  } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error: '+e.message;} }
 }
 
 async function deleteSectorSnapshot(id, sector) {
