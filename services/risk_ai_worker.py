@@ -32,20 +32,54 @@ AI_MAX_PER_UTC_DAY    = 30    # paid calls per UTC day, retries included
 AI_AUTO_FIRST_RISK_ID = 60    # first risk id created after this feature shipped; older risks only on explicit request
 AI_DEFAULT_MODEL      = "claude-sonnet-4-5"   # same model the existing incident pipeline uses; override via ANTHROPIC_MODEL
 
-EXTRA_BLOCK_TEMPLATE = (
-    "\n\nAdditional context:\n"
+AI_DEFAULT_LANGUAGE   = "lv"   # override via AI_OUTPUT_LANGUAGE
+LANGUAGE_NAMES = {"lv": "Latvian", "ru": "Russian", "en": "English"}
+
+# Worker-only prompt (the incident pipeline keeps services/ai_resolution.PROMPT_TEMPLATE).
+# Same JSON field names; language and operational framing come from the data.
+WORKER_PROMPT_TEMPLATE = (
+    "You are an assistant for a forest management company. A risk was recorded for one sector. "
+    "Write a short analysis and 2-4 concrete response options for the dispatcher.\n\n"
+    "Risk:\n"
+    "Sector: {sector}\n"
     "Risk level: {risk_level}\n"
     "Recorded at (UTC): {created_at}\n"
-    "Current date (UTC): {today}\n\n"
-    "Strict rules — these take precedence over any other instruction in this prompt:\n"
-    "1. Use only the data given in this prompt. In the summary, state explicitly which data is "
-    "missing (for example: no timber volume, no price basis, no confirmed damage, no worker or "
-    "equipment involved).\n"
-    "2. If the data contains no volume or price basis, set estimated_exposure_eur_low and "
+    "Current date (UTC): {today}\n"
+    "Event: {reason}\n\n"
+    "{facts}\n\n"
+    "Rules:\n"
+    "1. Language: write every text value (summary, option labels, message_text, exposure_basis, "
+    "exposure_period) in {language} only. Do not mix languages. Proper names, place names and quoted "
+    "source names stay as they are.\n"
+    "2. Use only the data given in this prompt. In the summary, state explicitly which data is missing.\n"
+    "3. {operations_rule}\n"
+    "4. If the data contains no volume or price basis, set estimated_exposure_eur_low and "
     "estimated_exposure_eur_high to null and make exposure_basis say why no estimate is possible. "
     "Never estimate money without a stated basis taken from the data.\n"
-    "3. If the event text describes a forecast, a warning or an unconfirmed event, say so explicitly "
-    "and do not describe damage as having occurred."
+    "5. If the event text describes a forecast, a warning or an unconfirmed event, say so explicitly "
+    "and do not describe damage as having occurred.\n"
+    "6. Each option's message_text is a ready-to-send Telegram message (2-3 sentences, no markdown) to "
+    "the person who would carry out that option.\n\n"
+    "Return ONLY valid JSON, no markdown code fences, no text outside the JSON object, with exactly "
+    "these fields:\n"
+    "{{\n"
+    '  "summary": "4-6 sentences: what was recorded, what it means, which data is missing",\n'
+    '  "options": [{{"id": "short_snake_case_id", "label": "short title", "message_text": "..."}}],\n'
+    '  "recommended_option_id": "id of one of the options",\n'
+    '  "estimated_exposure_eur_low": null,\n'
+    '  "estimated_exposure_eur_high": null,\n'
+    '  "exposure_basis": "one sentence: the basis of the estimate, or why there is none",\n'
+    '  "exposure_period": "short phrase: over what period the exposure would accumulate"\n'
+    "}}"
+)
+OPERATIONS_RULE_NO = (
+    "The sector data shows no logging operations. Do not mention crews, workers on duty, felling, "
+    "machinery, timber or suspending works. Recommend only what the data supports: visitor safety, "
+    "inspection, photo documentation, monitoring the forecast."
+)
+OPERATIONS_RULE_YES = (
+    "The sector data shows operational activity (listed above). Recommendations may address the "
+    "operations, equipment, vehicles and people listed there, and nothing beyond them."
 )
 
 _started = False
@@ -152,12 +186,77 @@ def _candidates():
             if (_parse_ts(r["created_at"]) or now) <= now - timedelta(seconds=AI_WORKER_MIN_AGE_S)]
 
 
-def _valid_recommendation(text):
+def _language():
+    code = (os.environ.get("AI_OUTPUT_LANGUAGE") or AI_DEFAULT_LANGUAGE).strip()
+    return code, LANGUAGE_NAMES.get(code.lower(), code)
+
+
+def _sector_facts(sector):
+    """Sector facts passed to the model, and whether they evidence operational activity.
+    GPS check-ins only count as evidence when made by employees registered to this sector."""
+    conn = _conn()
+    s = conn.execute("SELECT status, approved_volume, notes FROM sectors WHERE name=? LIMIT 1", (sector,)).fetchone()
+    if not s:
+        conn.close()
+        return "Sector data (from the database): this sector is not in the database.", False
+    equipment = conn.execute("SELECT COUNT(*) FROM sector_equipment WHERE sector=? AND active=1", (sector,)).fetchone()[0]
+    vehicles = conn.execute("SELECT COUNT(*) FROM sector_vehicles WHERE sector=? AND active=1", (sector,)).fetchone()[0]
+    checkins = conn.execute("SELECT COUNT(*) FROM work_sessions WHERE sector=?", (sector,)).fetchone()[0]
+    staff_checkins = conn.execute(
+        "SELECT COUNT(*) FROM work_sessions w WHERE w.sector=? AND w.employee_id IN "
+        "(SELECT id FROM sector_employees WHERE sector=? AND active=1)", (sector, sector)).fetchone()[0]
+    conn.close()
+    status = (s["status"] or "").strip()
+    volume = (s["approved_volume"] or "").strip()
+    notes = (s["notes"] or "").strip()[:1000]
+    operational = (status.lower().startswith("active") or bool(volume) or equipment > 0
+                   or vehicles > 0 or staff_checkins > 0)
+    lines = [
+        "Sector data (from the database):",
+        f"- Status: {status or 'not set'}",
+        f"- Approved volume: {volume or 'not set'}",
+        f"- Active equipment registered: {equipment}",
+        f"- Active vehicles registered: {vehicles}",
+        f"- GPS check-ins by employees registered to this sector: {staff_checkins}",
+        f"- GPS check-ins by people not registered to this sector: {checkins - staff_checkins}",
+        f"- Notes: {notes or 'none'}",
+        f"- Operational activity evidenced by this data: {'YES' if operational else 'NO'}",
+    ]
+    return "\n".join(lines), operational
+
+
+def _build_prompt(r):
+    facts, operational = _sector_facts(r["sector"])
+    created = _parse_ts(r["created_at"])
+    return WORKER_PROMPT_TEMPLATE.format(
+        sector=r["sector"] or "unknown",
+        risk_level=r["risk_level"] or "unknown",
+        created_at=created.strftime("%Y-%m-%d %H:%M") if created else "unknown",
+        today=_now().strftime("%Y-%m-%d"),
+        reason=r["reason"] or "unknown",
+        facts=facts,
+        language=_language()[1],
+        operations_rule=OPERATIONS_RULE_YES if operational else OPERATIONS_RULE_NO,
+    )
+
+
+def _has_cyrillic(s):
+    return any("Ѐ" <= ch <= "ӿ" for ch in s)
+
+
+def _valid_recommendation(text, r=None):
     try:
         rec = json.loads(text)
     except Exception:
         return False
-    return isinstance(rec, dict) and bool(rec.get("summary")) and isinstance(rec.get("options"), list) and bool(rec["options"])
+    if not (isinstance(rec, dict) and bool(rec.get("summary")) and isinstance(rec.get("options"), list) and bool(rec["options"])):
+        return False
+    # No language mixing: for a non-Russian output language, Cyrillic is only allowed inside the
+    # sector name (e.g. "A-007 — Сигулдский лес:") or when the risk text itself is Cyrillic.
+    if r is not None and _language()[0].lower() != "ru" and not _has_cyrillic(r["reason"] or ""):
+        if _has_cyrillic(text.replace(r["sector"] or "", "")):
+            return False
+    return True
 
 
 def analyse_risk(risk_id):
@@ -195,18 +294,9 @@ def analyse_risk(risk_id):
     model = os.environ.get("ANTHROPIC_MODEL") or AI_DEFAULT_MODEL
     database.add_risk_event(risk_id, "AI_ANALYSIS_REQUESTED", actor="ai_worker",
                             details=f"attempt {attempts}/{AI_MAX_ATTEMPTS}, model {model}")
-    created = _parse_ts(r["created_at"])
-    text = generate_incident_recommendation({
-        "sector": r["sector"], "reason": r["reason"],
-        "entity_type": r["entity_type"], "rule_code": r["rule_code"],
-        "extra_prompt_block": EXTRA_BLOCK_TEMPLATE.format(
-            risk_level=r["risk_level"] or "unknown",
-            created_at=created.strftime("%Y-%m-%d %H:%M") if created else "unknown",
-            today=_now().strftime("%Y-%m-%d"),
-        ),
-    }, model=model)
+    text = generate_incident_recommendation({"prompt_override": _build_prompt(r)}, model=model)
 
-    if text and _valid_recommendation(text):
+    if text and _valid_recommendation(text, r):
         conn = _conn()
         cur = conn.execute(
             "UPDATE risks SET ai_recommendation=?, ai_status='DONE' "
@@ -223,7 +313,8 @@ def analyse_risk(risk_id):
             database.add_risk_event(risk_id, "AI_RECOMMENDATION_GENERATED", actor="ai")
         return "done"
 
-    reason = "no response from model (see forest-api log)" if not text else "model output is not a valid recommendation JSON"
+    reason = ("no response from model (see forest-api log)" if not text
+              else "model output is not a valid recommendation JSON or mixes languages")
     new_status = "FAILED" if attempts >= AI_MAX_ATTEMPTS else None
     conn = _conn()
     conn.execute("UPDATE risks SET ai_status=? WHERE id=? AND ai_status='RUNNING'", (new_status, risk_id))
@@ -232,6 +323,40 @@ def analyse_risk(risk_id):
     database.add_risk_event(risk_id, "AI_ANALYSIS_FAILED", actor="ai_worker",
                             details=f"attempt {attempts}/{AI_MAX_ATTEMPTS}: {reason}")
     return "failed"
+
+
+def regenerate_risk(risk_id):
+    """Explicit one-off regeneration of an existing analysis (not used by the worker loop).
+    The previous analysis is archived in risk_events (AI_RECOMMENDATION_REPLACED, full JSON in
+    details) before the new one is written; if generation fails, the old analysis stays."""
+    conn = _conn()
+    r = conn.execute("SELECT * FROM risks WHERE id=?", (risk_id,)).fetchone()
+    conn.close()
+    if not r:
+        return "not_found"
+    if calls_today() >= AI_MAX_PER_UTC_DAY:
+        return "daily_cap"
+    old = r["ai_recommendation"] or ""
+    model = os.environ.get("ANTHROPIC_MODEL") or AI_DEFAULT_MODEL
+    database.add_risk_event(risk_id, "AI_ANALYSIS_REQUESTED", actor="ai_worker",
+                            details=f"regeneration, model {model}, language {_language()[0]}")
+    text = generate_incident_recommendation({"prompt_override": _build_prompt(r)}, model=model)
+    if not (text and _valid_recommendation(text, r)):
+        database.add_risk_event(risk_id, "AI_ANALYSIS_FAILED", actor="ai_worker",
+                                details="regeneration: no valid output; previous analysis kept")
+        return "failed"
+    if old:
+        database.add_risk_event(risk_id, "AI_RECOMMENDATION_REPLACED", actor="ai_worker", details=old)
+    conn = _conn()
+    cur = conn.execute("UPDATE risks SET ai_recommendation=?, ai_status='DONE' WHERE id=? AND COALESCE(ai_recommendation,'')=?",
+                       (text, risk_id, old))
+    conn.commit()
+    saved = cur.rowcount
+    conn.close()
+    if not saved:
+        return "changed_meanwhile"
+    database.add_risk_event(risk_id, "AI_RECOMMENDATION_GENERATED", actor="ai")
+    return "done"
 
 
 def request_retry(risk_id):

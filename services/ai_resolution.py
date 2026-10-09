@@ -107,7 +107,9 @@ def generate_incident_recommendation(incident: dict, model: str = None) -> str:
     satellite_context = incident.get("satellite_context")
     satellite_block = f"Satellite intelligence context:\n{satellite_context}\n\n" if satellite_context else ""
 
-    prompt = PROMPT_TEMPLATE.format(
+    # services/risk_ai_worker.py sends its own complete prompt (same JSON schema);
+    # every other caller gets PROMPT_TEMPLATE exactly as before.
+    prompt = incident.get("prompt_override") or PROMPT_TEMPLATE.format(
         sector=incident.get("sector") or "unknown",
         reason=incident.get("reason") or "unknown",
         entity_type=incident.get("entity_type") or "unknown",
