@@ -222,6 +222,11 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 .pc-kpi-l{font-size:11px;color:var(--text3);}
 .pc-kpi-s{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px;}
 @media (max-width:700px){.pc-sides{grid-template-columns:1fr;}}
+/* Point viewer (comparison tab only): one fixed frame so switching photos never shifts the layout. */
+.pc-viewer-frame{width:min(92vw,1600px);height:76vh;display:flex;align-items:center;justify-content:center;}
+.pc-viewer-frame img{width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;}
+.pc-viewer-side{display:inline-block;font-size:16px;font-weight:600;padding:2px 12px;border-radius:20px;margin-right:8px;border:1px solid var(--border2);color:var(--text);}
+.pc-viewer-side.pc-f{color:var(--gbright);border-color:var(--green);}
 .empty{color:var(--text3);font-family:var(--mono);font-size:12px;padding:20px 0;text-align:center;}
 
 ::-webkit-scrollbar{width:5px;}
@@ -668,6 +673,18 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   <div class="lightbox-missing" id="lightbox-missing" style="display:none">📷 Photo not available</div>
   <img id="lightbox-img" src="" alt="">
   <div class="lightbox-meta" id="lightbox-meta"></div>
+</div>
+
+<!-- POINT VIEWER (comparison tab): photos of one point only, wraps around -->
+<div class="lightbox" id="pc-viewer" onclick="pcViewerClose()">
+  <span class="lightbox-close">✕</span>
+  <span class="lightbox-nav lightbox-prev" id="pc-viewer-prev" style="display:none" onclick="event.stopPropagation();pcViewerStep(-1)">‹</span>
+  <span class="lightbox-nav lightbox-next" id="pc-viewer-next" style="display:none" onclick="event.stopPropagation();pcViewerStep(1)">›</span>
+  <div class="pc-viewer-frame">
+    <img id="pc-viewer-img" src="" alt="">
+    <div class="lightbox-missing" id="pc-viewer-missing" style="display:none">📷 Foto nav pieejams</div>
+  </div>
+  <div class="lightbox-meta" id="pc-viewer-meta"></div>
 </div>
 
 <!-- SNAPSHOT RISKS EDITOR -->
@@ -1700,9 +1717,8 @@ function pcRenderRun(data, runs) {
   const filters = PC_FILTERS.map(([k, label]) =>
     `<button class="btn${pcFilter === k ? ' pc-on' : ''}" onclick="pcSetFilter('${k}')">${label} (${pcFilterCount(data.points, k)})</button>`).join('');
 
-  // Viewer list: copies of the shown photos in on-screen order. The existing viewer prints photo_type and
-  // passes uploaded_at through photoLocalTime(), which shows a pre-formatted string unchanged.
-  const viewerList = [];
+  // Point viewer lists: per point, baseline photo(s) in capture order, then follow-up photo(s).
+  pcViewerLists = {};
   const decideOnly = pcFilter === 'decide';
 
   const points = data.points.filter(pt => pcMatch(pt, pcFilter)).map(pt => {
@@ -1715,12 +1731,13 @@ function pcRenderRun(data, runs) {
       const cls = c.review_status === 'REJECTED' ? 'pc-cell-rej' : 'pc-cell-' + c.class;
       return `<div class="pc-cell ${cls}" data-ch="${c.id}" style="left:${(col - 1) * 33.333}%;top:${(r - 1) * 33.333}%"><span>aptuvenā zona · ${pcEsc(c.cell_words)}</span></div>`;
     }).join('');
+    const vlist = pcViewerLists[pt.id] = [];
     const photo = (p, side) => {
-      const i = viewerList.push(Object.assign({}, p, {photo_type: side === 'b' ? 'bāzes foto' : 'pēcfoto', uploaded_at: pcDate(p.uploaded_at)})) - 1;
+      const i = vlist.push(Object.assign({}, p, {side, point_seq: pt.seq})) - 1;
       const f = photoFileName(p);
       const img = f ? `<div class="pc-imgwrap"><img loading="lazy" alt="" src="${API}/photos/file/${encodeURIComponent(f)}" onerror="pcImgFail(this)">${cells}</div>`
                     : '<div class="photo-thumb-placeholder" style="margin:0 12px">📷</div>';
-      return `<figure class="pc-ph" onclick="openPhotoViewer('compare', ${i})">${img}
+      return `<figure class="pc-ph" onclick="pcViewerOpen(${pt.id}, ${i})">${img}
         <figcaption>${side === 'b' ? 'bāzes foto' : 'pēcfoto'} #${p.id} · ${pcDate(p.uploaded_at)}</figcaption></figure>`;
     };
 
@@ -1791,7 +1808,6 @@ function pcRenderRun(data, runs) {
       ${legend}${limits}${changes}${observations}${noChanges}${discarded}${addObs}
     </div>`;
   }).join('');
-  photoLists.compare = viewerList;
 
   const statusLv = {CREATED:'izveidots', MATCHING:'notiek salīdzināšana', READY:'gatavs', RUNNING:'notiek apstrāde', INTERRUPTED:'pārtraukts'}[run.status] || run.status;
   return `<div class="card" style="margin-bottom:14px">
@@ -1840,6 +1856,42 @@ async function pcObsWithdraw(changeId) {
     alert('Neizdevās atsaukt: ' + e.message);
   }
   if (currentDetailTab === 'compare' && pcSector) loadPhotoCompare(pcSector, pcRunId);
+}
+
+// ── Point viewer ──
+let pcViewerLists = {}, pcViewerList = [], pcViewerIndex = 0;
+function pcViewerOpen(pointId, index) {
+  pcViewerList = pcViewerLists[pointId] || [];
+  if (!pcViewerList.length) return;
+  document.addEventListener('keydown', pcViewerKeys);
+  pcViewerShow(index);
+  document.getElementById('pc-viewer').classList.add('open');
+}
+function pcViewerShow(index) {
+  const n = pcViewerList.length;
+  pcViewerIndex = ((index % n) + n) % n;                 // wraps around in both directions
+  const p = pcViewerList[pcViewerIndex];
+  const img = document.getElementById('pc-viewer-img'), missing = document.getElementById('pc-viewer-missing');
+  const f = photoFileName(p);
+  img.onerror = () => { img.style.display = 'none'; missing.style.display = 'block'; };
+  img.style.display = f ? 'block' : 'none';
+  missing.style.display = f ? 'none' : 'block';
+  if (f) img.src = API + '/photos/file/' + encodeURIComponent(f);
+  const side = p.side === 'b' ? 'bāzes foto' : 'pēcfoto';
+  document.getElementById('pc-viewer-meta').innerHTML =
+    `<span class="pc-viewer-side${p.side === 'f' ? ' pc-f' : ''}">${side}</span>P${p.point_seq} · #${p.id} · ${pcDate(p.uploaded_at)} · ${pcViewerIndex + 1} / ${n}`;
+  ['pc-viewer-prev', 'pc-viewer-next'].forEach(id => document.getElementById(id).style.display = n > 1 ? 'flex' : 'none');
+}
+function pcViewerStep(d) { pcViewerShow(pcViewerIndex + d); }
+function pcViewerKeys(e) {
+  if (e.key === 'ArrowLeft') { e.preventDefault(); pcViewerStep(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); pcViewerStep(1); }
+  else if (e.key === 'Escape') pcViewerClose();
+}
+function pcViewerClose() {
+  document.getElementById('pc-viewer').classList.remove('open');
+  document.removeEventListener('keydown', pcViewerKeys);
+  document.getElementById('pc-viewer-img').onerror = null;
 }
 
 function pcObsToggle(pointId) {
