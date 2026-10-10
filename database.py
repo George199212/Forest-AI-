@@ -663,6 +663,9 @@ def _create_photo_compare_tables(cur):
         created_at TEXT
     )
     """)
+    # source: 'system' (found by the pipeline) or 'human' (observation entered by a reviewer)
+    _add_column_if_missing(cur, "photo_cmp_changes", "source", "TEXT NOT NULL DEFAULT 'system'")
+    _add_column_if_missing(cur, "photo_cmp_changes", "created_by", "TEXT")
     cur.execute("""
     CREATE TABLE IF NOT EXISTS photo_cmp_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -71,6 +71,12 @@ NO_CHANGES_LINES = [
     "Tas nenozīmē, ka pārbaudīta visa teritorija vai ka bojājumu noteikti nav.",
 ]
 REJECTED_LINE = "Sistēmas konstatētās izmaiņas, kuras pārskatītājs noraidīja: {n}."
+HUMAN_KIND = "human_observation"      # entered by a reviewer; never sent to a paid call, never reviewed
+OBSERVATION_MAX_LEN = 500
+# A reviewer observation has review_status HUMAN (active) or WITHDRAWN; for WITHDRAWN, reviewer/reviewed_at
+# hold who withdrew it and when. Withdrawn observations stay stored and no longer block "no changes".
+OBSERVATION_LINE = "Pārskatītāja ievadītie novērojumi: {n}."
+OBSERVATION_LINE_WITHDRAWN = "Pārskatītāja ievadītie novērojumi: {n} (atsaukti: {w})."
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 COMMON_RULES = (
@@ -86,12 +92,13 @@ COMMON_RULES = (
     "- Do not use percentages.\n"
     "- If unsure, say so. Never invent a change.\n"
     "- Write every text value in {language}. Keep JSON keys and enumerated values exactly as specified.\n"
+    "- In the text, call the photos only \"bāzes foto\" and \"pēcfoto\". Use no English words.\n"
     "- Return ONLY one JSON object, no markdown, no text outside it."
 )
 
 MATCH_PROMPT = (
-    "The FIRST image is a BASELINE photo of a forest place. The following images are FOLLOW-UP "
-    "CANDIDATES taken on a later date, each preceded by its id.\n"
+    "The first image is the \"bāzes foto\" of a forest place. The following images are \"pēcfoto\" "
+    "candidates taken on a later date, each preceded by its id.\n"
     "Decide which candidate, if any, shows the SAME PLACE from roughly the same position and direction. "
     "Judge only by stable landmarks: path layout and forks, distinctive trunks, stumps, stones, kerbs, "
     "signs, structures. Do not match on generic similarity such as \"both show pine forest\". Do not "
@@ -102,9 +109,9 @@ MATCH_PROMPT = (
 )
 
 CHECK_PROMPT = (
-    "The images above are photos of one place in a forest: first the BASELINE photo(s) from {baseline_date}, "
-    "then the FOLLOW-UP photo(s) from {followup_date}, each preceded by its id.\n"
-    "Task: decide whether the follow-up photo shows the same place as the baseline photo(s), and whether "
+    "The images above are photos of one place in a forest: first the \"bāzes foto\" from {baseline_date}, "
+    "then the \"pēcfoto\" from {followup_date}, each preceded by its id.\n"
+    "Task: decide whether the \"pēcfoto\" shows the same place as the \"bāzes foto\", and whether "
     "the photos are suitable for detecting visible changes between them. Do not look for changes yet.\n"
     "- same_place: \"yes\" (same place, clearly shared landmarks), \"partial\" (overlapping view of the same "
     "place), \"no\" (different place, or cannot be established).\n"
@@ -118,14 +125,14 @@ CHECK_PROMPT = (
 )
 
 DETECT_PROMPT = (
-    "The images above are photos of one place in a forest: first the BASELINE photo(s) from {baseline_date}, "
-    "then the FOLLOW-UP photo from {followup_date}, each preceded by its id. They were already judged to "
+    "The images above are photos of one place in a forest: first the \"bāzes foto\" from {baseline_date}, "
+    "then the \"pēcfoto\" from {followup_date}, each preceded by its id. They were already judged to "
     "show the same place.\n"
-    "Task: list the changes that are visible in the follow-up photo and absent in the baseline, or visible "
-    "in the baseline and absent in the follow-up. An empty list is a valid and common answer.\n"
+    "Task: list the changes that are visible in the \"pēcfoto\" and absent in the \"bāzes foto\", or visible "
+    "in the \"bāzes foto\" and absent in the \"pēcfoto\". An empty list is a valid and common answer.\n"
     "Per change:\n"
     "- kind: one of " + ", ".join(f'"{k}"' for k in CHANGE_KINDS) + "\n"
-    "- cell: position in the FOLLOW-UP photo on a 3x3 grid, \"r1c1\" (top left) to \"r3c3\" (bottom right)\n"
+    "- cell: position in the \"pēcfoto\" on a 3x3 grid, \"r1c1\" (top left) to \"r3c3\" (bottom right)\n"
     "- class: \"possible_change\" or \"possible_damage\"\n"
     "A person, animal or vehicle visible in only one photo is kind \"transient_object\" with class "
     "\"possible_change\", never \"possible_damage\".\n"
@@ -139,9 +146,9 @@ DETECT_PROMPT = (
 )
 
 VERIFY_PROMPT = (
-    "The images above are photos of one place in a forest: first the BASELINE photo(s) from {baseline_date}, "
-    "then the FOLLOW-UP photo from {followup_date}, each preceded by its id.\n"
-    "Someone claims the following change (cell = position on a 3x3 grid of the FOLLOW-UP photo, r1c1 top "
+    "The images above are photos of one place in a forest: first the \"bāzes foto\" from {baseline_date}, "
+    "then the \"pēcfoto\" from {followup_date}, each preceded by its id.\n"
+    "Someone claims the following change (cell = position on a 3x3 grid of the \"pēcfoto\", r1c1 top "
     "left to r3c3 bottom right):\n"
     "kind: {kind}\ncell: {cell}\nclaim: {description}\n\n"
     "Check this specific claim yourself, strictly:\n"
@@ -486,10 +493,10 @@ def _matching_pass(run_id, actor):
     start, results = 0, []
     for bid in run["baseline_ids"]:
         window = f_ids[start:start + MATCH_WINDOW]
-        content = [{"type": "text", "text": f"BASELINE photo id={bid}"},
+        content = [{"type": "text", "text": f"bāzes foto id={bid}"},
                    _image_block(photo[bid]["image_path"], MATCH_LONG_SIDE)]
         for fid in window:
-            content += [{"type": "text", "text": f"FOLLOW-UP CANDIDATE id={fid}"},
+            content += [{"type": "text", "text": f"pēcfoto kandidāts id={fid}"},
                         _image_block(photo[fid]["image_path"], MATCH_LONG_SIDE)]
         content.append({"type": "text", "text": MATCH_PROMPT})
 
@@ -547,7 +554,7 @@ def confirm_all(run_id, actor):
 
 
 def _reset_point(conn, point_id):
-    conn.execute("DELETE FROM photo_cmp_changes WHERE point_id=?", (point_id,))
+    conn.execute("DELETE FROM photo_cmp_changes WHERE point_id=? AND source='system'", (point_id,))
     conn.execute("UPDATE photo_cmp_points SET same_place=NULL, comparability=NULL, comparability_reason=NULL, "
                  "detect_limits=NULL, check_attempts=0, detect_attempts=0, checked_at=NULL, detected_at=NULL "
                  "WHERE id=?", (point_id,))
@@ -622,6 +629,9 @@ def reassign_photo(run_id, photo_id, target, actor, force=False):
         touched = [src["id"], dst["id"] if dst else new_pid]
         removed = None
         if not members[src["id"]]["baseline"] and not members[src["id"]]["followup"]:
+            if conn.execute("SELECT 1 FROM photo_cmp_changes WHERE point_id=? AND source='human'",
+                            (src["id"],)).fetchone():
+                return 409, {"error": "the point would be removed but has reviewer observations"}
             conn.execute("DELETE FROM photo_cmp_changes WHERE point_id=?", (src["id"],))
             conn.execute("DELETE FROM photo_cmp_points WHERE id=?", (src["id"],))
             del members[src["id"]]
@@ -659,6 +669,9 @@ def review_change(change_id, action, actor):
     if c["discarded"]:
         conn.close()
         return 409, {"error": "change was discarded by verification"}
+    if c["source"] == "human":
+        conn.close()
+        return 409, {"error": "reviewer observations are not reviewed"}
     new = REVIEW_ACTIONS[action]
     conn.execute("UPDATE photo_cmp_changes SET review_status=?, reviewer=?, reviewed_at=? WHERE id=?",
                  (new, actor, _now(), change_id))
@@ -731,10 +744,10 @@ def _validate_verify(a):
 def _point_content(run, photos, prompt):
     content = []
     for p in photos["baseline"]:
-        content += [{"type": "text", "text": f"BASELINE photo id={p['id']} ({run['baseline_date']})"},
+        content += [{"type": "text", "text": f"bāzes foto id={p['id']} ({run['baseline_date']})"},
                     _image_block(p["image_path"], COMPARE_LONG_SIDE)]
     for p in photos["followup"]:
-        content += [{"type": "text", "text": f"FOLLOW-UP photo id={p['id']} ({run['followup_date']})"},
+        content += [{"type": "text", "text": f"pēcfoto id={p['id']} ({run['followup_date']})"},
                     _image_block(p["image_path"], COMPARE_LONG_SIDE)]
     content.append({"type": "text", "text": prompt})
     return content
@@ -801,7 +814,7 @@ def _process_point(run, point_id, actor, force):
     # D: independent verification per change
     conn = _conn()
     pending = [dict(r) for r in conn.execute(
-        "SELECT * FROM photo_cmp_changes WHERE point_id=? AND discarded=0 AND verification IS NULL", (point_id,))]
+        "SELECT * FROM photo_cmp_changes WHERE point_id=? AND source='system' AND discarded=0 AND verification IS NULL", (point_id,))]
     conn.close()
     failed = False
     for ch in pending:
@@ -936,7 +949,8 @@ def build_report(run, points, changes):
                       if p["kind"] == "no_baseline" or p["status"] == "NOT_SAME_PLACE_HUMAN")
     compared = [p for p in both if p["status"] == "DONE"]
     not_comparable = [p for p in both if p["status"] in RESHOOT_STATES]
-    live = [c for c in changes if not c["discarded"]]
+    human = [c for c in changes if c["source"] == "human"]
+    live = [c for c in changes if not c["discarded"] and c["source"] == "system"]
     by_class = {}
     for cl in CHANGE_CLASSES:
         counts = {s: 0 for s in ("UNREVIEWED", "CONFIRMED", "REJECTED", "RESHOOT")}
@@ -962,7 +976,7 @@ def build_report(run, points, changes):
         "photos_unmatched_followup": unmatched_f,
         "possible_change": by_class["possible_change"],
         "possible_damage": by_class["possible_damage"],
-        "changes_discarded_by_verification": sum(1 for c in changes if c["discarded"]),
+        "changes_discarded_by_verification": sum(1 for c in changes if c["discarded"] and c["source"] == "system"),
         "points_needing_reshoot": len(reshoot_pts),
         "summary_lines": [],
     }
@@ -970,13 +984,21 @@ def build_report(run, points, changes):
     # transient objects count. Unreviewed, confirmed and re-shoot changes still block it.
     rejected = [c for c in live if c["review_status"] == "REJECTED"]
     transient = [c for c in live if c["kind"] == TRANSIENT_KIND]
-    blocking = [c for c in live if c["review_status"] != "REJECTED" and c["kind"] != TRANSIENT_KIND]
+    human_active = [c for c in human if c["review_status"] != "WITHDRAWN"]
+    human_withdrawn = len(human) - len(human_active)
+    blocking = [c for c in live if c["review_status"] != "REJECTED" and c["kind"] != TRANSIENT_KIND] + human_active
+    report["human_observations"] = dict({cl: sum(1 for c in human_active if c["class"] == cl) for cl in CHANGE_CLASSES},
+                                        withdrawn=human_withdrawn)
     report["changes_rejected_by_reviewer"] = len(rejected)
     report["transient_objects"] = len(transient)
     if compared and not blocking:
         report["summary_lines"] = list(NO_CHANGES_LINES)
         if rejected:
             report["summary_lines"].append(REJECTED_LINE.format(n=len(rejected)))
+    if human:                                  # own line, separate from system-detected changes
+        report["summary_lines"].append(
+            OBSERVATION_LINE_WITHDRAWN.format(n=len(human_active), w=human_withdrawn) if human_withdrawn
+            else OBSERVATION_LINE.format(n=len(human_active)))
     return report
 
 
@@ -1016,6 +1038,55 @@ def get_run(run_id):
     run.pop("followup_photo_ids")
     report = build_report(run, points, changes)
     return {"run": run, "points": points, "report": report}
+
+
+def add_observation(point_id, text, change_class, actor):
+    """A reviewer's own observation on any point (one-sided included). Stored as a human-entered change:
+    no cell, no verification, no confidence, no review; never sent to a paid call."""
+    text = (text or "").strip()
+    if change_class not in CHANGE_CLASSES:
+        return 400, {"error": "class must be possible_change or possible_damage"}
+    if not 3 <= len(text) <= OBSERVATION_MAX_LEN:
+        return 400, {"error": f"text must be 3-{OBSERVATION_MAX_LEN} characters"}
+    conn = _conn()
+    p = _point(conn, point_id)
+    if not p:
+        conn.close()
+        return 404, {"error": "point not found"}
+    cid = conn.execute(
+        "INSERT INTO photo_cmp_changes (point_id, kind, cell, class, description, limits, source, created_by, "
+        "review_status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (point_id, HUMAN_KIND, "", change_class, text, "", "human", actor, "HUMAN", _now())).lastrowid
+    conn.commit()
+    conn.close()
+    log_event("HUMAN_OBSERVATION_ADDED", actor, p["run_id"], point_id, cid,
+              details={"class": change_class, "text": text})
+    return 200, {"ok": True, "change_id": cid}
+
+
+def withdraw_observation(change_id, actor):
+    """Withdraw a reviewer observation: it stays stored (struck through in the UI), records who and when,
+    and no longer blocks the "no changes" wording."""
+    conn = _conn()
+    c = conn.execute("SELECT c.*, p.run_id FROM photo_cmp_changes c JOIN photo_cmp_points p ON p.id=c.point_id "
+                     "WHERE c.id=?", (change_id,)).fetchone()
+    if not c:
+        conn.close()
+        return 404, {"error": "observation not found"}
+    if c["source"] != "human":
+        conn.close()
+        return 409, {"error": "only reviewer observations can be withdrawn"}
+    if c["review_status"] == "WITHDRAWN":
+        conn.close()
+        return 409, {"error": "observation already withdrawn"}
+    now = _now()
+    conn.execute("UPDATE photo_cmp_changes SET review_status='WITHDRAWN', reviewer=?, reviewed_at=? WHERE id=?",
+                 (actor, now, change_id))
+    conn.commit()
+    conn.close()
+    log_event("HUMAN_OBSERVATION_WITHDRAWN", actor, c["run_id"], c["point_id"], change_id,
+              details={"class": c["class"], "text": c["description"]})
+    return 200, {"ok": True}
 
 
 def list_runs(sector=None):

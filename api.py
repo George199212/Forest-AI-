@@ -1807,6 +1807,18 @@ def photo_cmp_process(run_id: int, body: PhotoCmpProcessIn = PhotoCmpProcessIn()
     return _photo_cmp_response(photo_compare.start_processing(
         run_id, username, body.limit, body.point_ids, body.force))
 
+class PhotoCmpObservationIn(BaseModel):
+    text: str
+    change_class: str             # possible_change | possible_damage
+
+@app.post("/api/photo-compare/points/{point_id}/observations")
+def photo_cmp_add_observation(point_id: int, body: PhotoCmpObservationIn, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.add_observation(point_id, body.text, body.change_class, username))
+
+@app.post("/api/photo-compare/changes/{change_id}/withdraw")
+def photo_cmp_withdraw_observation(change_id: int, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.withdraw_observation(change_id, username))
+
 @app.post("/api/photo-compare/changes/{change_id}/review")
 def photo_cmp_review_change(change_id: int, body: PhotoCmpReviewIn, username: str = Depends(verify_credentials)):
     return _photo_cmp_response(photo_compare.review_change(change_id, body.action, username))

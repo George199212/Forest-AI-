@@ -177,26 +177,51 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);font-family:var(--mono);font-size:12px;gap:8px;}
 .spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+/* Photo comparison tab. On wide screens the point list uses the page padding too, so each photo of a
+   pair gets at least 600 px at a 1440 px window; photos keep their aspect ratio and are never cropped. */
+@media (min-width:701px){.pc-list{margin:0 -24px;}}
 .pc-point{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:10px;}
 .pc-point.pc-grey{opacity:0.85;border-left:3px solid var(--text3);}
 .pc-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px;font-family:var(--mono);font-size:12px;}
-.pc-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.pc-side-l{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px;}
+.pc-sides{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 -12px;}
+.pc-side{min-width:0;}
+.pc-side-l{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin:0 12px 4px;}
 .pc-photos{display:flex;flex-wrap:wrap;gap:8px;}
-.pc-photos .photo-card{width:170px;}
-.pc-none{color:var(--text3);font-family:var(--mono);font-size:12px;padding:30px 8px;border:1px dashed var(--border2);border-radius:var(--r);text-align:center;}
+.pc-ph{flex:1 1 100%;min-width:0;margin:0;cursor:pointer;}
+.pc-photos.pc-multi .pc-ph{flex:0 1 calc(50% - 4px);}
+.pc-photos > .pc-none{flex:1 1 100%;}
+.pc-imgwrap{position:relative;line-height:0;background:var(--bg4);}
+.pc-imgwrap img{width:100%;height:auto;display:block;}
+.pc-ph figcaption{font-size:11px;color:var(--text3);font-family:var(--mono);padding:4px 12px 0;}
+.pc-cell{position:absolute;width:33.333%;height:33.333%;box-sizing:border-box;border:2px dashed var(--amber);pointer-events:none;opacity:0.6;}
+.pc-cell-possible_damage{border-color:var(--red);}
+.pc-cell-rej{border-color:var(--text3);}
+.pc-cell span{display:none;position:absolute;left:4px;top:4px;line-height:1.3;font-size:10px;font-family:var(--mono);background:rgba(0,0,0,0.7);color:#fff;padding:1px 5px;border-radius:3px;white-space:nowrap;}
+.pc-cell-on{opacity:1;border-style:solid;border-width:3px;background:rgba(212,160,23,0.16);}
+.pc-cell-possible_damage.pc-cell-on{background:rgba(201,64,64,0.16);}
+.pc-cell-rej.pc-cell-on{background:rgba(85,102,68,0.2);}
+.pc-cell-on span{display:block;}
+.pc-none{color:var(--text3);font-family:var(--mono);font-size:12px;padding:30px 8px;margin:0 12px;border:1px dashed var(--border2);border-radius:var(--r);text-align:center;}
 .pc-change{margin-top:10px;padding:10px 12px;border-radius:var(--r);background:var(--bg3);border-left:3px solid var(--amber);}
+.pc-change:focus,.pc-change:focus-within{outline:1px solid var(--border2);}
 .pc-change.pc-damage{border-left-color:var(--red);}
+.pc-change.pc-human{border-left-style:double;border-left-width:5px;}
 .pc-change .pc-desc{margin:6px 0;font-size:13px;}
+.pc-change.pc-withdrawn{opacity:0.6;}
+.pc-change.pc-withdrawn .pc-desc{text-decoration:line-through;}
 .pc-meta{font-size:11px;color:var(--text3);font-family:var(--mono);}
 .pc-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-.pc-actions .btn.pc-on{background:var(--gdim);color:var(--gbright);}
+.pc-on{background:var(--gdim) !important;color:var(--gbright) !important;}
+.pc-filters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
+.pc-obs-form{display:none;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:flex-start;}
+.pc-obs-form textarea,.pc-obs-form select{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;}
+.pc-obs-form textarea{flex:1 1 320px;min-height:42px;}
 .pc-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:10px;}
 .pc-kpi{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;}
 .pc-kpi-n{font-size:18px;font-family:var(--mono);color:var(--text);}
 .pc-kpi-l{font-size:11px;color:var(--text3);}
 .pc-kpi-s{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px;}
-@media (max-width:700px){.pc-sides{grid-template-columns:1fr;}.pc-photos .photo-card{width:140px;}}
+@media (max-width:700px){.pc-sides{grid-template-columns:1fr;}}
 .empty{color:var(--text3);font-family:var(--mono);font-size:12px;padding:20px 0;text-align:center;}
 
 ::-webkit-scrollbar{width:5px;}
@@ -1541,7 +1566,8 @@ function detailTab(tab) {
 }
 
 // ── PHOTO COMPARISON (two dates) ─────────────────────────────────────────────
-// Read-only view of /api/photo-compare runs plus the three review actions per change.
+// View of /api/photo-compare runs: report, filters, points with photos and approximate cell outlines,
+// the three review actions per system change, and reviewer observations.
 // Uses fetch() directly (not api()) so review states are never served from the cache.
 const PC_KIND = {object_appeared:'Parādījies objekts', object_disappeared:'Pazudis objekts', fallen_tree:'Nogāzts koks',
   broken_tree_part:'Nolūzusi koka daļa', object_moved:'Pārvietots objekts', ground_damage:'Zemes virsmas bojājums',
@@ -1557,17 +1583,70 @@ const PC_REVIEW = {UNREVIEWED:'Nav pārskatīts', CONFIRMED:'Apstiprināts', REJ
 const PC_STATUS = {UNCONFIRMED:'Nav apstiprināts', CONFIRMED:'Gaida salīdzināšanu', CHECKED:'Pārbaudīts', DONE:'Salīdzināts',
   FAILED:'Kļūda apstrādē', NOT_SAME_PLACE:'Nav tā pati vieta', NOT_COMPARABLE:'Nav salīdzināms',
   NOT_COMPARABLE_HUMAN:'Nav salīdzināms (pārskatītājs)', NOT_SAME_PLACE_HUMAN:'Nav tā pati vieta (pārskatītājs)'};
-let pcSector = null, pcRunId = null;
+const PC_FILTERS = [['all', 'Visi punkti'], ['decide', 'Gaida manu lēmumu'], ['nochange', 'Salīdzināti bez izmaiņām'],
+  ['reshoot', 'Nepieciešama atkārtota fotografēšana'], ['oneside', 'Tikai viena puse']];
+let pcSector = null, pcRunId = null, pcData = null, pcRuns = [];
+let pcFilter = (() => { try { return localStorage.getItem('pcFilter') || 'all'; } catch (e) { return 'all'; } })();
 
 function pcEsc(v) {
   return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-// Code-side notes appended to model reasons, shown in Latvian.
-function pcReasonText(t) {
-  return String(t || '')
-    .replace(/\s*\[comparability set to partial in code: viewpoint_shift=(\w+)\]/, (m, v) =>
-      ` (daļēja salīdzināmība noteikta automātiski: kamera ${v === 'large' ? 'būtiski' : 'nedaudz'} pārvietota)`)
-    .replace(/\s*\[verdict set to unsure in code: no landmark given\]/, ' (neskaidrs: nav norādīts orientieris)');
+// Display only: stored model text may name the photos in English; show the Latvian names instead.
+function pcLv(t) {
+  return String(t ?? '').replace(/\b(BASELINE|FOLLOW-UP)(\s+(fotogrāfij|fotoattēl|attēl|foto)\p{L}*)?/giu,
+    (m, w, _a, _b, at, all) => {
+      const lv = w.toUpperCase() === 'BASELINE' ? 'bāzes foto' : 'pēcfoto';
+      return (at === 0 || /[.!?]\s*$/.test(all.slice(0, at))) ? lv[0].toUpperCase() + lv.slice(1) : lv;   // sentence start
+    });
+}
+function pcVerifText(t) {
+  return pcLv(String(t || '').replace(/\s*\[verdict set to unsure in code: no landmark given\]/, ' (neskaidrs: nav norādīts orientieris)'));
+}
+// Stored "YYYY-MM-DD HH:MM:SS UTC" → DD.MM.YYYY HH:MM, local time, 24-hour.
+function pcDate(s) {
+  if (!s) return '–';
+  const d = new Date(String(s).replace(' UTC', 'Z').replace(' ', 'T'));
+  if (isNaN(d)) return String(s);
+  const z = n => String(n).padStart(2, '0');
+  return `${z(d.getDate())}.${z(d.getMonth() + 1)}.${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}`;
+}
+function pcDay(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? `${m[3]}.${m[2]}.${m[1]}` : pcEsc(s); }
+
+// The single reason that determined comparability: the automatic rule when it lowered the model's
+// rating, the reviewer's decision, or else the model's own sentence.
+function pcCompMessage(pt) {
+  const r = pt.comparability_reason || '';
+  const rule = /\[comparability set to partial in code: viewpoint_shift=(\w+)\]/.exec(r);
+  if (rule) return `Automātiskais noteikums: kamera starp uzņēmumiem ${rule[1] === 'large' ? 'būtiski' : 'nedaudz'} pārvietota, tāpēc salīdzināmība ir daļēja.`;
+  const i = r.indexOf(': ');
+  const code = i >= 0 ? r.slice(0, i) : r, text = i >= 0 ? r.slice(i + 2) : '';
+  if (text === 'set by reviewer') return 'Atšķirīgs skatpunkts — noteica pārskatītājs.';
+  const label = PC_REASON[code] || '';
+  return (label ? label[0].toUpperCase() + label.slice(1) + ': ' : '') + pcLv(text);
+}
+
+// Filters. "No changes" follows the report rule: rejected, discarded and transient changes do not count;
+// active reviewer observations do.
+function pcUnreviewed(c) { return c.source !== 'human' && !c.discarded && c.review_status === 'UNREVIEWED'; }
+function pcBlocking(c) {
+  if (c.source === 'human') return c.review_status !== 'WITHDRAWN';
+  return !c.discarded && c.review_status !== 'REJECTED' && c.kind !== 'transient_object';
+}
+function pcMatch(pt, f) {
+  if (f === 'decide') return pt.changes.some(pcUnreviewed);
+  if (f === 'nochange') return pt.status === 'DONE' && !pt.changes.some(pcBlocking);
+  if (f === 'reshoot') return pt.reshoot_needed;
+  if (f === 'oneside') return pt.kind !== 'both';
+  return true;
+}
+function pcFilterCount(points, f) {
+  if (f === 'decide') return points.reduce((n, pt) => n + pt.changes.filter(pcUnreviewed).length, 0);
+  return points.filter(pt => pcMatch(pt, f)).length;
+}
+function pcSetFilter(f) {
+  pcFilter = f;
+  try { localStorage.setItem('pcFilter', f); } catch (e) {}
+  pcRender();
 }
 
 async function pcFetch(path, opts) {
@@ -1589,10 +1668,25 @@ async function loadPhotoCompare(sector, runId) {
     pcRunId = runId || (runs.some(r => r.id === pcRunId) ? pcRunId : runs[0].id);
     const data = await pcFetch('/api/photo-compare/runs/' + pcRunId);
     if (currentDetailTab !== 'compare' || pcSector !== sector) return;
-    el.innerHTML = pcRenderRun(data, runs);
+    pcData = data; pcRuns = runs;
+    pcRender();
   } catch (e) {
     el.innerHTML = `<div class="empty">Neizdevās ielādēt salīdzināšanu: ${pcEsc(e.message)}</div>`;
   }
+}
+
+function pcRender() {
+  if (currentDetailTab !== 'compare' || !pcData) return;
+  if (!PC_FILTERS.some(([k]) => k === pcFilter)) pcFilter = 'all';
+  document.getElementById('detail-tab-content').innerHTML = pcRenderRun(pcData, pcRuns);
+}
+
+function pcHi(changeId, on) {
+  document.querySelectorAll(`.pc-cell[data-ch="${changeId}"]`).forEach(e => e.classList.toggle('pc-cell-on', on));
+}
+function pcImgFail(img) {
+  img.onerror = null;
+  img.parentElement.outerHTML = '<div class="photo-thumb-placeholder" style="margin:0 12px">📷</div>';
 }
 
 function pcRenderRun(data, runs) {
@@ -1600,48 +1694,59 @@ function pcRenderRun(data, runs) {
   const split = o => `nepārskatītas ${o.UNREVIEWED} · apstiprinātas ${o.CONFIRMED} · noraidītas ${o.REJECTED} · atkārtot ${o.RESHOOT}`;
   const sum = o => o.UNREVIEWED + o.CONFIRMED + o.REJECTED + o.RESHOOT;
   const kpi = (n, l, sub) => `<div class="pc-kpi"><div class="pc-kpi-n">${n}</div><div class="pc-kpi-l">${l}</div>${sub ? `<div class="pc-kpi-s">${sub}</div>` : ''}</div>`;
+  const human = rep.human_observations || {possible_change: 0, possible_damage: 0};
   const runPicker = runs.length > 1 ? `<select onchange="loadPhotoCompare(pcSector, +this.value)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:4px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
-      ${runs.map(r => `<option value="${r.id}"${r.id === run.id ? ' selected' : ''}>#${r.id} · ${pcEsc(r.baseline_date)} → ${pcEsc(r.followup_date)}</option>`).join('')}</select>` : '';
+      ${runs.map(r => `<option value="${r.id}"${r.id === run.id ? ' selected' : ''}>#${r.id} · ${pcDay(r.baseline_date)} → ${pcDay(r.followup_date)}</option>`).join('')}</select>` : '';
+  const filters = PC_FILTERS.map(([k, label]) =>
+    `<button class="btn${pcFilter === k ? ' pc-on' : ''}" onclick="pcSetFilter('${k}')">${label} (${pcFilterCount(data.points, k)})</button>`).join('');
 
-  // One flat list in point order (baseline photos, then follow-up photos) for the existing viewer.
+  // Viewer list: copies of the shown photos in on-screen order. The existing viewer prints photo_type and
+  // passes uploaded_at through photoLocalTime(), which shows a pre-formatted string unchanged.
   const viewerList = [];
-  const thumb = p => {
-    const i = viewerList.push(p) - 1;
-    return `<div class="photo-card" onclick="openPhotoViewer('compare', ${i})">${photoThumbHTML(p)}
-      <div class="photo-info"><div class="sector">#${p.id}</div><div class="type">${photoLocalTime(p.uploaded_at)}</div></div></div>`;
-  };
+  const decideOnly = pcFilter === 'decide';
 
-  const points = data.points.map(pt => {
+  const points = data.points.filter(pt => pcMatch(pt, pcFilter)).map(pt => {
     const grey = ['NOT_COMPARABLE', 'NOT_COMPARABLE_HUMAN', 'NOT_SAME_PLACE', 'NOT_SAME_PLACE_HUMAN'].includes(pt.status);
+    const sysChanges = pt.changes.filter(c => c.source !== 'human');
+    const live = sysChanges.filter(c => !c.discarded), gone = sysChanges.filter(c => c.discarded);
+    const humanObs = pt.changes.filter(c => c.source === 'human');
+    const cells = live.filter(c => /^r[1-3]c[1-3]$/.test(c.cell)).map(c => {
+      const r = +c.cell[1], col = +c.cell[3];
+      const cls = c.review_status === 'REJECTED' ? 'pc-cell-rej' : 'pc-cell-' + c.class;
+      return `<div class="pc-cell ${cls}" data-ch="${c.id}" style="left:${(col - 1) * 33.333}%;top:${(r - 1) * 33.333}%"><span>aptuvenā zona · ${pcEsc(c.cell_words)}</span></div>`;
+    }).join('');
+    const photo = (p, side) => {
+      const i = viewerList.push(Object.assign({}, p, {photo_type: side === 'b' ? 'bāzes foto' : 'pēcfoto', uploaded_at: pcDate(p.uploaded_at)})) - 1;
+      const f = photoFileName(p);
+      const img = f ? `<div class="pc-imgwrap"><img loading="lazy" alt="" src="${API}/photos/file/${encodeURIComponent(f)}" onerror="pcImgFail(this)">${cells}</div>`
+                    : '<div class="photo-thumb-placeholder" style="margin:0 12px">📷</div>';
+      return `<figure class="pc-ph" onclick="openPhotoViewer('compare', ${i})">${img}
+        <figcaption>${side === 'b' ? 'bāzes foto' : 'pēcfoto'} #${p.id} · ${pcDate(p.uploaded_at)}</figcaption></figure>`;
+    };
+
     const badges = [];
     if (pt.kind === 'no_followup') badges.push(badge('Nav pēcfoto', 'b-gray'));
     if (pt.kind === 'no_baseline') badges.push(badge('Nav bāzes foto', 'b-gray'));
     if (pt.same_place) badges.push(badge('Tā pati vieta: ' + PC_SAME[pt.same_place], pt.same_place === 'yes' ? 'b-green' : pt.same_place === 'partial' ? 'b-amber' : 'b-gray'));
     if (pt.comparability) badges.push(badge('Salīdzināmība: ' + PC_COMP[pt.comparability], pt.comparability === 'suitable' ? 'b-green' : pt.comparability === 'partial' ? 'b-amber' : 'b-gray'));
-    if (pt.kind === 'both' && PC_STATUS[pt.status]) badges.push(badge(PC_STATUS[pt.status], grey ? 'b-gray' : pt.status === 'FAILED' ? 'b-red' : 'b-gray'));
+    if (pt.kind === 'both' && PC_STATUS[pt.status]) badges.push(badge(PC_STATUS[pt.status], pt.status === 'FAILED' ? 'b-red' : 'b-gray'));
     if (pt.reshoot_needed) badges.push(badge('Nepieciešama atkārtota fotografēšana', 'b-gray'));
+    const compMsg = pt.comparability ? `<div class="pc-meta" style="margin-bottom:8px">${pcEsc(pcCompMessage(pt))}</div>` : '';
 
-    let reason = '';
-    if (pt.comparability_reason) {
-      const [code, ...rest] = pt.comparability_reason.split(': ');
-      const label = PC_REASON[code] !== undefined ? PC_REASON[code] : code;
-      const text = rest.join(': ') === 'set by reviewer' ? 'noteica pārskatītājs' : pcReasonText(rest.join(': '));
-      reason = `<div class="pc-change pc-meta" style="border-left-color:var(--text3);margin-top:0;margin-bottom:8px">${label ? `<b>${pcEsc(label)}</b> · ` : ''}${pcEsc(text)}</div>`;
-    }
-
-    const live = pt.changes.filter(c => !c.discarded), gone = pt.changes.filter(c => c.discarded);
-    const changes = live.map(c => {
+    const shown = decideOnly ? live.filter(pcUnreviewed) : live;
+    const changes = shown.map(c => {
       const act = (a, label, st) => `<button class="btn${c.review_status === st ? ' pc-on' : ''}" onclick="pcReview(${c.id}, '${a}')">${label}</button>`;
-      return `<div class="pc-change${c.class === 'possible_damage' ? ' pc-damage' : ''}">
+      return `<div class="pc-change${c.class === 'possible_damage' ? ' pc-damage' : ''}" tabindex="0"
+          onmouseenter="pcHi(${c.id}, true)" onmouseleave="pcHi(${c.id}, false)" onfocusin="pcHi(${c.id}, true)" onfocusout="pcHi(${c.id}, false)">
         <div class="pc-head" style="margin-bottom:0">
           ${badge(PC_CLASS[c.class] || c.class, c.class === 'possible_damage' ? 'b-red' : 'b-amber')}
-          <b>${pcEsc(PC_KIND[c.kind] || c.kind)}</b> · ${pcEsc(c.cell_words)}
+          <b>${pcEsc(PC_KIND[c.kind] || c.kind)}</b> · ${pcEsc(c.cell_words)} (aptuvenā zona)
           · ticamība: <b>${PC_CONF[c.confidence] || '–'}</b>
         </div>
-        <div class="pc-desc">${pcEsc(c.description)}</div>
-        ${c.limits ? `<div class="pc-meta">Ierobežojumi: ${pcEsc(c.limits)}</div>` : ''}
-        <div class="pc-meta">Pārbaude: ${PC_VERIF[c.verification] || '–'}${c.verification_reason ? ' — ' + pcEsc(pcReasonText(c.verification_reason)) : ''}</div>
-        <div class="pc-meta">Statuss: <b>${PC_REVIEW[c.review_status] || c.review_status}</b>${c.reviewer ? ` · ${pcEsc(c.reviewer)} · ${photoLocalTime(c.reviewed_at)}` : ''}</div>
+        <div class="pc-desc">${pcEsc(pcLv(c.description))}</div>
+        ${c.limits ? `<div class="pc-meta">Ierobežojumi: ${pcEsc(pcLv(c.limits))}</div>` : ''}
+        <div class="pc-meta">Pārbaude: ${PC_VERIF[c.verification] || '–'}${c.verification_reason ? ' — ' + pcEsc(pcVerifText(c.verification_reason)) : ''}</div>
+        <div class="pc-meta">Statuss: <b>${PC_REVIEW[c.review_status] || c.review_status}</b>${c.reviewer ? ` · ${pcEsc(c.reviewer)} · ${pcDate(c.reviewed_at)}` : ''}</div>
         <div class="pc-actions">
           ${act('confirm', 'Apstiprināt', 'CONFIRMED')}
           ${act('reject', 'Noraidīt', 'REJECTED')}
@@ -1649,21 +1754,41 @@ function pcRenderRun(data, runs) {
         </div>
       </div>`;
     }).join('');
-    const discarded = gone.length ? `<details style="margin-top:8px"><summary class="pc-meta" style="cursor:pointer">Pārbaudē atmestas izmaiņas: ${gone.length}</summary>
-      ${gone.map(c => `<div class="pc-change pc-meta" style="border-left-color:var(--text3)">${pcEsc(PC_KIND[c.kind] || c.kind)} · ${pcEsc(c.cell_words)} — ${pcEsc(c.description)}<br>Pārbaude: nē — ${pcEsc(pcReasonText(c.verification_reason))}</div>`).join('')}</details>` : '';
-    const noChanges = pt.status === 'DONE' && !live.length ? '<div class="pc-meta" style="margin-top:8px">Izmaiņas šajā punktā nav konstatētas.</div>' : '';
-    const limits = pt.detect_limits ? `<div class="pc-meta" style="margin-top:8px">Nesalīdzināmās zonas: ${pcEsc(pt.detect_limits)}</div>` : '';
+    const observations = decideOnly ? '' : humanObs.map(c => {
+      const off = c.review_status === 'WITHDRAWN';
+      return `<div class="pc-change pc-human${c.class === 'possible_damage' ? ' pc-damage' : ''}${off ? ' pc-withdrawn' : ''}">
+        <div class="pc-head" style="margin-bottom:0">${badge(PC_CLASS[c.class] || c.class, c.class === 'possible_damage' ? 'b-red' : 'b-amber')}
+          ${badge('Pārskatītāja novērojums — nav sistēmas konstatēts', 'b-gray')}${off ? ' ' + badge('Atsaukts', 'b-gray') : ''}</div>
+        <div class="pc-desc">${pcEsc(c.description)}</div>
+        <div class="pc-meta">Pievienoja: ${pcEsc(c.created_by || '–')} · ${pcDate(c.created_at)}</div>
+        ${off ? `<div class="pc-meta">Atsauca: ${pcEsc(c.reviewer || '–')} · ${pcDate(c.reviewed_at)}</div>`
+              : `<div class="pc-actions"><button class="btn" onclick="pcObsWithdraw(${c.id})">Atsaukt novērojumu</button></div>`}
+      </div>`;
+    }).join('');
+    const discarded = (!decideOnly && gone.length) ? `<details style="margin-top:8px"><summary class="pc-meta" style="cursor:pointer">Pārbaudē atmestas izmaiņas: ${gone.length}</summary>
+      ${gone.map(c => `<div class="pc-change pc-meta" style="border-left-color:var(--text3)">${pcEsc(PC_KIND[c.kind] || c.kind)} · ${pcEsc(c.cell_words)} — ${pcEsc(pcLv(c.description))}<br>Pārbaude: nē — ${pcEsc(pcVerifText(c.verification_reason))}</div>`).join('')}</details>` : '';
+    const noChanges = (!decideOnly && pt.status === 'DONE' && !live.length) ? '<div class="pc-meta" style="margin-top:8px">Izmaiņas šajā punktā nav konstatētas.</div>' : '';
+    const limits = (!decideOnly && pt.detect_limits) ? `<div class="pc-meta" style="margin-top:8px">Nesalīdzināmās zonas: ${pcEsc(pcLv(pt.detect_limits))}</div>` : '';
+    const legend = cells ? '<div class="pc-meta" style="margin-top:6px">Iezīmētie laukumi ir aptuvenas zonas 3×3 režģī, nevis precīza kontūra. Novietojiet kursoru uz izmaiņas, lai to izceltu.</div>' : '';
+    const addObs = decideOnly ? '' : `<div style="margin-top:8px">
+        <button class="btn" onclick="pcObsToggle(${pt.id})">＋ Pievienot novērojumu</button>
+        <div class="pc-obs-form" id="pc-obs-${pt.id}">
+          <textarea id="pc-obs-t-${pt.id}" maxlength="500" placeholder="Īss novērojums: kas un kur redzams"></textarea>
+          <select id="pc-obs-c-${pt.id}"><option value="possible_change">Iespējamas izmaiņas</option><option value="possible_damage">Iespējams bojājums</option></select>
+          <button class="btn" onclick="pcObsSave(${pt.id})">Saglabāt</button>
+        </div>
+      </div>`;
 
     return `<div class="pc-point${grey ? ' pc-grey' : ''}">
       <div class="pc-head"><b>P${pt.seq}</b> ${badges.join(' ')}</div>
-      ${reason}
+      ${compMsg}
       <div class="pc-sides">
-        <div><div class="pc-side-l">Bāze ${pcEsc(run.baseline_date)}</div>
-          <div class="pc-photos">${pt.baseline.map(thumb).join('') || '<div class="pc-none">Nav bāzes foto</div>'}</div></div>
-        <div><div class="pc-side-l">Pēcfoto ${pcEsc(run.followup_date)}</div>
-          <div class="pc-photos">${pt.followup.map(thumb).join('') || '<div class="pc-none">Nav pēcfoto</div>'}</div></div>
+        <div class="pc-side"><div class="pc-side-l">Bāzes foto ${pcDay(run.baseline_date)}</div>
+          <div class="pc-photos${pt.baseline.length > 1 ? ' pc-multi' : ''}">${pt.baseline.map(p => photo(p, 'b')).join('') || '<div class="pc-none">Nav bāzes foto</div>'}</div></div>
+        <div class="pc-side"><div class="pc-side-l">Pēcfoto ${pcDay(run.followup_date)}</div>
+          <div class="pc-photos${pt.followup.length > 1 ? ' pc-multi' : ''}">${pt.followup.map(p => photo(p, 'f')).join('') || '<div class="pc-none">Nav pēcfoto</div>'}</div></div>
       </div>
-      ${limits}${changes}${noChanges}${discarded}
+      ${legend}${limits}${changes}${observations}${noChanges}${discarded}${addObs}
     </div>`;
   }).join('');
   photoLists.compare = viewerList;
@@ -1671,27 +1796,29 @@ function pcRenderRun(data, runs) {
   const statusLv = {CREATED:'izveidots', MATCHING:'notiek salīdzināšana', READY:'gatavs', RUNNING:'notiek apstrāde', INTERRUPTED:'pārtraukts'}[run.status] || run.status;
   return `<div class="card" style="margin-bottom:14px">
       <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px">
-        <div style="font-family:var(--mono);font-size:13px"><b>Foto salīdzināšana #${run.id}</b> · bāze ${pcEsc(run.baseline_date)} → pēcfoto ${pcEsc(run.followup_date)} · ${pcEsc(statusLv)}</div>
+        <div style="font-family:var(--mono);font-size:13px"><b>Foto salīdzināšana #${run.id}</b> · bāzes foto ${pcDay(run.baseline_date)} → pēcfoto ${pcDay(run.followup_date)} · ${pcEsc(statusLv)}</div>
         ${runPicker}
       </div>
       ${rep.summary_lines.length ? `<div style="margin-top:10px;font-size:13px">${rep.summary_lines.map(pcEsc).join('<br>')}</div>` : ''}
       <div class="pc-kpis">
-        ${kpi(rep.photos_baseline, 'Foto bāzes komplektā')}
-        ${kpi(rep.photos_followup, 'Foto pēcfoto komplektā')}
+        ${kpi(rep.photos_baseline, 'Bāzes foto')}
+        ${kpi(rep.photos_followup, 'Pēcfoto')}
         ${kpi(rep.points_total, 'Punkti kopā')}
         ${kpi(rep.points_compared, 'Salīdzināti punkti', rep.points_pending ? `gaida: ${rep.points_pending}` : '')}
         ${kpi(rep.points_not_comparable, 'Nesalīdzināmi punkti')}
         ${kpi(rep.photos_unmatched_baseline, 'Bāzes foto bez pēcfoto')}
         ${kpi(rep.photos_unmatched_followup, 'Pēcfoto bez bāzes foto')}
-        ${kpi(sum(rep.possible_change), 'Iespējamas izmaiņas', split(rep.possible_change))}
-        ${kpi(sum(rep.possible_damage), 'Iespējami bojājumi', split(rep.possible_damage))}
+        ${kpi(sum(rep.possible_change), 'Iespējamas izmaiņas (sistēma)', split(rep.possible_change))}
+        ${kpi(sum(rep.possible_damage), 'Iespējami bojājumi (sistēma)', split(rep.possible_damage))}
+        ${kpi(human.possible_change + human.possible_damage, 'Pārskatītāja novērojumi', `izmaiņas ${human.possible_change} · bojājumi ${human.possible_damage}${human.withdrawn ? ` · atsaukti ${human.withdrawn}` : ''}`)}
         ${kpi(rep.changes_discarded_by_verification, 'Pārbaudē atmestas izmaiņas')}
         ${kpi(rep.changes_rejected_by_reviewer ?? 0, 'Pārskatītāja noraidītas izmaiņas')}
         ${rep.transient_objects ? kpi(rep.transient_objects, 'Īslaicīgi objekti', 'neietekmē secinājumu “izmaiņas nav konstatētas”') : ''}
         ${kpi(rep.points_needing_reshoot, 'Punkti atkārtotai fotografēšanai')}
       </div>
     </div>
-    ${points}`;
+    <div class="pc-filters">${filters}</div>
+    <div class="pc-list">${points || '<div class="empty">Šim filtram nav punktu.</div>'}</div>`;
 }
 
 async function pcReview(changeId, action) {
@@ -1701,6 +1828,36 @@ async function pcReview(changeId, action) {
     });
   } catch (e) {
     alert('Neizdevās saglabāt: ' + e.message);
+  }
+  if (currentDetailTab === 'compare' && pcSector) loadPhotoCompare(pcSector, pcRunId);
+}
+
+async function pcObsWithdraw(changeId) {
+  if (!confirm('Atsaukt šo novērojumu? Tas paliks saglabāts un redzams pārsvītrots.')) return;
+  try {
+    await pcFetch(`/api/photo-compare/changes/${changeId}/withdraw`, {method: 'POST'});
+  } catch (e) {
+    alert('Neizdevās atsaukt: ' + e.message);
+  }
+  if (currentDetailTab === 'compare' && pcSector) loadPhotoCompare(pcSector, pcRunId);
+}
+
+function pcObsToggle(pointId) {
+  const f = document.getElementById('pc-obs-' + pointId);
+  f.style.display = f.style.display === 'flex' ? 'none' : 'flex';
+  if (f.style.display === 'flex') document.getElementById('pc-obs-t-' + pointId).focus();
+}
+async function pcObsSave(pointId) {
+  const text = document.getElementById('pc-obs-t-' + pointId).value.trim();
+  const change_class = document.getElementById('pc-obs-c-' + pointId).value;
+  if (text.length < 3) { alert('Novērojumam jābūt vismaz 3 rakstzīmes garam.'); return; }
+  try {
+    await pcFetch(`/api/photo-compare/points/${pointId}/observations`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text, change_class})
+    });
+  } catch (e) {
+    alert('Neizdevās saglabāt: ' + e.message);
+    return;
   }
   if (currentDetailTab === 'compare' && pcSector) loadPhotoCompare(pcSector, pcRunId);
 }
