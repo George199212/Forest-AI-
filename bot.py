@@ -542,6 +542,17 @@ def sectors_checkin_keyboard(sectors_list):
     return InlineKeyboardMarkup(buttons)
 
 
+async def ask_sector_again(message, context, reason):
+    """No sector is known for this action: ask for it again and store nothing (no default sector)."""
+    context.user_data.pop("pending_checkin_sector", None)
+    sectors_list = get_sectors()
+    if not sectors_list:
+        await message.reply_text(f"⚠️ {reason}\n\nNo sectors found.", reply_markup=main_keyboard())
+        return
+    await message.reply_text(f"⚠️ {reason}\n\n📍 GPS Check-in — select sector:",
+                             reply_markup=sectors_checkin_keyboard(sectors_list))
+
+
 # ── Export ────────────────────────────────────────────────────────────────────
 
 def write_csv(path, headers, rows):
@@ -608,13 +619,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_in(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sectors_list = get_sectors()
     if not sectors_list:
-        # No sectors — ask location directly for default sector
-        keyboard = [[KeyboardButton("📍 Send Location", request_location=True)], ["🌲 Sectors"]]
-        await update.message.reply_text(
-            "📍 GPS Check-in\n\nNo sectors found. Send location for default check-in.",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
-        )
-        context.user_data["pending_checkin_sector"] = "A-004"
+        await update.message.reply_text("📍 GPS Check-in\n\nNo sectors found. Ask the dispatcher to add one.",
+                                        reply_markup=main_keyboard())
         return
 
     await update.message.reply_text(
@@ -663,7 +669,10 @@ async def link_employee_callback(update: Update, context: ContextTypes.DEFAULT_T
     choice = query.data.split(":", 1)[1]
 
     if choice == "skip":
-        sector_name = context.user_data.get("pending_checkin_sector", "A-004")
+        sector_name = context.user_data.get("pending_checkin_sector")
+        if not sector_name:
+            await ask_sector_again(query.message, context, "Sector selection was lost.")
+            return
         keyboard = [[KeyboardButton("📍 Send Location", request_location=True)], ["🌲 Sectors"]]
         await query.message.reply_text(
             f"✅ Sector selected: {sector_name}\n\nNow send your GPS location:",
@@ -810,8 +819,14 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         employee_id, employee_name, employee_sector = employee_row
         sector_name = context.user_data.get("pending_checkin_sector") \
-            or (context.user_data.get("active_work_session") or {}).get("sector") \
-            or employee_sector
+            or (context.user_data.get("active_work_session") or {}).get("sector")
+        if not sector_name:
+            # No sector selected in a check-in: never fall back to the employee's sector. Store
+            # nothing; ask once (edits arrive every few seconds), the flag is cleared at check-in.
+            if not context.user_data.get("asked_sector_for_live"):
+                context.user_data["asked_sector_for_live"] = True
+                await ask_sector_again(msg, context, "Live location received, but no sector is selected.")
+            return
         telegram_user_id = str(update.effective_user.id)
         old_status, new_status = upsert_live_location(
             employee_id, telegram_user_id, sector_name,
@@ -881,8 +896,12 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Vehicle GPS ping (separate flow — does not touch employee check-in) ──
     pending_vehicle_id = context.user_data.get("pending_vehicle_id")
     if pending_vehicle_id is not None:
-        sector_name = context.user_data.pop("pending_vehicle_sector", "A-004")
+        sector_name = context.user_data.pop("pending_vehicle_sector", None)
         context.user_data.pop("pending_vehicle_id", None)
+        if not sector_name:
+            await update.message.reply_text("⚠️ Vehicle sector selection was lost. Start 🚛 Vehicle GPS again "
+                                            "and select the sector.", reply_markup=main_keyboard())
+            return
 
         vehicle_row = db_fetchone(
             "SELECT plate FROM sector_vehicles WHERE telegram_user_id=?",
@@ -918,7 +937,17 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠ {plate}: Вы за пределами границы сектора", reply_markup=main_keyboard())
         return
 
-    sector_name = context.user_data.get("pending_checkin_sector", "A-004")
+    sector_name = context.user_data.get("pending_checkin_sector")
+    if not sector_name:
+        active = context.user_data.get("active_work_session")
+        if active:
+            # A repeated location after the check-in (e.g. starting a live location): no new session.
+            await update.message.reply_text(
+                f"📍 Already checked in — Sector: {active['sector']} (session #{active['id']}).\n"
+                f"To change sector, use 📍 GPS Check-in.", reply_markup=work_keyboard())
+        else:
+            await ask_sector_again(update.message, context, "No sector selected for this check-in.")
+        return
 
     employee_row = db_fetchone(
         "SELECT id, full_name FROM sector_employees WHERE telegram_user_id=?",
@@ -978,6 +1007,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "distance": distance, "approved": approved,
     }
     context.user_data.pop("pending_checkin_sector", None)
+    context.user_data.pop("asked_sector_for_live", None)
 
     if not approved:
         reason = "Worker outside approved polygon boundary" if (sector_row and sector_row.get("boundary_json")) \
