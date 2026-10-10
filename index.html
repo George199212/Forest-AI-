@@ -2084,6 +2084,7 @@ async function openRisk(id, push=true) {
     : (r.status!=='OPEN' ? '<span style="color:var(--text2)">✓ Отправлено</span>' : '');
 
   document.getElementById('risk-detail-body').innerHTML = `
+    <div id="risk-conclusion"></div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
       <div>${riskBadge(r.risk_level)}</div>
       <div style="color:var(--text2)">Status: <b>${r.status||'OPEN'}</b></div>
@@ -2129,7 +2130,7 @@ async function openRisk(id, push=true) {
     ` : ''}
 
     <div class="card" style="background:var(--bg2);margin-bottom:16px">
-      <div class="card-head">🤖 AI Recommendation</div>
+      <div class="card-head" id="ai-rec-head">🤖 AI Recommendation</div>
       <div style="padding:12px">
         <div id="ai-summary" style="white-space:pre-wrap">${aiText ? '' :
           r.ai_state === 'in_progress' ? 'AI analysis in progress' :
@@ -2163,6 +2164,7 @@ async function openRisk(id, push=true) {
   `;
 
   if (aiText) startTypewriter('ai-summary', aiText);
+  loadRiskConclusion(r.id);
 
   const chatLog = document.getElementById('risk-chat-log');
   if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
@@ -2179,6 +2181,206 @@ async function openRisk(id, push=true) {
         .bindPopup(`${r.employee_name||'Worker'}<br>${r.last_location.updated_at}`).openPopup();
     });
   }
+}
+
+// ── RISK CONCLUSION ("Slēdziens") ────────────────────────────────────────────
+// Block at the top of the risk card. Evidence and the R0-R3 rule come from the server as-is; stored
+// text is shown at once (no typewriter). A risk without a conclusion shows only a one-line entry.
+const RC_STATUS = {DRAFT: ['Melnraksts', 'b-amber'], CLOSED: ['Akceptēts, risks slēgts', 'b-green'],
+  INTERIM: ['Starpposma slēdziens — darbs turpinās', 'b-amber'], SUPERSEDED: ['Aizstāts', 'b-gray']};
+const RC_REC = {CLOSE: ['Ieteikums: slēgt risku', 'b-green'], KEEP_OPEN: ['Ieteikums: atstāt risku atvērtu', 'b-amber']};
+const RC_REVIEW = {UNREVIEWED: 'nepārskatītas', CONFIRMED: 'apstiprinātas', REJECTED: 'noraidītas', RESHOOT: 'atkārtot'};
+let rcData = null, rcRiskId = null, rcExpanded = false;
+
+async function loadRiskConclusion(riskId) {
+  const el = document.getElementById('risk-conclusion');
+  if (!el) return;
+  if (rcRiskId !== riskId) rcExpanded = false;
+  rcRiskId = riskId;
+  try {
+    const data = await pcFetch(`/api/risks/${riskId}/conclusion`);
+    if (currentRiskId !== riskId) return;
+    rcData = data;
+  } catch (e) {
+    el.innerHTML = `<div class="pc-meta" style="margin-bottom:12px">Slēdzienu neizdevās ielādēt: ${pcEsc(e.message)}</div>`;
+    return;
+  }
+  rcRender();
+}
+
+function rcEvidenceHTML(ev, weather) {
+  const nd = '<i>nav datu</i>';
+  const row = (k, v) => `<tr><td style="color:var(--text3);white-space:nowrap;padding-right:14px">${k}</td><td>${v}</td></tr>`;
+  const pc = ev.photo_comparison, fa = ev.field_activity, r = ev.risk;
+  let pcRows = row('Foto salīdzināšana', nd);
+  if (pc !== 'nav datu') {
+    const st = pc.system_changes_by_review_status;
+    pcRows = row('Foto salīdzināšana', `#${pc.run_id} · ${Object.entries(pc.photos).map(([d, n]) => `${d}: ${n} foto`).join(' · ')}`)
+      + row('Punkti kopā', pc.points_total)
+      + row('Salīdzināti punkti', pc.points_compared)
+      + row('Nesalīdzināmi punkti', pc.points_not_comparable)
+      + row('Punkti ar vienu foto', pc.points_one_sided)
+      + row('Sistēmas izmaiņas', Object.entries(st).map(([k, n]) => `${RC_REVIEW[k]} ${n}`).join(' · '))
+      + row('Pārbaudē atmestas', pc.system_changes_discarded_by_verification)
+      + row('Atzīmētas atkārtotai fotografēšanai', pc.changes_marked_reshoot ?? 'nav datu')
+      + row('Pārskatītāja novērojumi', `aktīvi ${pc.reviewer_observations_active} · atsaukti ${pc.reviewer_observations_withdrawn}`)
+      + row('Atkārtoti fotografējamie punkti', pc.points_for_reshoot.length ? pc.points_for_reshoot.join(', ') : '–');
+  }
+  const sessions = fa.sessions === 'nav datu' ? nd
+    : fa.sessions.map(s => `#${s.id} ${pcEsc(s.employee)}: ${s.check_in} – ${s.finish}`).join('<br>');
+  const photos = fa.photos_by_day === 'nav datu' ? nd
+    : Object.entries(fa.photos_by_day).map(([d, n]) => `${d}: ${n}`).join(' · ');
+  const w = weather && weather.text ? `${pcEsc(weather.text)} <span style="color:var(--text3)">(avots: ${pcEsc(weather.source || 'nav datu')})</span>` : nd;
+  return `<details style="margin-top:10px"><summary class="pc-meta" style="cursor:pointer">Pierādījumi</summary>
+    <table style="font-size:12px;margin-top:6px;border-collapse:collapse">
+      ${row('Risks', `#${r.id} · ${pcEsc(r.level)} · reģistrēts ${r.created} · statuss ${pcEsc(r.status)}`)}
+      ${row('Riska teksts', pcEsc(r.text))}
+      ${row('Notikumi', r.events.length ? r.events.map(e => `${e.time} ${pcEsc(e.type)}${e.actor ? ' (' + pcEsc(e.actor) + ')' : ''}`).join('<br>') : nd)}
+      ${pcRows}
+      ${row(`Darbs sektorā kopš ${fa.since}`, `sesijas: ${fa.session_count === 'nav datu' ? nd : fa.session_count}<br>${sessions}`)}
+      ${row('Foto pa dienām', photos)}
+      ${row('Novērotie laikapstākļi', w)}
+    </table></details>`;
+}
+
+function rcRender() {
+  const el = document.getElementById('risk-conclusion');
+  if (!el || !rcData) return;
+  const d = rcData, cur = d.current;
+  const head = document.getElementById('ai-rec-head');
+  if (head && (cur || d.history.length) && d.ai_recommendation_generated_at)
+    head.textContent = `🤖 AI Recommendation · ģenerēts ${d.ai_recommendation_generated_at} · pirms slēdziena`;
+
+  if (!cur && !d.history.length && !d.sector_has_run) { el.innerHTML = ''; return; }   // only sectors with a photo comparison
+  if (!cur && !rcExpanded) {
+    el.innerHTML = `<div class="card" style="background:var(--bg2);margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+      <div><b>📋 Slēdziens</b> <span class="pc-meta">nav sagatavots</span></div>
+      <button class="btn" onclick="rcExpanded=true;rcRender()">Sagatavot slēdzienu</button></div>`;
+    return;
+  }
+
+  const decided = cur && cur.status !== 'DRAFT';
+  const rule = decided || (cur && cur.status === 'DRAFT') ? {rule: cur.rule, recommendation: cur.recommendation, outcome: cur.outcome, line: cur.rule_line, blocked: false} : d.rule;
+  const ev = cur ? cur.evidence : d.evidence;
+  const weather = cur ? {text: cur.weather_text, source: cur.weather_source} : null;
+  const riskClosed = ['RESOLVED', 'DISMISSED'].includes(d.evidence.risk.status);
+  const status = cur ? RC_STATUS[cur.status] : null;
+
+  const ruleHTML = rule.blocked
+    ? `<div style="margin-top:10px;padding:10px 12px;border-left:3px solid var(--amber);background:var(--bg3);border-radius:var(--r)">
+         <b>Vispirms jāizskata ${d.rule.unreviewed} izmaiņas</b> foto salīdzināšanā. Kamēr tās nav izskatītas, slēdzienu sagatavot nevar.
+         <div style="margin-top:8px"><button class="btn" onclick="rcGoReview('${pcEsc(d.evidence.risk.sector)}')">Atvērt nepārskatītās izmaiņas</button></div>
+         <div class="pc-meta" style="margin-top:6px">${pcEsc(d.rule.line)}</div></div>`
+    : `<div style="margin-top:10px"><b style="font-size:14px">${pcEsc(rule.outcome)}</b>
+         ${badge(RC_REC[rule.recommendation][0], RC_REC[rule.recommendation][1])}
+         <div class="pc-meta" style="margin-top:4px">${pcEsc(rule.line)}</div></div>`;
+
+  // Findings behind R1 / R3a: every confirmed change and every active reviewer observation, listed.
+  const epc = ev.photo_comparison;
+  const findings = (epc !== 'nav datu' && ((epc.confirmed_changes || []).length || (epc.active_observations || []).length))
+    ? `<div style="margin-top:8px;font-size:12px"><div class="pc-meta">Apstiprinātās izmaiņas un aktīvie pārskatītāja novērojumi:</div><ul style="margin:4px 0 0 18px;padding:0">
+        ${(epc.confirmed_changes || []).map(c => `<li>${pcEsc(c.point)} · ${pcEsc(c.kind)} · ${pcEsc(c.cell)} · <i>${pcEsc(c.class)}</i> — ${pcEsc(c.description)}</li>`).join('')}
+        ${(epc.active_observations || []).map(o => `<li>${pcEsc(o.point)} · pārskatītāja novērojums · <i>${pcEsc(o.class)}</i> — ${pcEsc(o.text)}</li>`).join('')}
+      </ul></div>` : '';
+
+  // Draft controls: no conclusion yet, or an interim one being followed up; never while R0 applies.
+  const canDraft = !riskClosed && !d.rule.blocked && (!cur || cur.status === 'INTERIM' || cur.status === 'DRAFT');
+  const lastW = [cur, ...d.history].find(x => x && x.weather_text) || {};   // weather carries over to a new draft
+  const draftControls = !canDraft ? '' : `
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
+      <input id="rc-weather" maxlength="500" value="${pcEsc(lastW.weather_text || '')}" placeholder="Novērotie laikapstākļi (nav obligāti)" style="flex:2 1 260px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+      <input id="rc-weather-src" maxlength="200" value="${pcEsc(lastW.weather_source || '')}" placeholder="Avots" style="flex:1 1 140px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+      <button class="btn" onclick="rcDraft(true)">${cur && cur.status === 'DRAFT' ? 'Ģenerēt tekstu no jauna' : 'Ģenerēt slēdziena tekstu'} (1 AI izsaukums)</button>
+      <button class="btn" onclick="rcDraft(false)">Rakstīt pašam bez AI</button>
+    </div>
+    ${d.rule.line !== rule.line ? `<div class="pc-meta" style="margin-top:4px">Pašreizējais noteikums: ${pcEsc(d.rule.line)}</div>` : ''}`;
+
+  const ta = 'width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:var(--r);font-size:13px';
+  let body = '';
+  if (cur && cur.status === 'DRAFT') {
+    const against = cur.recommendation === 'KEEP_OPEN';
+    const reshoot = (cur.evidence.photo_comparison !== 'nav datu' && cur.evidence.photo_comparison.points_for_reshoot.length)
+      ? cur.evidence.photo_comparison.points_for_reshoot.join(', ') : '–';
+    body = `
+      <div class="pc-meta" style="margin-top:12px">Slēdziena teksts (var labot pirms saglabāšanas)</div>
+      <textarea id="rc-text" rows="7" style="${ta}">${pcEsc(cur.ai_draft || '')}</textarea>
+      <details><summary class="pc-meta" style="cursor:pointer">Sistēmas sākotnējais melnraksts</summary>
+        <div style="white-space:pre-wrap;font-size:12px;margin-top:4px">${cur.ai_draft ? pcEsc(cur.ai_draft) : '<i>nav — teksts rakstīts bez AI</i>'}</div>
+        <div class="pc-meta">${pcEsc(cur.created_by || '')} · ${cur.created_at_local}${cur.model ? ' · ' + pcEsc(cur.model) : ''}</div></details>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+        <div class="pc-change" style="margin-top:0;border-left-color:${against ? 'var(--red)' : 'var(--green)'}">
+          ${against ? `<div class="pc-meta" style="margin-bottom:6px">Sistēma iesaka atstāt risku atvērtu. Slēdzot jānorāda iemesls; slēdziens tiks saglabāts kā „slēgts pretēji sistēmas ieteikumam”.</div>
+            <textarea id="rc-override" rows="2" placeholder="Iemesls, kāpēc slēgt pretēji ieteikumam" style="${ta}"></textarea>` : ''}
+          <button class="btn" style="margin-top:6px" onclick="rcClose(${cur.id}, ${against})">Akceptēt un slēgt risku</button>
+        </div>
+        <div class="pc-change" style="margin-top:0">
+          <textarea id="rc-next" rows="2" placeholder="Kas jādara tālāk (obligāti)" style="${ta}"></textarea>
+          <div class="pc-meta" style="margin-top:4px">Atkārtoti fotografējamie punkti: ${pcEsc(reshoot)}</div>
+          <button class="btn" style="margin-top:6px" onclick="rcContinue(${cur.id})">Turpināt darbu</button>
+        </div>
+      </div>`;
+  } else if (decided) {
+    body = `
+      <div style="white-space:pre-wrap;margin-top:12px;font-size:13px">${pcEsc(cur.final_text)}</div>
+      <div class="pc-meta" style="margin-top:6px">${cur.decision === 'CLOSE' ? 'Akceptēja un slēdza' : 'Saglabāja kā starpposma slēdzienu'}: ${pcEsc(cur.decided_by)} · ${cur.decided_at_local}</div>
+      ${cur.against_recommendation ? `<div style="margin-top:6px">${badge('slēgts pretēji sistēmas ieteikumam', 'b-red')} <span class="pc-meta">Iemesls: ${pcEsc(cur.override_reason)}</span></div>` : ''}
+      ${cur.status === 'INTERIM' ? `<div style="margin-top:6px"><b>Tālākie darbi:</b> ${pcEsc(cur.next_steps)}</div>
+        <div class="pc-meta">Atkārtoti fotografējamie punkti: ${cur.reshoot_points.length ? pcEsc(cur.reshoot_points.join(', ')) : '–'}</div>` : ''}
+      <details style="margin-top:6px"><summary class="pc-meta" style="cursor:pointer">Sistēmas sākotnējais melnraksts</summary>
+        <div style="white-space:pre-wrap;font-size:12px;margin-top:4px">${cur.ai_draft ? pcEsc(cur.ai_draft) : '<i>nav — teksts rakstīts bez AI</i>'}</div></details>`;
+  }
+
+  const history = d.history.length ? `<details style="margin-top:10px"><summary class="pc-meta" style="cursor:pointer">Iepriekšējie slēdzieni (${d.history.length})</summary>
+    ${d.history.map(h => `<div class="pc-change" style="border-left-color:var(--text3)">
+      <div class="pc-meta">#${h.id} · ${RC_STATUS[h.status][0]} · ${h.created_at_local} · ${pcEsc(h.rule || '')} ${pcEsc(h.outcome || '')}${h.decided_at_local ? ' · lēmums ' + h.decided_at_local : ''}</div>
+      <div style="white-space:pre-wrap;font-size:12px;margin-top:4px">${pcEsc(h.final_text || h.ai_draft || '')}</div></div>`).join('')}</details>` : '';
+
+  el.innerHTML = `<div class="card" style="background:var(--bg2);margin-bottom:16px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><b>📋 Slēdziens</b>${status ? badge(status[0], status[1]) : ''}</div>
+      ${ruleHTML}
+      ${rule.blocked ? '' : findings}
+      ${rcEvidenceHTML(ev, weather)}
+      ${body}
+      ${draftControls}
+      <div id="rc-msg" class="pc-meta" style="margin-top:6px"></div>
+      ${history}
+    </div>`;
+}
+
+function rcMsg(t) { const m = document.getElementById('rc-msg'); if (m) m.textContent = t; }
+async function rcPost(path, body) {
+  return pcFetch(`/api/risks/${rcRiskId}/conclusion${path}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+}
+async function rcDraft(useAi) {
+  const weather_text = (document.getElementById('rc-weather') || {}).value || '';
+  const weather_source = (document.getElementById('rc-weather-src') || {}).value || '';
+  rcMsg(useAi ? 'Ģenerē tekstu…' : 'Sagatavo melnrakstu…');
+  try { await rcPost('/draft', {weather_text, weather_source, use_ai: useAi}); }
+  catch (e) { rcMsg('Neizdevās: ' + e.message); return; }
+  loadRiskConclusion(rcRiskId);
+}
+async function rcClose(cid, against) {
+  const text = document.getElementById('rc-text').value.trim();
+  const override_reason = against ? document.getElementById('rc-override').value.trim() : '';
+  if (against && override_reason.length < 5) { rcMsg('Jānorāda iemesls, kāpēc risks tiek slēgts pretēji sistēmas ieteikumam.'); return; }
+  if (!confirm('Akceptēt slēdzienu un slēgt risku?')) return;
+  try { await rcPost(`/${cid}/close`, {text, override_reason}); }
+  catch (e) { rcMsg('Neizdevās: ' + e.message); return; }
+  openRisk(rcRiskId, false);
+}
+async function rcContinue(cid) {
+  const text = document.getElementById('rc-text').value.trim();
+  const next_steps = document.getElementById('rc-next').value.trim();
+  if (next_steps.length < 5) { rcMsg('Jānorāda, kas jādara tālāk.'); return; }
+  try { await rcPost(`/${cid}/continue`, {text, next_steps}); }
+  catch (e) { rcMsg('Neizdevās: ' + e.message); return; }
+  openRisk(rcRiskId, false);
+}
+async function rcGoReview(sector) {
+  try { localStorage.setItem('pcFilter', 'decide'); } catch (e) {}
+  pcFilter = 'decide';
+  await openSector(sector);
+  detailTab('compare');
 }
 
 async function openFinancialBreakdown(push=true) {

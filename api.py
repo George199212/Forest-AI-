@@ -21,6 +21,7 @@ from database import (
 from services.ai_resolution import _get_client as _get_anthropic_client, generate_incident_recommendation
 from services import risk_ai_worker
 from services import photo_compare
+from services import risk_conclusion
 from services.satellite_intelligence import collect_satellite_inspector_fields
 from services.satellite_intelligence.providers import ALL_PROVIDERS
 from services.satellite_intelligence.models import TIER_LABELS
@@ -1500,6 +1501,46 @@ def retry_risk_ai(risk_id: int):
     here; the worker's daily cap still applies."""
     code, payload = risk_ai_worker.request_retry(risk_id)
     return Response(content=json.dumps(payload, ensure_ascii=False), media_type="application/json", status_code=code)
+
+
+# ── Risk conclusion ("Slēdziens", services/risk_conclusion.py) ──────────────────
+class RiskConclusionDraftIn(BaseModel):
+    weather_text: str = ""
+    weather_source: str = ""
+    use_ai: bool = True
+
+class RiskConclusionCloseIn(BaseModel):
+    text: str
+    override_reason: str = ""
+
+class RiskConclusionContinueIn(BaseModel):
+    text: str
+    next_steps: str
+
+@app.get("/api/risks/{risk_id}/conclusion")
+def risk_conclusion_get(risk_id: int):
+    data = risk_conclusion.get_conclusion(risk_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Risk not found")
+    return data
+
+@app.post("/api/risks/{risk_id}/conclusion/draft")
+def risk_conclusion_draft(risk_id: int, body: RiskConclusionDraftIn = RiskConclusionDraftIn(),
+                          username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(risk_conclusion.create_draft(
+        risk_id, username, body.weather_text, body.weather_source, body.use_ai))
+
+@app.post("/api/risks/{risk_id}/conclusion/{conclusion_id}/close")
+def risk_conclusion_close(risk_id: int, conclusion_id: int, body: RiskConclusionCloseIn,
+                          username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(risk_conclusion.accept_and_close(
+        risk_id, conclusion_id, body.text, username, body.override_reason))
+
+@app.post("/api/risks/{risk_id}/conclusion/{conclusion_id}/continue")
+def risk_conclusion_continue(risk_id: int, conclusion_id: int, body: RiskConclusionContinueIn,
+                             username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(risk_conclusion.continue_work(
+        risk_id, conclusion_id, body.text, body.next_steps, username))
 
 
 @app.get("/api/risks/{risk_id}/photo")

@@ -576,6 +576,7 @@ def _migrate():
     """)
 
     _create_photo_compare_tables(cur)
+    _create_risk_conclusion_table(cur)
 
     # Seed exactly one default organization so every existing (pre-multi-tenant)
     # row and every new integration has somewhere to point organization_id=1 —
@@ -680,6 +681,40 @@ def _create_photo_compare_tables(cur):
         output_tokens INTEGER,
         details TEXT,
         created_at TEXT
+    )
+    """)
+
+
+def _create_risk_conclusion_table(cur):
+    """Final conclusions of risks (services/risk_conclusion.py). New table only; nothing is overwritten:
+    a newer conclusion marks the previous one SUPERSEDED."""
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS risk_conclusions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        risk_id INTEGER NOT NULL,
+        run_id INTEGER,
+        status TEXT NOT NULL,
+        rule TEXT,
+        recommendation TEXT,
+        outcome TEXT,
+        rule_line TEXT,
+        evidence_json TEXT,
+        weather_text TEXT,
+        weather_source TEXT,
+        ai_draft TEXT,
+        model TEXT,
+        created_by TEXT,
+        created_at TEXT,
+        final_text TEXT,
+        decision TEXT,
+        against_recommendation INTEGER NOT NULL DEFAULT 0,
+        override_reason TEXT,
+        next_steps TEXT,
+        reshoot_points_json TEXT,
+        decided_by TEXT,
+        decided_at TEXT,
+        superseded_by INTEGER,
+        superseded_at TEXT
     )
     """)
 
