@@ -48,7 +48,8 @@ SAME_PLACE     = ("yes", "partial", "no")
 COMPARABILITY  = ("suitable", "partial", "unsuitable")
 REASON_CODES   = ("none", "different_viewpoint", "blur", "too_dark", "low_overlap", "obstruction")
 CHANGE_KINDS   = ("object_appeared", "object_disappeared", "fallen_tree", "broken_tree_part",
-                  "object_moved", "ground_damage", "path_or_structure_change", "other")
+                  "object_moved", "ground_damage", "path_or_structure_change", "transient_object", "other")
+TRANSIENT_KIND = "transient_object"   # person, animal or vehicle: always possible_change, never decides "no changes"
 CHANGE_CLASSES = ("possible_change", "possible_damage")
 CELLS          = tuple(f"r{r}c{c}" for r in (1, 2, 3) for c in (1, 2, 3))
 VERDICTS       = ("yes", "no", "unsure")
@@ -69,6 +70,7 @@ NO_CHANGES_LINES = [
     "Salīdzināmajās redzamajās zonās izmaiņas nav konstatētas.",
     "Tas nenozīmē, ka pārbaudīta visa teritorija vai ka bojājumu noteikti nav.",
 ]
+REJECTED_LINE = "Sistēmas konstatētās izmaiņas, kuras pārskatītājs noraidīja: {n}."
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 COMMON_RULES = (
@@ -125,6 +127,8 @@ DETECT_PROMPT = (
     "- kind: one of " + ", ".join(f'"{k}"' for k in CHANGE_KINDS) + "\n"
     "- cell: position in the FOLLOW-UP photo on a 3x3 grid, \"r1c1\" (top left) to \"r3c3\" (bottom right)\n"
     "- class: \"possible_change\" or \"possible_damage\"\n"
+    "A person, animal or vehicle visible in only one photo is kind \"transient_object\" with class "
+    "\"possible_change\", never \"possible_damage\".\n"
     "- description: one or two sentences, what and where\n"
     "- limits: what could not be compared for this change\n"
     "Also give overall limits: which parts of the scene could not be compared (outside the shared view, "
@@ -699,6 +703,8 @@ def _validate_detect(a):
         k, cell, cl = str(c.get("kind", "")), str(c.get("cell", "")).lower(), str(c.get("class", ""))
         if k not in CHANGE_KINDS or cell not in CELLS or cl not in CHANGE_CLASSES:
             raise ValueError(f"bad change enums: {k!r} {cell!r} {cl!r}")
+        if k == TRANSIENT_KIND:
+            cl = "possible_change"            # enforced in code, whatever the model answered
         d, lim = str(c.get("description", "")).strip(), str(c.get("limits", "")).strip()
         if not d:
             raise ValueError("empty description")
@@ -960,8 +966,17 @@ def build_report(run, points, changes):
         "points_needing_reshoot": len(reshoot_pts),
         "summary_lines": [],
     }
-    if compared and not live:
+    # "No changes" wording: only changes that are not discarded, not rejected by the reviewer and not
+    # transient objects count. Unreviewed, confirmed and re-shoot changes still block it.
+    rejected = [c for c in live if c["review_status"] == "REJECTED"]
+    transient = [c for c in live if c["kind"] == TRANSIENT_KIND]
+    blocking = [c for c in live if c["review_status"] != "REJECTED" and c["kind"] != TRANSIENT_KIND]
+    report["changes_rejected_by_reviewer"] = len(rejected)
+    report["transient_objects"] = len(transient)
+    if compared and not blocking:
         report["summary_lines"] = list(NO_CHANGES_LINES)
+        if rejected:
+            report["summary_lines"].append(REJECTED_LINE.format(n=len(rejected)))
     return report
 
 

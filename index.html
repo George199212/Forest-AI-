@@ -1545,7 +1545,7 @@ function detailTab(tab) {
 // Uses fetch() directly (not api()) so review states are never served from the cache.
 const PC_KIND = {object_appeared:'Parādījies objekts', object_disappeared:'Pazudis objekts', fallen_tree:'Nogāzts koks',
   broken_tree_part:'Nolūzusi koka daļa', object_moved:'Pārvietots objekts', ground_damage:'Zemes virsmas bojājums',
-  path_or_structure_change:'Takas vai būves izmaiņas', other:'Cits'};
+  path_or_structure_change:'Takas vai būves izmaiņas', transient_object:'Īslaicīgs objekts (cilvēks, dzīvnieks, transportlīdzeklis)', other:'Cits'};
 const PC_CLASS = {possible_change:'Iespējamas izmaiņas', possible_damage:'Iespējams bojājums'};
 const PC_CONF = {high:'augsta', medium:'vidēja', low:'zema'};
 const PC_VERIF = {yes:'jā', no:'nē', unsure:'neskaidrs'};
@@ -1686,6 +1686,8 @@ function pcRenderRun(data, runs) {
         ${kpi(sum(rep.possible_change), 'Iespējamas izmaiņas', split(rep.possible_change))}
         ${kpi(sum(rep.possible_damage), 'Iespējami bojājumi', split(rep.possible_damage))}
         ${kpi(rep.changes_discarded_by_verification, 'Pārbaudē atmestas izmaiņas')}
+        ${kpi(rep.changes_rejected_by_reviewer ?? 0, 'Pārskatītāja noraidītas izmaiņas')}
+        ${rep.transient_objects ? kpi(rep.transient_objects, 'Īslaicīgi objekti', 'neietekmē secinājumu “izmaiņas nav konstatētas”') : ''}
         ${kpi(rep.points_needing_reshoot, 'Punkti atkārtotai fotografēšanai')}
       </div>
     </div>
