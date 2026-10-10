@@ -575,6 +575,8 @@ def _migrate():
     )
     """)
 
+    _create_photo_compare_tables(cur)
+
     # Seed exactly one default organization so every existing (pre-multi-tenant)
     # row and every new integration has somewhere to point organization_id=1 —
     # see services/integrations/registry.py docstring for the tenant-isolation
@@ -588,6 +590,95 @@ def _migrate():
 
     conn.commit()
     conn.close()
+
+
+def _create_photo_compare_tables(cur):
+    """Photo comparison between two dates (services/photo_compare.py). New tables only."""
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS photo_cmp_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sector TEXT NOT NULL,
+        baseline_date TEXT NOT NULL,
+        followup_date TEXT NOT NULL,
+        baseline_photo_ids TEXT NOT NULL,
+        followup_photo_ids TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'CREATED',
+        created_by TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS photo_cmp_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        seq INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        match_confidence TEXT,
+        confirmed INTEGER NOT NULL DEFAULT 0,
+        confirmed_by TEXT,
+        confirmed_at TEXT,
+        status TEXT NOT NULL DEFAULT 'UNCONFIRMED',
+        same_place TEXT,
+        comparability TEXT,
+        comparability_reason TEXT,
+        detect_limits TEXT,
+        check_attempts INTEGER NOT NULL DEFAULT 0,
+        detect_attempts INTEGER NOT NULL DEFAULT 0,
+        checked_at TEXT,
+        detected_at TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS photo_cmp_point_photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        point_id INTEGER NOT NULL,
+        photo_id INTEGER NOT NULL,
+        side TEXT NOT NULL,
+        match_confidence TEXT,
+        match_reason TEXT,
+        UNIQUE(run_id, photo_id)
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS photo_cmp_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        point_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        cell TEXT NOT NULL,
+        class TEXT NOT NULL,
+        description TEXT,
+        limits TEXT,
+        verification TEXT,
+        verification_reason TEXT,
+        verify_attempts INTEGER NOT NULL DEFAULT 0,
+        confidence TEXT,
+        discarded INTEGER NOT NULL DEFAULT 0,
+        review_status TEXT NOT NULL DEFAULT 'UNREVIEWED',
+        reviewer TEXT,
+        reviewed_at TEXT,
+        created_at TEXT
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS photo_cmp_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER,
+        point_id INTEGER,
+        change_id INTEGER,
+        event_type TEXT NOT NULL,
+        actor TEXT,
+        purpose TEXT,
+        model TEXT,
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        details TEXT,
+        created_at TEXT
+    )
+    """)
 
 
 # ── Geo helpers ───────────────────────────────────────────────────────────────

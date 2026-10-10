@@ -20,6 +20,7 @@ from database import (
 )
 from services.ai_resolution import _get_client as _get_anthropic_client, generate_incident_recommendation
 from services import risk_ai_worker
+from services import photo_compare
 from services.satellite_intelligence import collect_satellite_inspector_fields
 from services.satellite_intelligence.providers import ALL_PROVIDERS
 from services.satellite_intelligence.models import TIER_LABELS
@@ -1723,6 +1724,92 @@ def get_photos(sector: str = None, photo_type: str = None):
         if r.get("image_path"):
             r["filename"] = Path(r["image_path"]).name
     return rows
+
+
+# ── Photo comparison between two dates (services/photo_compare.py) ───────────
+# Every step runs only from these authenticated requests; nothing starts on its own.
+
+class PhotoCmpRunIn(BaseModel):
+    sector: str
+    baseline_date: str
+    followup_date: str
+    baseline_photo_ids: Optional[List[int]] = None
+    followup_photo_ids: Optional[List[int]] = None
+
+class PhotoCmpForceIn(BaseModel):
+    force: bool = False
+
+class PhotoCmpReassignIn(BaseModel):
+    photo_id: int
+    target_point_id: str          # a point id, or "new"
+    force: bool = False
+
+class PhotoCmpProcessIn(BaseModel):
+    limit: Optional[int] = None
+    point_ids: Optional[List[int]] = None
+    force: bool = False
+
+class PhotoCmpReviewIn(BaseModel):
+    action: str                   # confirm | reject | reshoot
+
+
+def _photo_cmp_response(result):
+    code, payload = result
+    return Response(content=json.dumps(payload, ensure_ascii=False), media_type="application/json", status_code=code)
+
+
+@app.get("/api/photo-compare/runs")
+def photo_cmp_list_runs(sector: str = None):
+    return photo_compare.list_runs(sector)
+
+@app.post("/api/photo-compare/runs")
+def photo_cmp_create_run(body: PhotoCmpRunIn, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.create_run(
+        body.sector, body.baseline_date, body.followup_date, username,
+        body.baseline_photo_ids, body.followup_photo_ids))
+
+@app.get("/api/photo-compare/runs/{run_id}")
+def photo_cmp_get_run(run_id: int):
+    data = photo_compare.get_run(run_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return data
+
+@app.get("/api/photo-compare/runs/{run_id}/events")
+def photo_cmp_get_events(run_id: int):
+    return photo_compare.get_events(run_id)
+
+@app.post("/api/photo-compare/runs/{run_id}/match")
+def photo_cmp_match(run_id: int, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.start_matching(run_id, username))
+
+@app.post("/api/photo-compare/runs/{run_id}/confirm-all")
+def photo_cmp_confirm_all(run_id: int, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.confirm_all(run_id, username))
+
+@app.post("/api/photo-compare/points/{point_id}/confirm")
+def photo_cmp_confirm_point(point_id: int, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.confirm_point(point_id, username))
+
+@app.post("/api/photo-compare/points/{point_id}/not-same-place")
+def photo_cmp_not_same_place(point_id: int, body: PhotoCmpForceIn = PhotoCmpForceIn(),
+                             username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.mark_not_same_place(point_id, username, body.force))
+
+@app.post("/api/photo-compare/runs/{run_id}/reassign")
+def photo_cmp_reassign(run_id: int, body: PhotoCmpReassignIn, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.reassign_photo(
+        run_id, body.photo_id, body.target_point_id, username, body.force))
+
+@app.post("/api/photo-compare/runs/{run_id}/process")
+def photo_cmp_process(run_id: int, body: PhotoCmpProcessIn = PhotoCmpProcessIn(),
+                      username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.start_processing(
+        run_id, username, body.limit, body.point_ids, body.force))
+
+@app.post("/api/photo-compare/changes/{change_id}/review")
+def photo_cmp_review_change(change_id: int, body: PhotoCmpReviewIn, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.review_change(change_id, body.action, username))
 
 
 # ── Map data ──────────────────────────────────────────────────────────────────

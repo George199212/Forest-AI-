@@ -177,6 +177,26 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);font-family:var(--mono);font-size:12px;gap:8px;}
 .spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+.pc-point{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:10px;}
+.pc-point.pc-grey{opacity:0.85;border-left:3px solid var(--text3);}
+.pc-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px;font-family:var(--mono);font-size:12px;}
+.pc-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.pc-side-l{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px;}
+.pc-photos{display:flex;flex-wrap:wrap;gap:8px;}
+.pc-photos .photo-card{width:170px;}
+.pc-none{color:var(--text3);font-family:var(--mono);font-size:12px;padding:30px 8px;border:1px dashed var(--border2);border-radius:var(--r);text-align:center;}
+.pc-change{margin-top:10px;padding:10px 12px;border-radius:var(--r);background:var(--bg3);border-left:3px solid var(--amber);}
+.pc-change.pc-damage{border-left-color:var(--red);}
+.pc-change .pc-desc{margin:6px 0;font-size:13px;}
+.pc-meta{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.pc-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.pc-actions .btn.pc-on{background:var(--gdim);color:var(--gbright);}
+.pc-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:10px;}
+.pc-kpi{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;}
+.pc-kpi-n{font-size:18px;font-family:var(--mono);color:var(--text);}
+.pc-kpi-l{font-size:11px;color:var(--text3);}
+.pc-kpi-s{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px;}
+@media (max-width:700px){.pc-sides{grid-template-columns:1fr;}.pc-photos .photo-card{width:140px;}}
 .empty{color:var(--text3);font-family:var(--mono);font-size:12px;padding:20px 0;text-align:center;}
 
 ::-webkit-scrollbar{width:5px;}
@@ -381,6 +401,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
         <div class="tabs" id="detail-tabs">
           <div class="tab active" onclick="detailTab('gps')">GPS</div>
           <div class="tab" onclick="detailTab('photos')">Photos</div>
+          <div class="tab" onclick="detailTab('compare')">🔍 Salīdzināšana</div>
           <div class="tab" onclick="detailTab('risks')">Risks</div>
           <div class="tab" onclick="detailTab('comments')">Comments</div>
           <div class="tab" onclick="detailTab('trucks')">Trucks</div>
@@ -1208,7 +1229,7 @@ async function openSector(name, push=true) {
 function detailTab(tab) {
   currentDetailTab = tab;
   document.querySelectorAll('#detail-tabs .tab').forEach(t=>t.classList.remove('active'));
-  const tabs = ['gps','photos','risks','comments','trucks','timber','employees','vehicles','forest','map','satellite','history'];
+  const tabs = ['gps','photos','compare','risks','comments','trucks','timber','employees','vehicles','forest','map','satellite','history'];
   const idx = tabs.indexOf(tab);
   if (idx>=0) document.querySelectorAll('#detail-tabs .tab')[idx].classList.add('active');
   if (!currentDetailData) return;
@@ -1476,6 +1497,9 @@ function detailTab(tab) {
       </div>`;
     loadDetailSatelliteIntel(s.name);
 
+  } else if (tab==='compare') {
+    loadPhotoCompare(s.name);
+
   } else if (tab==='history') {
     const snaps = d.snapshots || [];
     if (selectedSnapshotId && !snaps.some(sn => sn.id === selectedSnapshotId)) selectedSnapshotId = null;
@@ -1514,6 +1538,169 @@ function detailTab(tab) {
           </div>
         </div>`).join('')||'<div class="empty">no snapshots yet</div>'}</div>`;
   }
+}
+
+// ── PHOTO COMPARISON (two dates) ─────────────────────────────────────────────
+// Read-only view of /api/photo-compare runs plus the three review actions per change.
+// Uses fetch() directly (not api()) so review states are never served from the cache.
+const PC_KIND = {object_appeared:'Parādījies objekts', object_disappeared:'Pazudis objekts', fallen_tree:'Nogāzts koks',
+  broken_tree_part:'Nolūzusi koka daļa', object_moved:'Pārvietots objekts', ground_damage:'Zemes virsmas bojājums',
+  path_or_structure_change:'Takas vai būves izmaiņas', other:'Cits'};
+const PC_CLASS = {possible_change:'Iespējamas izmaiņas', possible_damage:'Iespējams bojājums'};
+const PC_CONF = {high:'augsta', medium:'vidēja', low:'zema'};
+const PC_VERIF = {yes:'jā', no:'nē', unsure:'neskaidrs'};
+const PC_SAME = {yes:'jā', partial:'daļēji', no:'nē'};
+const PC_COMP = {suitable:'piemērota', partial:'daļēja', unsuitable:'nepiemērota'};
+const PC_REASON = {none:'', different_viewpoint:'atšķirīgs skatpunkts', blur:'izplūdis attēls', too_dark:'par tumšu',
+  low_overlap:'maza pārklāšanās', obstruction:'skatu aizsedz objekts'};
+const PC_REVIEW = {UNREVIEWED:'Nav pārskatīts', CONFIRMED:'Apstiprināts', REJECTED:'Noraidīts', RESHOOT:'Nepieciešama atkārtota fotografēšana'};
+const PC_STATUS = {UNCONFIRMED:'Nav apstiprināts', CONFIRMED:'Gaida salīdzināšanu', CHECKED:'Pārbaudīts', DONE:'Salīdzināts',
+  FAILED:'Kļūda apstrādē', NOT_SAME_PLACE:'Nav tā pati vieta', NOT_COMPARABLE:'Nav salīdzināms',
+  NOT_COMPARABLE_HUMAN:'Nav salīdzināms (pārskatītājs)', NOT_SAME_PLACE_HUMAN:'Nav tā pati vieta (pārskatītājs)'};
+let pcSector = null, pcRunId = null;
+
+function pcEsc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Code-side notes appended to model reasons, shown in Latvian.
+function pcReasonText(t) {
+  return String(t || '')
+    .replace(/\s*\[comparability set to partial in code: viewpoint_shift=(\w+)\]/, (m, v) =>
+      ` (daļēja salīdzināmība noteikta automātiski: kamera ${v === 'large' ? 'būtiski' : 'nedaudz'} pārvietota)`)
+    .replace(/\s*\[verdict set to unsure in code: no landmark given\]/, ' (neskaidrs: nav norādīts orientieris)');
+}
+
+async function pcFetch(path, opts) {
+  const r = await fetch(API + path, opts);
+  let data = null;
+  try { data = await r.json(); } catch (e) { data = null; }
+  if (!r.ok) throw new Error((data && (data.error || data.detail)) || ('HTTP ' + r.status));
+  return data;
+}
+
+async function loadPhotoCompare(sector, runId) {
+  const el = document.getElementById('detail-tab-content');
+  pcSector = sector;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const runs = await pcFetch('/api/photo-compare/runs?sector=' + encodeURIComponent(sector));
+    if (currentDetailTab !== 'compare' || pcSector !== sector) return;
+    if (!runs.length) { el.innerHTML = '<div class="empty">Šim sektoram vēl nav foto salīdzināšanas.</div>'; return; }
+    pcRunId = runId || (runs.some(r => r.id === pcRunId) ? pcRunId : runs[0].id);
+    const data = await pcFetch('/api/photo-compare/runs/' + pcRunId);
+    if (currentDetailTab !== 'compare' || pcSector !== sector) return;
+    el.innerHTML = pcRenderRun(data, runs);
+  } catch (e) {
+    el.innerHTML = `<div class="empty">Neizdevās ielādēt salīdzināšanu: ${pcEsc(e.message)}</div>`;
+  }
+}
+
+function pcRenderRun(data, runs) {
+  const run = data.run, rep = data.report;
+  const split = o => `nepārskatītas ${o.UNREVIEWED} · apstiprinātas ${o.CONFIRMED} · noraidītas ${o.REJECTED} · atkārtot ${o.RESHOOT}`;
+  const sum = o => o.UNREVIEWED + o.CONFIRMED + o.REJECTED + o.RESHOOT;
+  const kpi = (n, l, sub) => `<div class="pc-kpi"><div class="pc-kpi-n">${n}</div><div class="pc-kpi-l">${l}</div>${sub ? `<div class="pc-kpi-s">${sub}</div>` : ''}</div>`;
+  const runPicker = runs.length > 1 ? `<select onchange="loadPhotoCompare(pcSector, +this.value)" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:4px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+      ${runs.map(r => `<option value="${r.id}"${r.id === run.id ? ' selected' : ''}>#${r.id} · ${pcEsc(r.baseline_date)} → ${pcEsc(r.followup_date)}</option>`).join('')}</select>` : '';
+
+  // One flat list in point order (baseline photos, then follow-up photos) for the existing viewer.
+  const viewerList = [];
+  const thumb = p => {
+    const i = viewerList.push(p) - 1;
+    return `<div class="photo-card" onclick="openPhotoViewer('compare', ${i})">${photoThumbHTML(p)}
+      <div class="photo-info"><div class="sector">#${p.id}</div><div class="type">${photoLocalTime(p.uploaded_at)}</div></div></div>`;
+  };
+
+  const points = data.points.map(pt => {
+    const grey = ['NOT_COMPARABLE', 'NOT_COMPARABLE_HUMAN', 'NOT_SAME_PLACE', 'NOT_SAME_PLACE_HUMAN'].includes(pt.status);
+    const badges = [];
+    if (pt.kind === 'no_followup') badges.push(badge('Nav pēcfoto', 'b-gray'));
+    if (pt.kind === 'no_baseline') badges.push(badge('Nav bāzes foto', 'b-gray'));
+    if (pt.same_place) badges.push(badge('Tā pati vieta: ' + PC_SAME[pt.same_place], pt.same_place === 'yes' ? 'b-green' : pt.same_place === 'partial' ? 'b-amber' : 'b-gray'));
+    if (pt.comparability) badges.push(badge('Salīdzināmība: ' + PC_COMP[pt.comparability], pt.comparability === 'suitable' ? 'b-green' : pt.comparability === 'partial' ? 'b-amber' : 'b-gray'));
+    if (pt.kind === 'both' && PC_STATUS[pt.status]) badges.push(badge(PC_STATUS[pt.status], grey ? 'b-gray' : pt.status === 'FAILED' ? 'b-red' : 'b-gray'));
+    if (pt.reshoot_needed) badges.push(badge('Nepieciešama atkārtota fotografēšana', 'b-gray'));
+
+    let reason = '';
+    if (pt.comparability_reason) {
+      const [code, ...rest] = pt.comparability_reason.split(': ');
+      const label = PC_REASON[code] !== undefined ? PC_REASON[code] : code;
+      const text = rest.join(': ') === 'set by reviewer' ? 'noteica pārskatītājs' : pcReasonText(rest.join(': '));
+      reason = `<div class="pc-change pc-meta" style="border-left-color:var(--text3);margin-top:0;margin-bottom:8px">${label ? `<b>${pcEsc(label)}</b> · ` : ''}${pcEsc(text)}</div>`;
+    }
+
+    const live = pt.changes.filter(c => !c.discarded), gone = pt.changes.filter(c => c.discarded);
+    const changes = live.map(c => {
+      const act = (a, label, st) => `<button class="btn${c.review_status === st ? ' pc-on' : ''}" onclick="pcReview(${c.id}, '${a}')">${label}</button>`;
+      return `<div class="pc-change${c.class === 'possible_damage' ? ' pc-damage' : ''}">
+        <div class="pc-head" style="margin-bottom:0">
+          ${badge(PC_CLASS[c.class] || c.class, c.class === 'possible_damage' ? 'b-red' : 'b-amber')}
+          <b>${pcEsc(PC_KIND[c.kind] || c.kind)}</b> · ${pcEsc(c.cell_words)}
+          · ticamība: <b>${PC_CONF[c.confidence] || '–'}</b>
+        </div>
+        <div class="pc-desc">${pcEsc(c.description)}</div>
+        ${c.limits ? `<div class="pc-meta">Ierobežojumi: ${pcEsc(c.limits)}</div>` : ''}
+        <div class="pc-meta">Pārbaude: ${PC_VERIF[c.verification] || '–'}${c.verification_reason ? ' — ' + pcEsc(pcReasonText(c.verification_reason)) : ''}</div>
+        <div class="pc-meta">Statuss: <b>${PC_REVIEW[c.review_status] || c.review_status}</b>${c.reviewer ? ` · ${pcEsc(c.reviewer)} · ${photoLocalTime(c.reviewed_at)}` : ''}</div>
+        <div class="pc-actions">
+          ${act('confirm', 'Apstiprināt', 'CONFIRMED')}
+          ${act('reject', 'Noraidīt', 'REJECTED')}
+          ${act('reshoot', 'Nepieciešama atkārtota fotografēšana', 'RESHOOT')}
+        </div>
+      </div>`;
+    }).join('');
+    const discarded = gone.length ? `<details style="margin-top:8px"><summary class="pc-meta" style="cursor:pointer">Pārbaudē atmestas izmaiņas: ${gone.length}</summary>
+      ${gone.map(c => `<div class="pc-change pc-meta" style="border-left-color:var(--text3)">${pcEsc(PC_KIND[c.kind] || c.kind)} · ${pcEsc(c.cell_words)} — ${pcEsc(c.description)}<br>Pārbaude: nē — ${pcEsc(pcReasonText(c.verification_reason))}</div>`).join('')}</details>` : '';
+    const noChanges = pt.status === 'DONE' && !live.length ? '<div class="pc-meta" style="margin-top:8px">Izmaiņas šajā punktā nav konstatētas.</div>' : '';
+    const limits = pt.detect_limits ? `<div class="pc-meta" style="margin-top:8px">Nesalīdzināmās zonas: ${pcEsc(pt.detect_limits)}</div>` : '';
+
+    return `<div class="pc-point${grey ? ' pc-grey' : ''}">
+      <div class="pc-head"><b>P${pt.seq}</b> ${badges.join(' ')}</div>
+      ${reason}
+      <div class="pc-sides">
+        <div><div class="pc-side-l">Bāze ${pcEsc(run.baseline_date)}</div>
+          <div class="pc-photos">${pt.baseline.map(thumb).join('') || '<div class="pc-none">Nav bāzes foto</div>'}</div></div>
+        <div><div class="pc-side-l">Pēcfoto ${pcEsc(run.followup_date)}</div>
+          <div class="pc-photos">${pt.followup.map(thumb).join('') || '<div class="pc-none">Nav pēcfoto</div>'}</div></div>
+      </div>
+      ${limits}${changes}${noChanges}${discarded}
+    </div>`;
+  }).join('');
+  photoLists.compare = viewerList;
+
+  const statusLv = {CREATED:'izveidots', MATCHING:'notiek salīdzināšana', READY:'gatavs', RUNNING:'notiek apstrāde', INTERRUPTED:'pārtraukts'}[run.status] || run.status;
+  return `<div class="card" style="margin-bottom:14px">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px">
+        <div style="font-family:var(--mono);font-size:13px"><b>Foto salīdzināšana #${run.id}</b> · bāze ${pcEsc(run.baseline_date)} → pēcfoto ${pcEsc(run.followup_date)} · ${pcEsc(statusLv)}</div>
+        ${runPicker}
+      </div>
+      ${rep.summary_lines.length ? `<div style="margin-top:10px;font-size:13px">${rep.summary_lines.map(pcEsc).join('<br>')}</div>` : ''}
+      <div class="pc-kpis">
+        ${kpi(rep.photos_baseline, 'Foto bāzes komplektā')}
+        ${kpi(rep.photos_followup, 'Foto pēcfoto komplektā')}
+        ${kpi(rep.points_total, 'Punkti kopā')}
+        ${kpi(rep.points_compared, 'Salīdzināti punkti', rep.points_pending ? `gaida: ${rep.points_pending}` : '')}
+        ${kpi(rep.points_not_comparable, 'Nesalīdzināmi punkti')}
+        ${kpi(rep.photos_unmatched_baseline, 'Bāzes foto bez pēcfoto')}
+        ${kpi(rep.photos_unmatched_followup, 'Pēcfoto bez bāzes foto')}
+        ${kpi(sum(rep.possible_change), 'Iespējamas izmaiņas', split(rep.possible_change))}
+        ${kpi(sum(rep.possible_damage), 'Iespējami bojājumi', split(rep.possible_damage))}
+        ${kpi(rep.changes_discarded_by_verification, 'Pārbaudē atmestas izmaiņas')}
+        ${kpi(rep.points_needing_reshoot, 'Punkti atkārtotai fotografēšanai')}
+      </div>
+    </div>
+    ${points}`;
+}
+
+async function pcReview(changeId, action) {
+  try {
+    await pcFetch(`/api/photo-compare/changes/${changeId}/review`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action})
+    });
+  } catch (e) {
+    alert('Neizdevās saglabāt: ' + e.message);
+  }
+  if (currentDetailTab === 'compare' && pcSector) loadPhotoCompare(pcSector, pcRunId);
 }
 
 function downloadPDF() {
