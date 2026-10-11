@@ -308,6 +308,27 @@ def _migrate():
     )
     """)
 
+    # Worker route: one appended row per live-location update during an
+    # active session (services/session_track.py). Never updated or backfilled.
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS session_track_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        employee_id INTEGER,
+        telegram_user_id TEXT,
+        live_message_id INTEGER,
+        sector TEXT,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        horizontal_accuracy REAL,
+        inside_boundary INTEGER,
+        recorded_at TEXT NOT NULL,
+        received_at TEXT
+    )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_session_track_points_session "
+                "ON session_track_points (session_id, recorded_at)")
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS timber_movements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

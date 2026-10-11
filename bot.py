@@ -5,7 +5,8 @@ import os
 import zipfile
 import sqlite3
 import re
-from datetime import datetime, timedelta
+import asyncio
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters, ApplicationHandlerStop
@@ -13,6 +14,7 @@ from database import init_db, add_sector, get_sectors, add_risk, get_risks, pars
 from services.robez_ocr_vision import analyze_robez_plan_ocr_vision
 from services.ai_resolution import generate_incident_recommendation
 from services import demo_scenarios
+from services import session_track
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
@@ -759,7 +761,7 @@ def _is_inside_sector(sector, latitude, longitude):
     sector_lon = (sector_row.get("center_lon") if sector_row else None) or 24.1034
     return calculate_distance_meters(latitude, longitude, sector_lat, sector_lon) <= 10000
 
-def upsert_live_location(employee_id, telegram_user_id, sector, latitude, longitude, live_period):
+def upsert_live_location(employee_id, telegram_user_id, sector, latitude, longitude, live_period, new_share=False):
     """One row per person — UPSERT by telegram_user_id so live-location edits
     (sent every few seconds by Telegram) update the same row instead of
     piling up history. Returns (old_status, new_status) — 'IN'/'OUT' —
@@ -774,12 +776,14 @@ def upsert_live_location(employee_id, telegram_user_id, sector, latitude, longit
     if existing:
         row_id, started_at, existing_period, old_status = existing
         period = live_period if live_period is not None else existing_period
+        if new_share:
+            started_at = now  # first update of a new live share restarts the window
         expires_at = _calc_expiry(started_at, period)
         db_execute("""
         UPDATE live_locations SET employee_id=?, sector=?, latitude=?, longitude=?,
-            live_period=?, updated_at=?, expires_at=?, last_status=?
+            live_period=?, started_at=?, updated_at=?, expires_at=?, last_status=?
         WHERE id=?
-        """, (employee_id, sector, latitude, longitude, period, now, expires_at, new_status, row_id))
+        """, (employee_id, sector, latitude, longitude, period, started_at, now, expires_at, new_status, row_id))
     else:
         old_status = None
         period = live_period or 0
@@ -790,6 +794,91 @@ def upsert_live_location(employee_id, telegram_user_id, sector, latitude, longit
         VALUES (?,?,?,?,?,?,?,?,?,?)
         """, (employee_id, telegram_user_id, sector, latitude, longitude, period, now, now, expires_at, new_status))
     return old_status, new_status
+
+# ── Session route (services/session_track.py) ────────────────────────────────
+# One live share = one Telegram message (later positions arrive as edits of it).
+# State per user: context.user_data["live_track"] = {message_id, session_id,
+# sector, ended, ll_refreshed}. Every stored point is a real received position.
+
+LIVE_PERIOD_FOREVER = 0x7FFFFFFF  # Telegram: "until stopped"
+
+def _live_period_s(loc):
+    p = loc.live_period
+    if p is None:
+        return None
+    return int(p.total_seconds()) if isinstance(p, timedelta) else int(p)
+
+def _msg_time_utc(msg):
+    """Telegram's own time of this position (edit time for live updates)."""
+    t = msg.edit_date or msg.date
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=timezone.utc)
+    return t.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+def _live_share_ended(msg, loc):
+    """An edit that no longer carries a live period (Bot API: "for active live
+    locations only"), or whose period ends at or before the edit, is the stop."""
+    period = _live_period_s(loc)
+    if period is None:
+        return True
+    if period == LIVE_PERIOD_FOREVER or not msg.edit_date:
+        return False
+    return msg.date + timedelta(seconds=period) <= msg.edit_date
+
+async def _end_live_track(bot, user_data, chat_id, message_id):
+    track = user_data.get("live_track")
+    if not track or track["message_id"] != message_id or track.get("ended"):
+        return
+    track["ended"] = True
+    n = session_track.point_count(track["session_id"], message_id)
+    try:
+        await bot.send_message(chat_id=chat_id,
+                               text=f"Maršruta ieraksts beidzies, sektors {track['sector']}. Ierakstīti punkti: {n}")
+    except Exception:
+        pass
+
+async def _live_track_expiry(bot, user_data, chat_id, message_id, delay):
+    await asyncio.sleep(max(0, delay))
+    await _end_live_track(bot, user_data, chat_id, message_id)
+
+async def _start_live_track(context, msg, loc, session):
+    context.user_data["live_track"] = {
+        "message_id": msg.message_id, "session_id": session["id"], "sector": session["sector"],
+        "ended": False, "ll_refreshed": False,
+    }
+    try:
+        await context.bot.send_message(chat_id=msg.chat_id,
+                                       text=f"Maršruta ieraksts sākts, sektors {session['sector']}")
+    except Exception:
+        pass
+    period = _live_period_s(loc)
+    if period and period != LIVE_PERIOD_FOREVER:
+        ends = msg.date + timedelta(seconds=period)
+        delay = (ends - datetime.now(timezone.utc)).total_seconds()
+        context.application.create_task(
+            _live_track_expiry(context.bot, context.user_data, msg.chat_id, msg.message_id, delay))
+
+async def _track_live_update(context, msg, loc, session, telegram_user_id):
+    """Store this position as a track point of the active session (append-only)."""
+    track = context.user_data.get("live_track")
+    if not track or track["message_id"] != msg.message_id:
+        if not _live_period_s(loc):
+            return  # a plain (non-live) location never starts a route
+        await _start_live_track(context, msg, loc, session)
+        track = context.user_data["live_track"]
+    if track.get("ended"):
+        return
+    row = db_fetchone("SELECT employee_id, finish_time FROM work_sessions WHERE id=?", (session["id"],))
+    if not row or row[1]:
+        return  # session already finished
+    session_track.record_point(
+        session["id"], row[0], telegram_user_id, msg.message_id, session["sector"],
+        loc.latitude, loc.longitude, loc.horizontal_accuracy,
+        _is_inside_sector(session["sector"], loc.latitude, loc.longitude),
+        _msg_time_utc(msg), datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+    )
+    if msg.edit_date and _live_share_ended(msg, loc):
+        await _end_live_track(context.bot, context.user_data, msg.chat_id, msg.message_id)
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_edit = update.edited_message is not None
@@ -828,10 +917,24 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await ask_sector_again(msg, context, "Live location received, but no sector is selected.")
             return
         telegram_user_id = str(update.effective_user.id)
+        active = context.user_data.get("active_work_session")
+        track = context.user_data.get("live_track")
+        first_of_share = bool(active) and (not track or track["message_id"] != msg.message_id
+                                           or not track.get("ll_refreshed"))
+        if first_of_share:
+            sector_name = active["sector"]  # a new live share takes the active session's sector
         old_status, new_status = upsert_live_location(
             employee_id, telegram_user_id, sector_name,
-            loc.latitude, loc.longitude, loc.live_period
+            loc.latitude, loc.longitude, loc.live_period, new_share=first_of_share
         )
+        if active:
+            try:
+                await _track_live_update(context, msg, loc, active, telegram_user_id)
+                track = context.user_data.get("live_track")
+                if track and track["message_id"] == msg.message_id:
+                    track["ll_refreshed"] = True
+            except Exception as e:
+                print(f"TRACK ERROR: {e}")
 
         if old_status == "IN" and new_status == "OUT":
             incident_reason = f"Worker {employee_name} left sector boundary"
@@ -940,8 +1043,14 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sector_name = context.user_data.get("pending_checkin_sector")
     if not sector_name:
         active = context.user_data.get("active_work_session")
-        if active:
-            # A repeated location after the check-in (e.g. starting a live location): no new session.
+        if active and _live_period_s(loc):
+            # Live location started after the check-in: record the route, no new session.
+            try:
+                await _track_live_update(context, update.message, loc, active, str(update.effective_user.id))
+            except Exception as e:
+                print(f"TRACK ERROR: {e}")
+        elif active:
+            # A repeated location after the check-in: no new session.
             await update.message.reply_text(
                 f"📍 Already checked in — Sector: {active['sector']} (session #{active['id']}).\n"
                 f"To change sector, use 📍 GPS Check-in.", reply_markup=work_keyboard())
@@ -998,7 +1107,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if loc.live_period:
         upsert_live_location(
             employee_id, str(update.effective_user.id), sector_name,
-            loc.latitude, loc.longitude, loc.live_period
+            loc.latitude, loc.longitude, loc.live_period, new_share=True
         )
 
     context.user_data["active_work_session"] = {
@@ -1024,6 +1133,15 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{'Now upload field data.' if approved else '⚠️ Risk created automatically.'}",
         reply_markup=work_keyboard() if approved else main_keyboard()
     )
+
+    if loc.live_period:
+        # Check-in made with a live location: its position is the route's first point.
+        try:
+            await _track_live_update(context, update.message, loc, context.user_data["active_work_session"],
+                                     str(update.effective_user.id))
+            context.user_data["live_track"]["ll_refreshed"] = True
+        except Exception as e:
+            print(f"TRACK ERROR: {e}")
 
 
 # ── Photo, comment, finish ────────────────────────────────────────────────────
@@ -1109,6 +1227,9 @@ async def finish_work(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Approved: {'YES' if session['approved'] else 'NO'}\nPhotos: {photos_total}",
         reply_markup=main_keyboard()
     )
+    track = context.user_data.get("live_track")
+    if track and track["session_id"] == session["id"]:
+        await _end_live_track(context.bot, context.user_data, update.effective_chat.id, track["message_id"])
     context.user_data.clear()
 
 

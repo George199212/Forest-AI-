@@ -22,6 +22,7 @@ from services.ai_resolution import _get_client as _get_anthropic_client, generat
 from services import risk_ai_worker
 from services import photo_compare
 from services import risk_conclusion
+from services import session_track
 from services.satellite_intelligence import collect_satellite_inspector_fields
 from services.satellite_intelligence.providers import ALL_PROVIDERS
 from services.satellite_intelligence.models import TIER_LABELS
@@ -932,6 +933,21 @@ def get_vehicle_route(name: str, vehicle_id: int):
         "SELECT latitude, longitude, inside_boundary, recorded_at FROM vehicle_gps_pings WHERE vehicle_id=? ORDER BY recorded_at ASC",
         (vehicle_id,),
     )
+
+
+# ── Worker route per work session (services/session_track.py) ────────────────
+
+@app.get("/api/sectors/{name}/session-tracks")
+def get_sector_session_tracks(name: str):
+    return session_track.list_sessions(name)
+
+
+@app.get("/api/sessions/{session_id}/track")
+def get_session_track(session_id: int):
+    track = session_track.build_track(session_id)
+    if track is None:
+        return Response(content='{"error":"Not found"}', media_type="application/json", status_code=404)
+    return track
 
 
 class SectorPolygonIn(BaseModel):

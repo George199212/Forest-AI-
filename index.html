@@ -257,6 +257,14 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 .auto-refresh-badge{font-size:10px;font-family:var(--mono);color:var(--text3);display:flex;align-items:center;gap:4px;}
 .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-anim 2s infinite;}
 @keyframes pulse-anim{0%,100%{opacity:1}50%{opacity:0.3}}
+/* Worker route on the sector Map tab */
+.trk-bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+.trk-bar select{flex:1;min-width:0;max-width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);padding:6px 8px;font-family:var(--mono);font-size:12px;}
+.trk-none{margin-top:10px;padding:8px 12px;border:1px solid var(--border2);border-radius:var(--r);color:var(--text2);font-size:13px;}
+.trk-sum{margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;}
+.trk-sum div{background:var(--bg3);border-radius:var(--r);padding:6px 10px;font-size:12px;color:var(--text2);}
+.trk-sum b{display:block;color:var(--text);font-family:var(--mono);font-size:13px;}
+.leaflet-tooltip.trk-gap-label{background:rgba(40,40,40,0.75);color:#ddd;border:none;box-shadow:none;font-size:10px;padding:1px 5px;}
 </style>
 </head>
 <body>
@@ -1499,7 +1507,10 @@ function detailTab(tab) {
 
   } else if (tab==='map') {
     const boundary = s.boundary_json ? JSON.parse(s.boundary_json) : null;
-    el.innerHTML = `<div id="detail-map-wrap" style="height:420px;border-radius:var(--r);overflow:hidden;background:var(--bg3)"></div>
+    el.innerHTML = `<div class="trk-bar"><span style="font-size:12px;color:var(--text2)">Sesija</span>
+        <select id="trk-select" onchange="trkShow(+this.value)"><option>Ielādē…</option></select></div>
+      <div id="detail-map-wrap" style="height:420px;border-radius:var(--r);overflow:hidden;background:var(--bg3)"></div>
+      <div id="trk-info"></div>
       <div style="margin-top:10px;font-size:11px;font-family:var(--mono);color:var(--text3)">
         ${boundary ? `Boundary: ${boundary.length} points · Center: ${s.center_lat?.toFixed(5)}°N ${s.center_lon?.toFixed(5)}°E · Area: ${s.area_ha||'–'} ha` : 'No boundary defined yet'}
       </div>`;
@@ -3378,30 +3389,97 @@ function renderDetailMap(sector, boundary) {
       poly.bindPopup(`<b>${sector.name}</b><br>${sector.contractor||''}<br>Area: ${sector.area_ha||'?'} ha`).openPopup();
     }
 
-    // GPS points
-    window.gpsMarkersById = {};
-    if (currentDetailData && currentDetailData.gps_sessions) {
-      currentDetailData.gps_sessions.forEach(g => {
-        if (!g.latitude || !g.longitude) return;
-        const col = g.approved==='YES' ? '#7ab83c' : '#c94040';
-        const marker = L.circleMarker([g.latitude, g.longitude], {radius:6, color:col, fillColor:col, fillOpacity:0.9})
-          .addTo(detailMap)
-          .bindPopup(`${g.employee}<br>${fmt(g.check_in_time)}<br>${g.approved==='YES'?'✓ Approved':'✗ Rejected'}`);
-        window.gpsMarkersById[g.id] = marker;
-      });
-    }
+    // One work session at a time: its check-in point and recorded route.
+    trkLayer = null;
+    trkLoad(sector.name);
   });
 }
 
 function focusGpsOnMap(sessionId) {
+  trkWanted = sessionId;  // the Map tab opens on this session instead of the default
   detailTab('map');
-  setTimeout(() => {
-    const marker = window.gpsMarkersById && window.gpsMarkersById[sessionId];
-    if (!marker || !detailMap) return;
-    const latlng = marker.getLatLng();
-    detailMap.setView([latlng.lat, latlng.lng], 17);
-    marker.openPopup();
-  }, 150);
+}
+
+// ── Worker route (one session; only recorded positions, nothing interpolated) ──
+let trkLayer = null, trkWanted = null, trkToken = 0, trkSessions = [];
+const TRK_IN = '#f2c81e', TRK_OUT = '#e0302a', TRK_GAP = '#8a8a8a';
+function trkDur(s) {
+  if (s == null) return 'nav datu';
+  s = Math.round(s);
+  if (s < 60) return `${s} s`;
+  if (s < 3600) return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
+  const m = Math.round(s / 60);
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+}
+function trkDist(m) { return m == null ? 'nav datu' : (m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'); }
+function trkEsc(t) { return String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function trkOption(x) {
+  const end = x.finish_local || (x.open ? 'nav pabeigta' : '–');
+  const flag = x.late_finish ? ' · nav pabeigta laikā' : '';
+  const pts = x.points ? `${x.points} punkti` : 'maršruts nav ierakstīts';
+  return `${x.check_in_local || '–'} → ${end} · ${trkEsc(x.employee)} · ${trkDur(x.session_duration_s)} · ${pts}${flag}`;
+}
+async function trkLoad(sectorName) {
+  const sel = document.getElementById('trk-select');
+  if (!sel) return;
+  let d;
+  try { d = await (await fetch(`${API}/api/sectors/${encodeURIComponent(sectorName)}/session-tracks`)).json(); }
+  catch (e) { sel.innerHTML = '<option>Kļūda ielādējot sesijas</option>'; return; }
+  trkSessions = d.sessions || [];
+  if (!trkSessions.length) { sel.innerHTML = '<option>Nav sesiju</option>'; sel.disabled = true; return; }
+  sel.innerHTML = trkSessions.map(x => `<option value="${x.id}">#${x.id} · ${trkOption(x)}</option>`).join('');
+  const want = trkSessions.some(x => x.id === trkWanted) ? trkWanted : d.default_session_id;
+  trkWanted = null;
+  sel.value = want;
+  trkShow(want);
+}
+async function trkShow(id) {
+  const token = ++trkToken;
+  let t;
+  try { t = await (await fetch(`${API}/api/sessions/${id}/track`)).json(); } catch (e) { return; }
+  if (token !== trkToken || !detailMap) return;
+  if (trkLayer) detailMap.removeLayer(trkLayer);
+  trkLayer = L.layerGroup().addTo(detailMap);
+  detailMap.closePopup();  // the sector popup would cover the start label
+  const s = t.session, bounds = [];
+  if (s.latitude != null && s.longitude != null) {
+    const col = s.approved === 'YES' ? '#7ab83c' : '#c94040';
+    L.circleMarker([s.latitude, s.longitude], {radius:6, color:col, fillColor:col, fillOpacity:0.9}).addTo(trkLayer)
+      .bindPopup(`Reģistrācija · ${trkEsc(s.employee)}<br>${s.check_in_local || '–'}<br>${s.approved === 'YES' ? '✓ Approved' : '✗ Rejected'}`);
+    bounds.push([s.latitude, s.longitude]);
+  }
+  t.runs.forEach(r => {
+    const col = r.inside ? TRK_IN : TRK_OUT;
+    if (r.coords.length > 1) L.polyline(r.coords, {color:col, weight:4, opacity:0.95}).addTo(trkLayer);
+    else L.circleMarker(r.coords[0], {radius:3, color:col, fillColor:col, fillOpacity:1}).addTo(trkLayer);
+    bounds.push(...r.coords);
+  });
+  t.gaps.forEach(g => {
+    L.polyline([g.from, g.to], {color:TRK_GAP, weight:1.5, dashArray:'4 6'}).addTo(trkLayer)
+      .bindTooltip(`pārtraukums ${trkDur(g.seconds)}`, {permanent:true, direction:'center', className:'trk-gap-label'});
+  });
+  const pin = (m, label) => L.circleMarker([m.lat, m.lon], {radius:7, color:'#fff', weight:2, fillColor:'#222', fillOpacity:1})
+    .addTo(trkLayer).bindTooltip(`${label} ${m.local}`, {permanent:true, direction:'top', offset:[0, -6]});
+  if (t.start) pin(t.start, 'Sākums');
+  if (t.end) pin(t.end, 'Beigas');
+  photoLists.track = t.photos;
+  t.photos.forEach((p, i) => {
+    L.circleMarker([p.latitude, p.longitude], {radius:6, color:'#3b8bd4', fillColor:'#3b8bd4', fillOpacity:0.9}).addTo(trkLayer)
+      .bindTooltip(`📷 ${trkEsc(p.photo_type)} · ${p.uploaded_local} · aptuvenā vieta (±${Math.round(p.match_seconds)} s)`)
+      .on('click', () => openPhotoViewer('track', i));
+  });
+  if (bounds.length > 1) detailMap.fitBounds(bounds, {padding:[40, 40], maxZoom:18});
+  else if (bounds.length === 1) detailMap.setView(bounds[0], 16);
+  const sm = t.summary, info = document.getElementById('trk-info');
+  if (!info) return;
+  const cell = (label, val) => `<div>${label}<b>${val}</b></div>`;
+  const gaps = sm.gaps_count == null ? 'nav datu' : `${sm.gaps_count} · ${trkDur(sm.gaps_seconds)}`;
+  info.innerHTML = (t.recorded ? '' : '<div class="trk-none">Maršruts nav ierakstīts — redzams tikai reģistrācijas punkts.</div>')
+    + `<div class="trk-sum">${cell('Ilgums', trkDur(sm.duration_s))}${cell('Attālums', trkDist(sm.distance_m))}
+       ${cell('Sektorā', trkDur(sm.inside_s))}${cell('Ārpus sektora', trkDur(sm.outside_s))}
+       ${cell(`Pārtraukumi (&gt; ${t.gap_seconds} s)`, gaps)}${cell('Punkti', sm.points ? sm.points : 'nav datu')}</div>`
+    + (t.photos.length || t.photos_unplaced ? `<div style="margin-top:6px;font-size:11px;color:var(--text3)">Foto uz maršruta: ${t.photos.length}`
+       + ` · bez maršruta punkta ${t.photo_match_seconds} s robežās: ${t.photos_unplaced}</div>` : '');
 }
 
 async function showVehicleRoute(vehicleId, plate) {
