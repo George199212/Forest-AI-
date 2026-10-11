@@ -10,6 +10,7 @@ backfilled. A session without recorded points has no route.
 """
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -265,3 +266,109 @@ def build_track(session_id):
         "photos_unplaced": unplaced,
         "photo_match_seconds": PHOTO_MATCH_SECONDS,
     }
+
+
+# ── Route in a sector-exit incident card (read-only) ─────────────────────────
+
+EXIT_MATCH_SECONDS = 120   # the track's IN->OUT point must be this close to the exit event
+_COORD_RE = re.compile(r"(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})")
+
+
+def _coords_in_text(*texts):
+    """Exit coordinates written into the incident itself (reason / DETECTED details), if any."""
+    for t in texts:
+        m = _COORD_RE.search(t or "")
+        if m:
+            return [float(m.group(1)), float(m.group(2))]
+    return None
+
+
+def exit_route(risk_id):
+    """Route around the latest exit of a SECTOR_EXIT incident. The geofence logs a repeat exit
+    of an already open incident as STILL_OUTSIDE, so the latest DETECTED/STILL_OUTSIDE event is
+    the exit shown; the session is the employee's session open at that moment."""
+    conn = _conn()
+    try:
+        risk = conn.execute("SELECT * FROM risks WHERE id=?", (risk_id,)).fetchone()
+        if not risk:
+            return None
+        if risk["rule_code"] != "SECTOR_EXIT" or risk["entity_type"] != "EMPLOYEE":
+            return {"applicable": False}
+        events = conn.execute(
+            "SELECT event_type, details, created_at FROM risk_events WHERE risk_id=? "
+            "AND event_type IN ('DETECTED','STILL_OUTSIDE') ORDER BY created_at, id", (risk_id,)).fetchall()
+        exit_at = events[-1]["created_at"] if events else risk["created_at"]
+        s = conn.execute(
+            "SELECT * FROM work_sessions WHERE employee_id=? AND check_in_time<=? "
+            "AND (finish_time IS NULL OR finish_time='' OR finish_time>=?) "
+            "ORDER BY check_in_time DESC, id DESC LIMIT 1",
+            (risk["entity_id"], exit_at, exit_at)).fetchone()
+        sector_name = s["sector"] if s else risk["sector"]
+        sector_row = conn.execute("SELECT boundary_json, center_lat, center_lon FROM sectors WHERE name=?",
+                                  (sector_name,)).fetchone()
+    finally:
+        conn.close()
+
+    boundary = None
+    if sector_row and sector_row["boundary_json"]:
+        try:
+            boundary = json.loads(sector_row["boundary_json"])
+        except Exception:
+            boundary = None
+    detected = next((e["details"] for e in events if e["event_type"] == "DETECTED"), None)
+    out = {
+        "applicable": True, "risk_id": risk_id, "exit_event_time": exit_at, "exit_event_local": _local(exit_at),
+        "exits_count": len(events), "sector": sector_name, "boundary": boundary,
+        "session": None, "recorded": False, "runs": [], "gaps": [],
+        "exit": None, "returned": None, "outside_s": None, "outside_distance_m": None, "outside_gap_s": None,
+        "text_coords": _coords_in_text(risk["reason"], detected),
+    }
+    if not s:
+        return out
+    track = build_track(s["id"])
+    out.update(session=track["session"], recorded=track["recorded"], runs=track["runs"], gaps=track["gaps"])
+    if not track["recorded"]:
+        return out
+
+    conn = _conn()
+    try:
+        pts = [dict(r) for r in conn.execute(
+            "SELECT latitude, longitude, inside_boundary, recorded_at FROM session_track_points "
+            "WHERE session_id=? ORDER BY recorded_at, id", (s["id"],))]
+    finally:
+        conn.close()
+    for p in pts:
+        p["t"], p["inside"] = _parse(p["recorded_at"]), bool(p["inside_boundary"])
+    t_ev = _parse(exit_at)
+    candidates = [i for i, p in enumerate(pts) if not p["inside"] and (i == 0 or pts[i - 1]["inside"])]
+    best = min(candidates, key=lambda i: abs((pts[i]["t"] - t_ev).total_seconds()), default=None) if t_ev else None
+    if best is None or abs((pts[best]["t"] - t_ev).total_seconds()) > EXIT_MATCH_SECONDS:
+        return out  # exit not found on the recorded route: route shown, exit figures stay "nav datu"
+
+    i = best
+    j = next((k for k in range(i + 1, len(pts)) if pts[k]["inside"]), None)
+    inside = _inside_test(sector_row)
+    secs = dist = gap_s = 0.0
+    for a, b in zip(pts[max(i - 1, 0):(j + 1 if j is not None else len(pts))],
+                    pts[max(i - 1, 0) + 1:(j + 1 if j is not None else len(pts))]):
+        dt = (b["t"] - a["t"]).total_seconds()
+        if dt > TRACK_GAP_SECONDS:
+            gap_s += dt  # no positions: not counted as outside time or distance
+            continue
+        d = calculate_distance_meters(a["latitude"], a["longitude"], b["latitude"], b["longitude"])
+        if not a["inside"] and not b["inside"]:
+            frac = 1.0
+        elif a["inside"] != b["inside"]:
+            f = _crossing(a, b, a["inside"], inside)
+            frac = (1 - f) if a["inside"] else f
+        else:
+            frac = 0.0
+        secs += dt * frac
+        dist += d * frac
+    p = pts[i]
+    out["exit"] = {"lat": p["latitude"], "lon": p["longitude"], "time": p["recorded_at"], "local": _local(p["recorded_at"])}
+    if j is not None:
+        q = pts[j]
+        out["returned"] = {"lat": q["latitude"], "lon": q["longitude"], "time": q["recorded_at"], "local": _local(q["recorded_at"])}
+    out.update(outside_s=secs, outside_distance_m=dist, outside_gap_s=gap_s)
+    return out

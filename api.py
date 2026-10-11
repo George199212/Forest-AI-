@@ -942,6 +942,14 @@ def get_sector_session_tracks(name: str):
     return session_track.list_sessions(name)
 
 
+@app.get("/api/risks/{risk_id}/exit-route")
+def get_risk_exit_route(risk_id: int):
+    route = session_track.exit_route(risk_id)
+    if route is None:
+        return Response(content='{"error":"Not found"}', media_type="application/json", status_code=404)
+    return route
+
+
 @app.get("/api/sessions/{session_id}/track")
 def get_session_track(session_id: int):
     track = session_track.build_track(session_id)

@@ -2150,7 +2150,7 @@ async function openRisk(id, push=true) {
       </div>
     ` : ''}
 
-    ${r.last_location ? `
+    ${r.rule_code === 'SECTOR_EXIT' ? '<div id="risk-exit-route"></div>\n\n    ' : ''}${r.last_location ? `
       <div class="card-head" style="margin-top:8px">📍 Последняя позиция</div>
       <div id="risk-map-wrap" style="height:220px;border-radius:var(--r);overflow:hidden;margin-bottom:16px"></div>
       <div style="color:var(--text2);font-size:11px;margin-top:-12px;margin-bottom:16px">
@@ -2194,6 +2194,7 @@ async function openRisk(id, push=true) {
 
   if (aiText) startTypewriter('ai-summary', aiText);
   loadRiskConclusion(r.id);
+  if (r.rule_code === 'SECTOR_EXIT') loadExitRoute(r.id);
 
   const chatLog = document.getElementById('risk-chat-log');
   if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
@@ -2210,6 +2211,65 @@ async function openRisk(id, push=true) {
         .bindPopup(`${r.employee_name||'Worker'}<br>${r.last_location.updated_at}`).openPopup();
     });
   }
+}
+
+// ── Route in a sector-exit incident (SECTOR_EXIT cards only) ──────────────────
+let exitMap = null;
+async function loadExitRoute(riskId) {
+  const el = document.getElementById('risk-exit-route');
+  if (!el) return;
+  let d;
+  try { d = await api(`/api/risks/${riskId}/exit-route`); } catch (e) { return; }
+  if (!d || !d.applicable || currentRiskId !== riskId) return;
+  const s = d.session;
+  const multi = d.exits_count > 1 ? `<div style="font-size:11px;color:var(--text3)">Šim incidentam reģistrētas ${d.exits_count} izejas; parādīta pēdējā (${d.exit_event_local}).</div>` : '';
+  const link = s ? `<a href="#" class="exit-map-link" onclick="event.preventDefault();trkOpenOnMap('${trkEsc(s.sector).replace(/'/g, "\\'")}', ${s.id})"
+      style="font-size:12px;color:var(--gbright)">Atvērt sektora kartē (sesija #${s.id}) →</a>` : '';
+  const head = `<div class="card-head" style="margin-top:8px">🧭 Maršruts ap izeju no sektora</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">${s ? `Sesija #${s.id} · ${trkEsc(s.sector)} · ${trkEsc(s.employee)} · ` : ''}izeja reģistrēta ${d.exit_event_local || '–'}</div>${multi}`;
+  if (!d.recorded) {
+    const c = d.text_coords;
+    el.innerHTML = head + `<div class="trk-none">Maršruts nav ierakstīts.</div>
+      <div style="margin:8px 0 16px;font-size:13px;color:var(--text2)">${c ? `Izejas koordinātas: <span class="mono">${c[0].toFixed(5)}, ${c[1].toFixed(5)}</span>` : 'Izejas koordinātas nav saglabātas.'}
+      ${link ? '<br>' + link : ''}</div>`;
+    return;
+  }
+  const returned = d.returned ? d.returned.local : (d.exit ? 'nav atgriezies' : 'nav datu');
+  const gapNote = d.outside_gap_s ? `<div style="font-size:11px;color:var(--text3)">Ārpus sektora bija pārtraukums ${trkDur(d.outside_gap_s)} bez pozīcijām — tas nav ieskaitīts.</div>` : '';
+  el.innerHTML = head + `<div id="risk-exit-map" style="height:240px;border-radius:var(--r);overflow:hidden;background:var(--bg3)"></div>
+    ${d.exit ? '' : '<div class="trk-none">Izejas punkts ierakstītajā maršrutā nav atrasts.</div>'}
+    <div class="trk-sum" style="margin-bottom:6px"><div>Laiks ārpus sektora<b>${trkDur(d.outside_s)}</b></div>
+      <div>Attālums ārpus sektora<b>${trkDist(d.outside_distance_m)}</b></div><div>Atgriezās sektorā<b>${returned}</b></div></div>
+    ${gapNote}<div style="margin-bottom:16px">${link}</div>`;
+  ensureSatLeaflet(() => {
+    const box = document.getElementById('risk-exit-map');
+    if (!box) return;
+    if (exitMap) { exitMap.remove(); exitMap = null; }
+    exitMap = L.map(box);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap contributors', maxZoom:19}).addTo(exitMap);
+    const bounds = [];  // fitted to the route; the boundary only when there is no route
+    if (d.boundary && d.boundary.length >= 3) {
+      L.polygon(d.boundary, {color:'#c94040', fillColor:'#c94040', fillOpacity:0.12, weight:2}).addTo(exitMap);
+      if (!d.runs.length) bounds.push(...d.boundary);
+    }
+    d.runs.forEach(r => {
+      const col = r.inside ? TRK_IN : TRK_OUT;
+      if (r.coords.length > 1) L.polyline(r.coords, {color:col, weight:4, opacity:0.95}).addTo(exitMap);
+      else L.circleMarker(r.coords[0], {radius:3, color:col, fillColor:col, fillOpacity:1}).addTo(exitMap);
+      bounds.push(...r.coords);
+    });
+    d.gaps.forEach(g => L.polyline([g.from, g.to], {color:TRK_GAP, weight:1.5, dashArray:'4 6'}).addTo(exitMap)
+      .bindTooltip(`pārtraukums ${trkDur(g.seconds)}`, {permanent:true, direction:'center', className:'trk-gap-label'}));
+    if (d.exit) {
+      L.circleMarker([d.exit.lat, d.exit.lon], {radius:7, color:'#fff', weight:2, fillColor:TRK_OUT, fillOpacity:1}).addTo(exitMap)
+        .bindTooltip(`Izeja ${d.exit.local}`, {permanent:true, direction:'top', offset:[0, -6]});
+    }
+    if (bounds.length) exitMap.fitBounds(bounds, {padding:[20, 20], maxZoom:18});
+  });
+}
+async function trkOpenOnMap(sector, sessionId) {
+  await openSector(sector);
+  focusGpsOnMap(sessionId);
 }
 
 // ── RISK CONCLUSION ("Slēdziens") ────────────────────────────────────────────
