@@ -672,6 +672,9 @@ def review_change(change_id, action, actor):
     if c["source"] == "human":
         conn.close()
         return 409, {"error": "reviewer observations are not reviewed"}
+    if c["review_status"] != "UNREVIEWED":
+        conn.close()
+        return 409, {"error": "change is already reviewed; undo the decision first"}
     new = REVIEW_ACTIONS[action]
     conn.execute("UPDATE photo_cmp_changes SET review_status=?, reviewer=?, reviewed_at=? WHERE id=?",
                  (new, actor, _now(), change_id))
@@ -680,6 +683,41 @@ def review_change(change_id, action, actor):
     log_event("CHANGE_REVIEWED", actor, c["run_id"], c["point_id"], change_id,
               details={"old": c["review_status"], "new": new})
     return 200, {"ok": True, "review_status": new}
+
+
+def _closing_conclusion(conn, run_id):
+    """The accepted conclusion that closed a risk on this run's evidence, if any (blocks review undo)."""
+    r = conn.execute("SELECT rc.id, rc.risk_id FROM risk_conclusions rc JOIN risks r ON r.id=rc.risk_id "
+                     "WHERE rc.run_id=? AND rc.status='CLOSED' AND r.status IN ('RESOLVED','DISMISSED') "
+                     "ORDER BY rc.id DESC LIMIT 1", (run_id,)).fetchone()
+    return {"conclusion_id": r["id"], "risk_id": r["risk_id"]} if r else None
+
+
+def undo_review(change_id, actor):
+    """Return a reviewed system change to UNREVIEWED. The previous decision is kept in the event log."""
+    conn = _conn()
+    c = conn.execute("SELECT c.*, p.run_id FROM photo_cmp_changes c JOIN photo_cmp_points p ON p.id=c.point_id "
+                     "WHERE c.id=?", (change_id,)).fetchone()
+    if not c:
+        conn.close()
+        return 404, {"error": "change not found"}
+    if c["source"] != "system" or c["discarded"]:
+        conn.close()
+        return 409, {"error": "only reviewed system changes can be undone"}
+    if c["review_status"] == "UNREVIEWED":
+        conn.close()
+        return 409, {"error": "change is not reviewed"}
+    lock = _closing_conclusion(conn, c["run_id"])
+    if lock:
+        conn.close()
+        return 409, {"error": "Vispirms jāatceļ slēdziena lēmums", "locked_by": lock}
+    conn.execute("UPDATE photo_cmp_changes SET review_status='UNREVIEWED', reviewer=NULL, reviewed_at=NULL WHERE id=?",
+                 (change_id,))
+    conn.commit()
+    conn.close()
+    log_event("CHANGE_REVIEW_UNDONE", actor, c["run_id"], c["point_id"], change_id,
+              details={"old": c["review_status"], "old_reviewer": c["reviewer"], "old_reviewed_at": c["reviewed_at"]})
+    return 200, {"ok": True, "review_status": "UNREVIEWED"}
 
 
 # ── B / C / D per point ───────────────────────────────────────────────────────
@@ -1022,9 +1060,18 @@ def get_run(run_id):
     changes = [dict(r) for r in conn.execute(
         "SELECT c.* FROM photo_cmp_changes c JOIN photo_cmp_points p ON p.id=c.point_id WHERE p.run_id=? "
         "ORDER BY p.seq, c.id", (run_id,))]
+    history = {}
+    for e in conn.execute("SELECT change_id, event_type, actor, details, created_at FROM photo_cmp_events "
+                          "WHERE run_id=? AND event_type IN ('CHANGE_REVIEWED','CHANGE_REVIEW_UNDONE') ORDER BY id",
+                          (run_id,)):
+        d = json.loads(e["details"] or "{}")
+        history.setdefault(e["change_id"], []).append({"type": e["event_type"], "actor": e["actor"],
+                                                       "at": e["created_at"], "old": d.get("old"), "new": d.get("new")})
+    run["locked_by_conclusion"] = _closing_conclusion(conn, run_id)
     conn.close()
     for c in changes:
         c["cell_words"] = CELL_WORDS.get(c["cell"], c["cell"])
+        c["history"] = history.get(c["id"], [])
     by_point = {}
     for c in changes:
         by_point.setdefault(c["point_id"], []).append(c)

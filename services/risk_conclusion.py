@@ -288,14 +288,37 @@ def _check_text(text, findings=False):
 
 
 # ── Read side ─────────────────────────────────────────────────────────────────
+REVIEW_EVENTS = ("CHANGE_REVIEWED", "CHANGE_REVIEW_UNDONE", "HUMAN_OBSERVATION_ADDED", "HUMAN_OBSERVATION_WITHDRAWN")
+DECIDED = ("INTERIM", "CLOSED")
+
+
+def _last_review_change(conn, run_id):
+    """Time of the latest review decision, review undo or reviewer-observation change on the run."""
+    if not run_id:
+        return None
+    q = ",".join("?" * len(REVIEW_EVENTS))
+    r = conn.execute(f"SELECT MAX(created_at) FROM photo_cmp_events WHERE run_id=? AND event_type IN ({q})",
+                     (run_id,) + REVIEW_EVENTS).fetchone()
+    return r[0] if r else None
+
+
+def _is_stale(conn, d):
+    """A draft text is stale when any review decision or observation changed after it was produced."""
+    last = _last_review_change(conn, d["run_id"])
+    return bool(last and last > (d.get("text_at") or d["created_at"])), last
+
+
 def _rows(conn, risk_id):
     rows = []
     for r in conn.execute("SELECT * FROM risk_conclusions WHERE risk_id=? ORDER BY id DESC", (risk_id,)):
         d = dict(r)
         d["evidence"] = json.loads(d.pop("evidence_json") or "{}")
         d["reshoot_points"] = json.loads(d.pop("reshoot_points_json") or "[]")
-        for k in ("created_at", "decided_at", "superseded_at"):
+        for k in ("created_at", "decided_at", "superseded_at", "undone_at", "text_at"):
             d[k + "_local"] = local(d[k]) if d[k] else None
+        if d["status"] == "DRAFT":
+            d["stale"], last = _is_stale(conn, d)
+            d["last_review_change_local"] = local(last) if last else None
         rows.append(d)
     return rows
 
@@ -310,7 +333,7 @@ def get_conclusion(risk_id):
     gen = conn.execute("SELECT created_at FROM risk_events WHERE risk_id=? AND event_type='AI_RECOMMENDATION_GENERATED' "
                        "ORDER BY id DESC LIMIT 1", (risk_id,)).fetchone()
     conn.close()
-    current = next((r for r in rows if r["status"] != "SUPERSEDED"), None)
+    current = next((r for r in rows if r["status"] in ("DRAFT",) + DECIDED), None)
     conn = _conn()
     has_run = conn.execute("SELECT 1 FROM photo_cmp_runs WHERE sector=? LIMIT 1", (ev["risk"]["sector"],)).fetchone()
     conn.close()
@@ -383,11 +406,11 @@ def create_draft(risk_id, actor, weather_text="", weather_source="", use_ai=True
         conn.execute("UPDATE risk_conclusions SET status='SUPERSEDED', superseded_at=? WHERE id=?", (now, old["id"]))
     cid = conn.execute(
         "INSERT INTO risk_conclusions (risk_id, run_id, status, rule, recommendation, outcome, rule_line, "
-        "evidence_json, weather_text, weather_source, ai_draft, model, created_by, created_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "evidence_json, weather_text, weather_source, ai_draft, model, created_by, created_at, text_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (risk_id, ev["photo_comparison"]["run_id"] if ev["photo_comparison"] != NO_DATA else None, "DRAFT",
          rule["rule"], rule["recommendation"], rule["outcome"], rule["line"], json.dumps(ev, ensure_ascii=False),
-         weather_text or None, weather_source or None, text, model, actor, now)).lastrowid
+         weather_text or None, weather_source or None, text, model, actor, now, now)).lastrowid
     conn.execute("UPDATE risk_conclusions SET superseded_by=? WHERE risk_id=? AND status='SUPERSEDED' "
                  "AND superseded_by IS NULL AND id<>?", (cid, risk_id, cid))
     conn.commit()
@@ -409,6 +432,17 @@ def _supersede_previous(conn, risk_id, cid, now):
                  "WHERE risk_id=? AND id<>? AND status IN ('INTERIM','CLOSED')", (cid, now, risk_id, cid))
 
 
+def _decision_guard(conn, risk_id, d):
+    """Refuse a decision on a stale draft or when the live rule no longer matches the draft's rule."""
+    stale, _ = _is_stale(conn, d)
+    if stale:
+        return 409, {"error": "novecojis: review decisions changed after the text was produced; regenerate or rewrite it"}
+    live = decide_rule(build_evidence(risk_id))
+    if live["blocked"] or live["rule"] != d["rule"]:
+        return 409, {"error": f"the rule changed ({live['line']}); regenerate or rewrite the text"}
+    return None
+
+
 def accept_and_close(risk_id, cid, text, actor, override_reason=""):
     text, override_reason = (text or "").strip(), (override_reason or "").strip()
     if len(text) < 10:
@@ -425,6 +459,10 @@ def accept_and_close(risk_id, cid, text, actor, override_reason=""):
     if risk["status"] in CLOSED_STATUSES:
         conn.close()
         return 409, {"error": "risk is already closed"}
+    refused = _decision_guard(conn, risk_id, d)
+    if refused:
+        conn.close()
+        return refused
     against = d["recommendation"] == KEEP_OPEN
     if against and len(override_reason) < 5:
         conn.close()
@@ -432,8 +470,8 @@ def accept_and_close(risk_id, cid, text, actor, override_reason=""):
     now = _now()
     _supersede_previous(conn, risk_id, cid, now)
     conn.execute("UPDATE risk_conclusions SET status='CLOSED', final_text=?, decision='CLOSE', "
-                 "against_recommendation=?, override_reason=?, decided_by=?, decided_at=? WHERE id=?",
-                 (text, 1 if against else 0, override_reason or None, actor, now, cid))
+                 "against_recommendation=?, override_reason=?, decided_by=?, decided_at=?, risk_status_before=? "
+                 "WHERE id=?", (text, 1 if against else 0, override_reason or None, actor, now, risk["status"], cid))
     conn.commit()
     conn.close()
     database.update_incident_status(risk_id, "RESOLVED")          # existing status mechanism
@@ -459,6 +497,10 @@ def continue_work(risk_id, cid, text, next_steps, actor):
     if d["status"] != "DRAFT":
         conn.close()
         return 409, {"error": f"conclusion is {d['status']}"}
+    refused = _decision_guard(conn, risk_id, d)
+    if refused:
+        conn.close()
+        return refused
     ev = json.loads(d["evidence_json"])
     reshoot = ev["photo_comparison"]["points_for_reshoot"] if ev.get("photo_comparison") != NO_DATA else []
     now = _now()
@@ -471,3 +513,53 @@ def continue_work(risk_id, cid, text, next_steps, actor):
     _risk_event(risk_id, "CONCLUSION_INTERIM", actor,
                 {"conclusion_id": cid, "rule": d["rule"], "next_steps": next_steps, "reshoot_points": reshoot})
     return 200, {"ok": True, "status": "INTERIM"}
+
+
+def undo_decision(risk_id, cid, reason, actor):
+    """Undo "accept and close" or "continue": the decided row becomes UNDONE (kept, shown as "atcelts"), a new
+    DRAFT row restores the saved text, and a risk closed by that decision returns to its previous status."""
+    reason = (reason or "").strip()
+    if len(reason) < 5:
+        return 400, {"error": "a short reason is required"}
+    conn = _conn()
+    d = _draft(conn, risk_id, cid)
+    if not d:
+        conn.close()
+        return 404, {"error": "conclusion not found"}
+    current = conn.execute("SELECT id FROM risk_conclusions WHERE risk_id=? AND status IN ('DRAFT','INTERIM','CLOSED') "
+                           "ORDER BY id DESC LIMIT 1", (risk_id,)).fetchone()
+    if d["status"] not in DECIDED or not current or current["id"] != cid:
+        conn.close()
+        return 409, {"error": "only the current saved decision can be undone"}
+    risk = conn.execute("SELECT status FROM risks WHERE id=?", (risk_id,)).fetchone()
+    now = _now()
+    new_id = conn.execute(
+        "INSERT INTO risk_conclusions (risk_id, run_id, status, rule, recommendation, outcome, rule_line, evidence_json, "
+        "weather_text, weather_source, ai_draft, model, created_by, created_at, text_at, final_text) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (risk_id, d["run_id"], "DRAFT", d["rule"], d["recommendation"], d["outcome"], d["rule_line"], d["evidence_json"],
+         d["weather_text"], d["weather_source"], d["ai_draft"], d["model"], d["created_by"], now,
+         d.get("text_at") or d["created_at"], d["final_text"])).lastrowid
+    conn.execute("UPDATE risk_conclusions SET status='UNDONE', undone_by=?, undone_at=?, undo_reason=?, restored_as=? "
+                 "WHERE id=?", (actor, now, reason, new_id, cid))
+    conn.commit()
+    conn.close()
+    status_change = None
+    if d["decision"] == "CLOSE" and risk and risk["status"] == "RESOLVED":
+        before = d.get("risk_status_before") or "OPEN"
+        if before == "NOTIFIED":
+            # update_incident_status's NOTIFIED branch would overwrite notified_at and telegram_message_id;
+            # restore the status alone, as its generic branch does.
+            c2 = _conn()
+            c2.execute("UPDATE risks SET status=? WHERE id=?", (before, risk_id))
+            c2.commit()
+            c2.close()
+        else:
+            database.update_incident_status(risk_id, before)          # existing status mechanism
+        status_change = {"from": "RESOLVED", "to": before}
+    _risk_event(risk_id, "CONCLUSION_DECISION_UNDONE", actor,
+                {"conclusion_id": cid, "undone_decision": d["decision"], "previous_status": d["status"],
+                 "reason": reason, "restored_draft_id": new_id, "risk_status": status_change})
+    if status_change:
+        _risk_event(risk_id, "REOPENED", actor, f"conclusion #{cid} decision undone: {reason}")
+    return 200, {"ok": True, "draft_id": new_id, "risk_status": status_change}

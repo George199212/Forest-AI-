@@ -1543,6 +1543,15 @@ def risk_conclusion_continue(risk_id: int, conclusion_id: int, body: RiskConclus
         risk_id, conclusion_id, body.text, body.next_steps, username))
 
 
+class RiskConclusionUndoIn(BaseModel):
+    reason: str
+
+@app.post("/api/risks/{risk_id}/conclusion/{conclusion_id}/undo")
+def risk_conclusion_undo(risk_id: int, conclusion_id: int, body: RiskConclusionUndoIn,
+                         username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(risk_conclusion.undo_decision(risk_id, conclusion_id, body.reason, username))
+
+
 @app.get("/api/risks/{risk_id}/photo")
 def get_risk_photo(risk_id: int):
     row = db1("SELECT photo_path FROM risks WHERE id=?", (risk_id,))
@@ -1859,6 +1868,10 @@ def photo_cmp_add_observation(point_id: int, body: PhotoCmpObservationIn, userna
 @app.post("/api/photo-compare/changes/{change_id}/withdraw")
 def photo_cmp_withdraw_observation(change_id: int, username: str = Depends(verify_credentials)):
     return _photo_cmp_response(photo_compare.withdraw_observation(change_id, username))
+
+@app.post("/api/photo-compare/changes/{change_id}/undo")
+def photo_cmp_undo_review(change_id: int, username: str = Depends(verify_credentials)):
+    return _photo_cmp_response(photo_compare.undo_review(change_id, username))
 
 @app.post("/api/photo-compare/changes/{change_id}/review")
 def photo_cmp_review_change(change_id: int, body: PhotoCmpReviewIn, username: str = Depends(verify_credentials)):

@@ -1720,6 +1720,7 @@ function pcRenderRun(data, runs) {
   // Point viewer lists: per point, baseline photo(s) in capture order, then follow-up photo(s).
   pcViewerLists = {};
   const decideOnly = pcFilter === 'decide';
+  const locked = run.locked_by_conclusion;      // a risk closed by an accepted conclusion uses this run
 
   const points = data.points.filter(pt => pcMatch(pt, pcFilter)).map(pt => {
     const grey = ['NOT_COMPARABLE', 'NOT_COMPARABLE_HUMAN', 'NOT_SAME_PLACE', 'NOT_SAME_PLACE_HUMAN'].includes(pt.status);
@@ -1765,10 +1766,17 @@ function pcRenderRun(data, runs) {
         <div class="pc-meta">Pārbaude: ${PC_VERIF[c.verification] || '–'}${c.verification_reason ? ' — ' + pcEsc(pcVerifText(c.verification_reason)) : ''}</div>
         <div class="pc-meta">Statuss: <b>${PC_REVIEW[c.review_status] || c.review_status}</b>${c.reviewer ? ` · ${pcEsc(c.reviewer)} · ${pcDate(c.reviewed_at)}` : ''}</div>
         <div class="pc-actions">
+          ${c.review_status === 'UNREVIEWED' ? `
           ${act('confirm', 'Apstiprināt', 'CONFIRMED')}
           ${act('reject', 'Noraidīt', 'REJECTED')}
-          ${act('reshoot', 'Nepieciešama atkārtota fotografēšana', 'RESHOOT')}
+          ${act('reshoot', 'Nepieciešama atkārtota fotografēšana', 'RESHOOT')}`
+          : locked ? `<button class="btn" disabled style="opacity:0.5;cursor:not-allowed">Atcelt lēmumu</button>
+              <span class="pc-meta" style="align-self:center">Vispirms jāatceļ slēdziena lēmums (risks #${locked.risk_id}).</span>`
+          : `<button class="btn" onclick="pcUndo(${c.id})">Atcelt lēmumu</button>`}
         </div>
+        ${c.history && c.history.length ? `<details style="margin-top:6px"><summary class="pc-meta" style="cursor:pointer">Lēmumu vēsture (${c.history.length})</summary>
+          ${c.history.map(h => `<div class="pc-meta">${pcDate(h.at)} · ${pcEsc(h.actor || '–')} · ${h.type === 'CHANGE_REVIEW_UNDONE'
+              ? `atcēla lēmumu „${PC_REVIEW[h.old] || pcEsc(h.old)}”` : `${PC_REVIEW[h.new] || pcEsc(h.new)}`}</div>`).join('')}</details>` : ''}
       </div>`;
     }).join('');
     const observations = decideOnly ? '' : humanObs.map(c => {
@@ -1892,6 +1900,16 @@ function pcViewerClose() {
   document.getElementById('pc-viewer').classList.remove('open');
   document.removeEventListener('keydown', pcViewerKeys);
   document.getElementById('pc-viewer-img').onerror = null;
+}
+
+async function pcUndo(changeId) {
+  if (!confirm('Atcelt šo lēmumu? Izmaiņa atgriezīsies statusā „Nav pārskatīts”.')) return;
+  try {
+    await pcFetch(`/api/photo-compare/changes/${changeId}/undo`, {method: 'POST'});
+  } catch (e) {
+    alert('Neizdevās atcelt: ' + e.message);
+  }
+  if (currentDetailTab === 'compare' && pcSector) loadPhotoCompare(pcSector, pcRunId);
 }
 
 function pcObsToggle(pointId) {
@@ -2187,7 +2205,8 @@ async function openRisk(id, push=true) {
 // Block at the top of the risk card. Evidence and the R0-R3 rule come from the server as-is; stored
 // text is shown at once (no typewriter). A risk without a conclusion shows only a one-line entry.
 const RC_STATUS = {DRAFT: ['Melnraksts', 'b-amber'], CLOSED: ['Akceptēts, risks slēgts', 'b-green'],
-  INTERIM: ['Starpposma slēdziens — darbs turpinās', 'b-amber'], SUPERSEDED: ['Aizstāts', 'b-gray']};
+  INTERIM: ['Starpposma slēdziens — darbs turpinās', 'b-amber'], SUPERSEDED: ['Aizstāts', 'b-gray'],
+  UNDONE: ['Lēmums atcelts', 'b-gray']};
 const RC_REC = {CLOSE: ['Ieteikums: slēgt risku', 'b-green'], KEEP_OPEN: ['Ieteikums: atstāt risku atvērtu', 'b-amber']};
 const RC_REVIEW = {UNREVIEWED: 'nepārskatītas', CONFIRMED: 'apstiprinātas', REJECTED: 'noraidītas', RESHOOT: 'atkārtot'};
 let rcData = null, rcRiskId = null, rcExpanded = false;
@@ -2260,12 +2279,15 @@ function rcRender() {
   }
 
   const decided = cur && cur.status !== 'DRAFT';
-  const rule = decided || (cur && cur.status === 'DRAFT') ? {rule: cur.rule, recommendation: cur.recommendation, outcome: cur.outcome, line: cur.rule_line, blocked: false} : d.rule;
-  const ev = cur ? cur.evidence : d.evidence;
+  // Rule line, numbers and confirmed changes are always the live ones; the decision-time rule is shown if it differs.
+  const rule = d.rule;
+  const ev = d.evidence;
   const weather = cur ? {text: cur.weather_text, source: cur.weather_source} : null;
   const riskClosed = ['RESOLVED', 'DISMISSED'].includes(d.evidence.risk.status);
   const status = cur ? RC_STATUS[cur.status] : null;
 
+  const frozen = (cur && cur.rule_line && cur.rule_line !== rule.line)
+    ? `<div class="pc-meta" style="margin-top:4px">${decided ? 'Lēmuma brīdī' : 'Teksta sagatavošanas brīdī'}: ${pcEsc(cur.rule_line)}</div>` : '';
   const ruleHTML = rule.blocked
     ? `<div style="margin-top:10px;padding:10px 12px;border-left:3px solid var(--amber);background:var(--bg3);border-radius:var(--r)">
          <b>Vispirms jāizskata ${d.rule.unreviewed} izmaiņas</b> foto salīdzināšanā. Kamēr tās nav izskatītas, slēdzienu sagatavot nevar.
@@ -2299,11 +2321,15 @@ function rcRender() {
   let body = '';
   if (cur && cur.status === 'DRAFT') {
     const against = cur.recommendation === 'KEEP_OPEN';
+    const blockDecision = cur.stale || rule.blocked || rule.rule !== cur.rule;
     const reshoot = (cur.evidence.photo_comparison !== 'nav datu' && cur.evidence.photo_comparison.points_for_reshoot.length)
       ? cur.evidence.photo_comparison.points_for_reshoot.join(', ') : '–';
     body = `
       <div class="pc-meta" style="margin-top:12px">Slēdziena teksts (var labot pirms saglabāšanas)</div>
-      <textarea id="rc-text" rows="7" style="${ta}">${pcEsc(cur.ai_draft || '')}</textarea>
+      ${cur.stale ? `<div style="margin:6px 0;padding:8px 10px;border-left:3px solid var(--red);background:var(--bg3);border-radius:var(--r)">
+          ${badge('novecojis', 'b-red')} Pēc teksta sagatavošanas (${cur.text_at_local}) mainīti izskatīšanas lēmumi vai novērojumi (pēdējoreiz ${cur.last_review_change_local}).
+          Lēmumu pieņemt nevar, kamēr teksts nav ģenerēts no jauna vai uzrakstīts pašam.</div>` : ''}
+      <textarea id="rc-text" rows="7" style="${ta}">${pcEsc(cur.final_text || cur.ai_draft || '')}</textarea>
       <details><summary class="pc-meta" style="cursor:pointer">Sistēmas sākotnējais melnraksts</summary>
         <div style="white-space:pre-wrap;font-size:12px;margin-top:4px">${cur.ai_draft ? pcEsc(cur.ai_draft) : '<i>nav — teksts rakstīts bez AI</i>'}</div>
         <div class="pc-meta">${pcEsc(cur.created_by || '')} · ${cur.created_at_local}${cur.model ? ' · ' + pcEsc(cur.model) : ''}</div></details>
@@ -2311,12 +2337,12 @@ function rcRender() {
         <div class="pc-change" style="margin-top:0;border-left-color:${against ? 'var(--red)' : 'var(--green)'}">
           ${against ? `<div class="pc-meta" style="margin-bottom:6px">Sistēma iesaka atstāt risku atvērtu. Slēdzot jānorāda iemesls; slēdziens tiks saglabāts kā „slēgts pretēji sistēmas ieteikumam”.</div>
             <textarea id="rc-override" rows="2" placeholder="Iemesls, kāpēc slēgt pretēji ieteikumam" style="${ta}"></textarea>` : ''}
-          <button class="btn" style="margin-top:6px" onclick="rcClose(${cur.id}, ${against})">Akceptēt un slēgt risku</button>
+          <button class="btn" style="margin-top:6px${blockDecision ? ';opacity:0.5;cursor:not-allowed' : ''}" ${blockDecision ? 'disabled' : ''} onclick="rcClose(${cur.id}, ${against})">Akceptēt un slēgt risku</button>
         </div>
         <div class="pc-change" style="margin-top:0">
           <textarea id="rc-next" rows="2" placeholder="Kas jādara tālāk (obligāti)" style="${ta}"></textarea>
           <div class="pc-meta" style="margin-top:4px">Atkārtoti fotografējamie punkti: ${pcEsc(reshoot)}</div>
-          <button class="btn" style="margin-top:6px" onclick="rcContinue(${cur.id})">Turpināt darbu</button>
+          <button class="btn" style="margin-top:6px${blockDecision ? ';opacity:0.5;cursor:not-allowed' : ''}" ${blockDecision ? 'disabled' : ''} onclick="rcContinue(${cur.id})">Turpināt darbu</button>
         </div>
       </div>`;
   } else if (decided) {
@@ -2327,17 +2353,22 @@ function rcRender() {
       ${cur.status === 'INTERIM' ? `<div style="margin-top:6px"><b>Tālākie darbi:</b> ${pcEsc(cur.next_steps)}</div>
         <div class="pc-meta">Atkārtoti fotografējamie punkti: ${cur.reshoot_points.length ? pcEsc(cur.reshoot_points.join(', ')) : '–'}</div>` : ''}
       <details style="margin-top:6px"><summary class="pc-meta" style="cursor:pointer">Sistēmas sākotnējais melnraksts</summary>
-        <div style="white-space:pre-wrap;font-size:12px;margin-top:4px">${cur.ai_draft ? pcEsc(cur.ai_draft) : '<i>nav — teksts rakstīts bez AI</i>'}</div></details>`;
+        <div style="white-space:pre-wrap;font-size:12px;margin-top:4px">${cur.ai_draft ? pcEsc(cur.ai_draft) : '<i>nav — teksts rakstīts bez AI</i>'}</div></details>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
+        <input id="rc-undo-reason" maxlength="300" placeholder="Atcelšanas iemesls (obligāti)" style="flex:1 1 280px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
+        <button class="btn btn-red" onclick="rcUndo(${cur.id})">Atcelt lēmumu</button>
+      </div>`;
   }
 
   const history = d.history.length ? `<details style="margin-top:10px"><summary class="pc-meta" style="cursor:pointer">Iepriekšējie slēdzieni (${d.history.length})</summary>
     ${d.history.map(h => `<div class="pc-change" style="border-left-color:var(--text3)">
-      <div class="pc-meta">#${h.id} · ${RC_STATUS[h.status][0]} · ${h.created_at_local} · ${pcEsc(h.rule || '')} ${pcEsc(h.outcome || '')}${h.decided_at_local ? ' · lēmums ' + h.decided_at_local : ''}</div>
+      <div class="pc-meta">#${h.id} · ${RC_STATUS[h.status][0]} · ${h.created_at_local} · ${pcEsc(h.rule || '')} ${pcEsc(h.outcome || '')}${h.decided_at_local ? ' · lēmums ' + h.decided_at_local + ' (' + (h.decision === 'CLOSE' ? 'akceptēts un slēgts' : 'turpināt darbu') + ', ' + pcEsc(h.decided_by || '') + ')' : ''}</div>
+      ${h.status === 'UNDONE' ? `<div style="margin-top:4px">${badge('atcelts', 'b-gray')} <span class="pc-meta">${pcEsc(h.undone_by || '')} · ${h.undone_at_local} · iemesls: ${pcEsc(h.undo_reason || '')}</span></div>` : ''}
       <div style="white-space:pre-wrap;font-size:12px;margin-top:4px">${pcEsc(h.final_text || h.ai_draft || '')}</div></div>`).join('')}</details>` : '';
 
   el.innerHTML = `<div class="card" style="background:var(--bg2);margin-bottom:16px">
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><b>📋 Slēdziens</b>${status ? badge(status[0], status[1]) : ''}</div>
-      ${ruleHTML}
+      ${ruleHTML}${frozen}
       ${rule.blocked ? '' : findings}
       ${rcEvidenceHTML(ev, weather)}
       ${body}
@@ -2373,6 +2404,14 @@ async function rcContinue(cid) {
   const next_steps = document.getElementById('rc-next').value.trim();
   if (next_steps.length < 5) { rcMsg('Jānorāda, kas jādara tālāk.'); return; }
   try { await rcPost(`/${cid}/continue`, {text, next_steps}); }
+  catch (e) { rcMsg('Neizdevās: ' + e.message); return; }
+  openRisk(rcRiskId, false);
+}
+async function rcUndo(cid) {
+  const reason = (document.getElementById('rc-undo-reason') || {}).value.trim();
+  if (reason.length < 5) { rcMsg('Jānorāda atcelšanas iemesls.'); return; }
+  if (!confirm('Atcelt saglabāto lēmumu? Slēdziens atgriezīsies melnrakstā.')) return;
+  try { await rcPost(`/${cid}/undo`, {reason}); }
   catch (e) { rcMsg('Neizdevās: ' + e.message); return; }
   openRisk(rcRiskId, false);
 }

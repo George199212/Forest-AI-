@@ -717,6 +717,12 @@ def _create_risk_conclusion_table(cur):
         superseded_at TEXT
     )
     """)
+    # Undo of a decision (status UNDONE keeps the decided row; a new DRAFT row restores the text).
+    for column, definition in (("text_at", "TEXT"),             # when the draft text was produced (stale check)
+                               ("risk_status_before", "TEXT"),  # risk status before "accept and close"
+                               ("undone_by", "TEXT"), ("undone_at", "TEXT"), ("undo_reason", "TEXT"),
+                               ("restored_as", "INTEGER")):
+        _add_column_if_missing(cur, "risk_conclusions", column, definition)
 
 
 # ── Geo helpers ───────────────────────────────────────────────────────────────
