@@ -1611,10 +1611,12 @@ const PC_REVIEW = {UNREVIEWED:'Nav pārskatīts', CONFIRMED:'Apstiprināts', REJ
 const PC_STATUS = {UNCONFIRMED:'Nav apstiprināts', CONFIRMED:'Gaida salīdzināšanu', CHECKED:'Pārbaudīts', DONE:'Salīdzināts',
   FAILED:'Kļūda apstrādē', NOT_SAME_PLACE:'Nav tā pati vieta', NOT_COMPARABLE:'Nav salīdzināms',
   NOT_COMPARABLE_HUMAN:'Nav salīdzināms (pārskatītājs)', NOT_SAME_PLACE_HUMAN:'Nav tā pati vieta (pārskatītājs)'};
-const PC_FILTERS = [['all', 'Visi punkti'], ['decide', 'Gaida manu lēmumu'], ['nochange', 'Salīdzināti bez izmaiņām'],
+const PC_FILTERS = [['match', 'Sakrītošās vietas'], ['all', 'Visi punkti'], ['decide', 'Gaida manu lēmumu'], ['nochange', 'Salīdzināti bez izmaiņām'],
   ['reshoot', 'Nepieciešama atkārtota fotografēšana'], ['oneside', 'Tikai viena puse']];
 let pcSector = null, pcRunId = null, pcData = null, pcRuns = [];
-let pcFilter = (() => { try { return localStorage.getItem('pcFilter') || 'all'; } catch (e) { return 'all'; } })();
+// Default view: only pairs that show the same place (see pcMatch 'match'). Stored under a new key so
+// browsers that saved the old default ('all') start on the new default once.
+let pcFilter = (() => { try { return localStorage.getItem('pcFilter2') || 'match'; } catch (e) { return 'match'; } })();
 
 function pcEsc(v) {
   return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1660,7 +1662,14 @@ function pcBlocking(c) {
   if (c.source === 'human') return c.review_status !== 'WITHDRAWN';
   return !c.discarded && c.review_status !== 'REJECTED' && c.kind !== 'transient_object';
 }
+const PC_NOT_SAME = ['NOT_COMPARABLE', 'NOT_COMPARABLE_HUMAN', 'NOT_SAME_PLACE', 'NOT_SAME_PLACE_HUMAN'];
+// "Matching places": both sides present, the model judged the same place, comparability not unsuitable,
+// and no reviewer decision against the pair. Points not yet compared are not shown here.
+function pcIsMatch(pt) {
+  return pt.kind === 'both' && pt.same_place === 'yes' && pt.comparability !== 'unsuitable' && !PC_NOT_SAME.includes(pt.status);
+}
 function pcMatch(pt, f) {
+  if (f === 'match') return pcIsMatch(pt);
   if (f === 'decide') return pt.changes.some(pcUnreviewed);
   if (f === 'nochange') return pt.status === 'DONE' && !pt.changes.some(pcBlocking);
   if (f === 'reshoot') return pt.reshoot_needed;
@@ -1673,7 +1682,7 @@ function pcFilterCount(points, f) {
 }
 function pcSetFilter(f) {
   pcFilter = f;
-  try { localStorage.setItem('pcFilter', f); } catch (e) {}
+  try { localStorage.setItem('pcFilter2', f); } catch (e) {}
   pcRender();
 }
 
@@ -1705,7 +1714,7 @@ async function loadPhotoCompare(sector, runId) {
 
 function pcRender() {
   if (currentDetailTab !== 'compare' || !pcData) return;
-  if (!PC_FILTERS.some(([k]) => k === pcFilter)) pcFilter = 'all';
+  if (!PC_FILTERS.some(([k]) => k === pcFilter)) pcFilter = 'match';
   document.getElementById('detail-tab-content').innerHTML = pcRenderRun(pcData, pcRuns);
 }
 
@@ -1806,8 +1815,10 @@ function pcRenderRun(data, runs) {
     const noChanges = (!decideOnly && pt.status === 'DONE' && !live.length) ? '<div class="pc-meta" style="margin-top:8px">Izmaiņas šajā punktā nav konstatētas.</div>' : '';
     const limits = (!decideOnly && pt.detect_limits) ? `<div class="pc-meta" style="margin-top:8px">Nesalīdzināmās zonas: ${pcEsc(pcLv(pt.detect_limits))}</div>` : '';
     const legend = cells ? '<div class="pc-meta" style="margin-top:6px">Iezīmētie laukumi ir aptuvenas zonas 3×3 režģī, nevis precīza kontūra. Novietojiet kursoru uz izmaiņas, lai to izceltu.</div>' : '';
+    const canMarkNotSame = !decideOnly && pt.kind === 'both' && pt.status !== 'NOT_SAME_PLACE_HUMAN' && !locked;
     const addObs = decideOnly ? '' : `<div style="margin-top:8px">
         <button class="btn" onclick="pcObsToggle(${pt.id})">＋ Pievienot novērojumu</button>
+        ${canMarkNotSame ? `<button class="btn" onclick="pcNotSamePlace(${pt.id}, ${pt.seq}, ${live.length})">✗ Nav tā pati vieta</button>` : ''}
         <div class="pc-obs-form" id="pc-obs-${pt.id}">
           <textarea id="pc-obs-t-${pt.id}" maxlength="500" placeholder="Īss novērojums: kas un kur redzams"></textarea>
           <select id="pc-obs-c-${pt.id}"><option value="possible_change">Iespējamas izmaiņas</option><option value="possible_damage">Iespējams bojājums</option></select>
@@ -1854,6 +1865,20 @@ function pcRenderRun(data, runs) {
     </div>
     <div class="pc-filters">${filters}</div>
     <div class="pc-list">${points || '<div class="empty">Šim filtram nav punktu.</div>'}</div>`;
+}
+
+// Reviewer: this pair does not show the same place. The service records the decision and the removed
+// automatic findings in the event log; the point then leaves the "matching places" view.
+async function pcNotSamePlace(pointId, seq, nChanges) {
+  const extra = nChanges ? ` Sistēmas atrastās izmaiņas šim punktam (${nChanges}) vairs netiks rādītas; tās paliek notikumu žurnālā.` : '';
+  if (!confirm(`P${seq}: atzīmēt, ka bāzes foto un pēcfoto nav uzņemti tajā pašā vietā?${extra}`)) return;
+  try {
+    await pcFetch('/api/photo-compare/points/' + pointId + '/not-same-place',
+      {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({force: true})});
+    await loadPhotoCompare(pcSector, pcRunId);
+  } catch (e) {
+    alert('Neizdevās saglabāt: ' + e.message);
+  }
 }
 
 async function pcReview(changeId, action) {
@@ -2427,7 +2452,7 @@ async function rcUndo(cid) {
   openRisk(rcRiskId, false);
 }
 async function rcGoReview(sector) {
-  try { localStorage.setItem('pcFilter', 'decide'); } catch (e) {}
+  try { localStorage.setItem('pcFilter2', 'decide'); } catch (e) {}
   pcFilter = 'decide';
   await openSector(sector);
   detailTab('compare');

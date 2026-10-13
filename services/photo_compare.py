@@ -569,13 +569,24 @@ def mark_not_same_place(point_id, actor, force=False):
     if p["status"] in POINT_DONE_STATES and not force:
         conn.close()
         return 409, {"error": f"point already processed ({p['status']}); use force"}
+    # Evidence behind an accepted conclusion must not change (same rule as undo_review).
+    lock = _closing_conclusion(conn, p["run_id"])
+    if lock:
+        conn.close()
+        return 409, {"error": "Vispirms jāatceļ slēdziena lēmums", "locked_by": lock}
+    # _reset_point deletes the point's system changes; keep what they said in the audit event.
+    removed = [dict(r) for r in conn.execute(
+        "SELECT id, kind, class, cell, description, confidence, review_status, discarded "
+        "FROM photo_cmp_changes WHERE point_id=? AND source='system'", (point_id,))]
     _reset_point(conn, point_id)
     now = _now()
     conn.execute("UPDATE photo_cmp_points SET confirmed=1, confirmed_by=?, confirmed_at=?, "
                  "status='NOT_SAME_PLACE_HUMAN', updated_at=? WHERE id=?", (actor, now, now, point_id))
     conn.commit()
     conn.close()
-    log_event("POINT_NOT_SAME_PLACE", actor, p["run_id"], point_id, details={"previous_status": p["status"]})
+    log_event("POINT_NOT_SAME_PLACE", actor, p["run_id"], point_id,
+              details={"previous_status": p["status"], "previous_same_place": p["same_place"],
+                       "removed_system_changes": removed})
     return 200, {"ok": True}
 
 
