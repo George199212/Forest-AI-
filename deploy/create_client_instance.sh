@@ -53,11 +53,18 @@ confirm() { read -r -p "$1 [y/N] " a; [[ "$a" == "y" || "$a" == "Y" ]]; }
 
 sync_code() {
   # Code only. data/, .env, databases, caches and backups are never copied.
-  rsync -a --delete \
-    --exclude 'data/' --exclude '.env' --exclude '*.db' --exclude '*.db-journal' \
-    --exclude '__pycache__/' --exclude 'venv/' --exclude '*.bak_*' --exclude '*.log' \
-    --exclude '.claude/' --exclude '.serena/' --exclude '.headroom/' \
+  # Excludes mirror .gitignore plus .git and ad-hoc files that may mention other
+  # sectors. --delete-excluded also removes them from an existing client instance.
+  rsync -a --delete --delete-excluded \
+    --exclude 'data/' --exclude '.env' --exclude '*.db' --exclude '*.db-*' \
+    --exclude '__pycache__/' --exclude '*.pyc' --exclude 'venv/' --exclude '*.bak_*' \
+    --exclude '*.bak' --exclude '*.log' --exclude '*.patch' --exclude '*.zip' \
+    --exclude '.git/' --exclude '.claude/' --exclude '.serena/' --exclude '.headroom/' \
+    --exclude 'diagnostic_dump.txt' --exclude 'DIAGNOSTIC_DUMP.md' --exclude 'LEAFLET_CHECK.txt' \
+    --exclude '*.png' --exclude '*.jpg' --exclude '*.jpeg' \
     "$MAIN_DIR/" "$TARGET_DIR/"
+  # assets/ (logo) is needed by the dashboard; copy it explicitly
+  if [ -d "$MAIN_DIR/assets" ]; then rsync -a --delete "$MAIN_DIR/assets/" "$TARGET_DIR/assets/"; fi
 }
 
 [ -d "$MAIN_DIR" ] || { echo "ERROR: main instance not found: $MAIN_DIR" >&2; exit 1; }
