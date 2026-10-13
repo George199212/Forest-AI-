@@ -1,5 +1,24 @@
 # CURRENT_STATUS.md — Forest AI
 
+## Update 2026-10-13 — client instances (separate accounts)
+
+- New: a client account is a separate instance of the same code (own directory, `.env`,
+  `data/`, port, systemd unit). See `docs/CLIENT_INSTANCES.md`.
+- New: `scripts/clone_sector_instance.py` seeds a client instance with selected sector(s)
+  from the main DB (read-only source, dry run by default, audit manifest).
+- New: `deploy/create_client_instance.sh` creates the instance on the server.
+- Planned first instance: Rīgas meži, `/root/forest_ai_rm`, port 8002, sector BIK-001,
+  no Telegram bot. **Not yet run on the server** (this session has no SSH access).
+- Verified locally: script tested on a synthetic DB (filtering, no credential leak, dangling
+  and unknown-table guards, refuse-overwrite); second instance started with uvicorn on the
+  filtered DB: sees only BIK-001, wrong login → 401, photos served.
+- Application code unchanged.
+- Research: `docs/rigas-mezi-real-infrastructure.md`, `docs/rigas-mezi-architecture.md`.
+- Schema fact confirmed by running `init_db()` on an empty DB at commit `1c86df3`: 37 tables.
+  `organization_id` exists only on Integration Layer tables.
+
+---
+
 **Обновлено:** 2026-09-09, после `git clone` + построчной инспекции
 `github.com/George199212/Forest-AI-`, ветка `master`, коммит `0db0a79`
 (2026-09-08 16:54 UTC, "Sum financial risk KPI from incident
