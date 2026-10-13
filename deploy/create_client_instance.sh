@@ -26,7 +26,7 @@ set -euo pipefail
 
 MAIN_DIR="/root/forest_ai"
 MAIN_UNIT="forest-api.service"
-SLUG=""; ORG_NAME=""; ORG_SLUG=""; PORT=""; UPDATE_CODE=0
+SLUG=""; ORG_NAME=""; ORG_SLUG=""; PORT=""; UPDATE_CODE=0; UI_LANGUAGE=""
 SECTORS=()
 EMPLOYEES=()
 
@@ -38,6 +38,7 @@ while [ $# -gt 0 ]; do
     --sector) SECTORS+=("$2"); shift 2 ;;
     --include-employee) EMPLOYEES+=("$2"); shift 2 ;;
     --port) PORT="$2"; shift 2 ;;
+    --ui-language) UI_LANGUAGE="$2"; shift 2 ;;
     --main-dir) MAIN_DIR="$2"; shift 2 ;;
     --update-code) UPDATE_CODE=1; shift ;;
     -h|--help) sed -n 2,24p "$0"; exit 0 ;;
@@ -120,6 +121,7 @@ echo "  organization  : $ORG_NAME ($ORG_SLUG)"
 echo "  sectors       : ${SECTORS[*]}"
 echo "  employees in  : ${EMPLOYEES[*]:-none} (re-assigned to ${SECTORS[0]} in the copy)"
 echo "  port          : $PORT"
+echo "  UI language   : ${UI_LANGUAGE:-default}"
 echo "  systemd unit  : $UNIT (API only, no bot)"
 confirm "Continue to dry run of the data copy?" || exit 1
 
@@ -160,6 +162,9 @@ ANTHROPIC_API_KEY=$(get_main ANTHROPIC_API_KEY)
 SENTINEL_CLIENT_ID=$(get_main SENTINEL_CLIENT_ID)
 SENTINEL_CLIENT_SECRET=$(get_main SENTINEL_CLIENT_SECRET)
 AI_OUTPUT_LANGUAGE=lv
+
+# Dashboard language (display only). "lv" loads assets/i18n-lv.js; empty = default UI.
+UI_LANGUAGE=$UI_LANGUAGE
 
 # Own key: credentials stored in this instance are not readable by the main one
 INTEGRATION_CREDENTIALS_KEY=$INT_KEY

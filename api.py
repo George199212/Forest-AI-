@@ -514,7 +514,17 @@ def inspector_report_issue(body: ReportIssueIn):
 @app.get("/", response_class=HTMLResponse)
 def serve_index():
     p = Path("index.html")
-    return HTMLResponse(p.read_text(encoding="utf-8") if p.exists() else "<h1>Forest AI</h1>")
+    if not p.exists():
+        return HTMLResponse("<h1>Forest AI</h1>")
+    html = p.read_text(encoding="utf-8")
+    # Per-instance UI language (client accounts, see docs/CLIENT_INSTANCES.md).
+    # Unset = the page is served unchanged. "lv" loads assets/i18n-lv.js, a
+    # display-only translation layer; data and API responses are not changed.
+    ui_lang = os.environ.get("UI_LANGUAGE", "").strip().lower()
+    if ui_lang and ui_lang.isalpha() and Path(f"assets/i18n-{ui_lang}.js").exists():
+        html = html.replace('<html lang="en">', f'<html lang="{ui_lang}">', 1)
+        html = html.replace("</head>", f'<script src="/assets/i18n-{ui_lang}.js"></script>\n</head>', 1)
+    return HTMLResponse(html)
 
 @app.get("/photos/file/{filename}")
 def serve_photo_file(filename: str):

@@ -12,7 +12,9 @@
 - Verified locally: script tested on a synthetic DB (filtering, no credential leak, dangling
   and unknown-table guards, refuse-overwrite); second instance started with uvicorn on the
   filtered DB: sees only BIK-001, wrong login → 401, photos served.
-- Application code unchanged.
+- 2026-10-13: Latvian dashboard for client instances: `UI_LANGUAGE=lv` → `assets/i18n-lv.js`
+  (display-only layer). Only `api.py::serve_index` changed; without the setting the page is
+  byte-identical. Verified by crawling all 16 pages/tabs: no Russian left, no new JS errors.
 - Research: `docs/rigas-mezi-real-infrastructure.md`, `docs/rigas-mezi-architecture.md`.
 - Schema fact confirmed by running `init_db()` on an empty DB at commit `1c86df3`: 37 tables.
   `organization_id` exists only on Integration Layer tables.

@@ -23,3 +23,6 @@ forest.db
 diagnostic_dump.txt
 DIAGNOSTIC_DUMP.md
 LEAFLET_CHECK.txt
+
+# i18n coverage tool: local copies of Chart.js / Leaflet (npm pack)
+tools/i18n_check/vendor/

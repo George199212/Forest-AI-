@@ -45,7 +45,7 @@ python3 /root/forest_ai/scripts/clone_sector_instance.py --source-root /root/for
 # 2. Create (interactive: dry run, then confirmation at each step)
 bash /root/forest_ai/deploy/create_client_instance.sh \
      --slug rm --org-name "Rīgas meži" --org-slug rigas-mezi \
-     --sector "BIK-001" --port 8002
+     --sector "BIK-001" --port 8002 --ui-language lv
 ```
 
 The script prints the URL, login and generated password at the end.
@@ -88,6 +88,36 @@ The re-assignment is listed in the dry-run warnings and in `instance_manifest.js
 - Dangling references (kept row pointing at a dropped row) block `--apply`
   unless `--allow-dangling` is given after review.
 - `PRAGMA integrity_check` must return `ok`.
+
+## Dashboard language (Latvian for Rīgas meži)
+
+`UI_LANGUAGE=lv` in the instance `.env` makes `api.py` inject `assets/i18n-lv.js` into
+`index.html`. Without it the page is served byte-for-byte unchanged (verified).
+
+The layer is **display only**: it translates known UI strings on screen (text, placeholders,
+titles, dialogs, chart labels, date format) through an exact-match dictionary plus patterns
+for strings with numbers. It never changes the DB, API responses, form input, AI output or
+map attribution. Unknown strings stay as they are, so a new English/Russian string added to
+`index.html` shows untranslated until it is added to `EXACT` in `assets/i18n-lv.js`.
+
+AI texts are already Latvian through `AI_OUTPUT_LANGUAGE=lv`.
+
+Coverage check after changing `index.html` (needs Playwright + Chromium):
+
+```bash
+cd tools/i18n_check && mkdir -p vendor && cd vendor \
+  && npm pack chart.js@4.4.1 leaflet@1.9.4 \
+  && for f in *.tgz; do d=${f%.tgz}; mkdir -p $d && tar xzf $f -C $d --strip-components=1; done && cd ..
+# start a test instance on 8102 with UI_LANGUAGE=lv and a DB from make_fixture.py, then:
+python3 crawl.py 8102 out.json && python3 report.py out.json
+```
+
+Known limits: integration catalog notes come from `services/integrations/registry.py` and are
+shown in a client-neutral Latvian wording; the long-term fix is a client-specific Integrations
+page (see `docs/rigas-mezi-architecture.md` §7).
+
+To enable on an existing instance: add `UI_LANGUAGE=lv` to its `.env`, then
+`systemctl restart forest-<slug>-api`.
 
 ## Updating code
 
