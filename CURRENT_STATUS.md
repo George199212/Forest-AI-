@@ -16,6 +16,9 @@
   (display-only layer). Only `api.py::serve_index` changed; without the setting the page is
   byte-identical. Verified by crawling all 16 pages/tabs: no Russian left, no new JS errors.
 - Research: `docs/rigas-mezi-real-infrastructure.md`, `docs/rigas-mezi-architecture.md`.
+- 2026-10-13: photo comparison — default view "Sakrītošās vietas", reviewer action "Nav tā pati vieta"
+  in the UI (API existed), and `mark_not_same_place` now refuses changes behind an accepted conclusion
+  (409, same rule as review undo) and logs the removed automatic findings.
 - Schema fact confirmed by running `init_db()` on an empty DB at commit `1c86df3`: 37 tables.
   `organization_id` exists only on Integration Layer tables.
 
