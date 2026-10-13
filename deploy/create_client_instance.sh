@@ -55,7 +55,10 @@ sync_code() {
   # Code only. data/, .env, databases, caches and backups are never copied.
   # Excludes mirror .gitignore plus .git and ad-hoc files that may mention other
   # sectors. --delete-excluded also removes them from an existing client instance.
+  # P (protect) rules MUST come first: with --delete-excluded rsync would otherwise
+  # delete the client's own data/ and .env, which are excluded from the copy.
   rsync -a --delete --delete-excluded \
+    --filter 'P /data/' --filter 'P /.env' --filter 'P /assets/' \
     --exclude 'data/' --exclude '.env' --exclude '*.db' --exclude '*.db-*' \
     --exclude '__pycache__/' --exclude '*.pyc' --exclude 'venv/' --exclude '*.bak_*' \
     --exclude '*.bak' --exclude '*.log' --exclude '*.patch' --exclude '*.zip' \
