@@ -63,7 +63,7 @@ sync_code() {
     --exclude '__pycache__/' --exclude '*.pyc' --exclude 'venv/' --exclude '*.bak_*' \
     --exclude '*.bak' --exclude '*.log' --exclude '*.patch' --exclude '*.zip' \
     --exclude '.git/' --exclude '.claude/' --exclude '.serena/' --exclude '.headroom/' \
-    --exclude 'diagnostic_dump.txt' --exclude 'DIAGNOSTIC_DUMP.md' --exclude 'LEAFLET_CHECK.txt' \
+    --exclude 'diagnostic_dump.txt' --exclude 'DIAGNOSTIC_DUMP.md' --exclude 'LEAFLET_*.txt' \
     --exclude '*.png' --exclude '*.jpg' --exclude '*.jpeg' \
     "$MAIN_DIR/" "$TARGET_DIR/"
   # assets/ (logo) is needed by the dashboard; copy it explicitly
