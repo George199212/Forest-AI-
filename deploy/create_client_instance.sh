@@ -28,6 +28,7 @@ MAIN_DIR="/root/forest_ai"
 MAIN_UNIT="forest-api.service"
 SLUG=""; ORG_NAME=""; ORG_SLUG=""; PORT=""; UPDATE_CODE=0
 SECTORS=()
+EMPLOYEES=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -35,6 +36,7 @@ while [ $# -gt 0 ]; do
     --org-name) ORG_NAME="$2"; shift 2 ;;
     --org-slug) ORG_SLUG="$2"; shift 2 ;;
     --sector) SECTORS+=("$2"); shift 2 ;;
+    --include-employee) EMPLOYEES+=("$2"); shift 2 ;;
     --port) PORT="$2"; shift 2 ;;
     --main-dir) MAIN_DIR="$2"; shift 2 ;;
     --update-code) UPDATE_CODE=1; shift ;;
@@ -106,12 +108,14 @@ echo "Plan:"
 echo "  new directory : $TARGET_DIR"
 echo "  organization  : $ORG_NAME ($ORG_SLUG)"
 echo "  sectors       : ${SECTORS[*]}"
+echo "  employees in  : ${EMPLOYEES[*]:-none} (re-assigned to ${SECTORS[0]} in the copy)"
 echo "  port          : $PORT"
 echo "  systemd unit  : $UNIT (API only, no bot)"
 confirm "Continue to dry run of the data copy?" || exit 1
 
 SECTOR_ARGS=()
 for s in "${SECTORS[@]}"; do SECTOR_ARGS+=(--sector "$s"); done
+for e in "${EMPLOYEES[@]}"; do SECTOR_ARGS+=(--include-employee "$e"); done
 
 # ── 1. Dry run of the data copy (writes nothing) ────────────────────────────
 "$PY" "$MAIN_DIR/scripts/clone_sector_instance.py" --source-root "$MAIN_DIR" \

@@ -51,6 +51,21 @@ bash /root/forest_ai/deploy/create_client_instance.sh \
 The script prints the URL, login and generated password at the end.
 The password is stored only in `/root/forest_ai_rm/.env`.
 
+### Workers registered under another sector
+
+If the kept sector's sessions, live locations or routes were recorded by a worker whose
+`sector_employees` row belongs to another sector, the dry run reports dangling
+`employee_id` references. Pass that worker's id:
+
+```bash
+... --sector "BIK-001" --include-employee 2
+```
+
+The row is copied and re-assigned to the first kept sector **in the copy only**
+(the main DB is not changed), so the client never sees another sector's name.
+The re-assignment is listed in the dry-run warnings and in `instance_manifest.json`
+(`reassigned_employees`).
+
 ### What is copied
 
 - Code: exactly what runs in `/root/forest_ai` (rsync, without `data/`, `.env`, `*.db`, caches, `*.bak_*`).

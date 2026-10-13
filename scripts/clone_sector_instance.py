@@ -174,8 +174,13 @@ def list_sectors(source_db):
         conn.close()
 
 
-def filter_db(db_path, keep, org_name, org_slug):
-    """Delete everything not belonging to `keep` sectors. Returns a report dict."""
+def filter_db(db_path, keep, org_name, org_slug, include_employees=()):
+    """Delete everything not belonging to `keep` sectors. Returns a report dict.
+
+    include_employees: sector_employees ids registered under another sector but
+    referenced by kept rows (e.g. the same worker did the kept sector's sessions).
+    They are kept and re-assigned to the first kept sector in the copy only, so the
+    client instance does not show another sector's name. Recorded in the report."""
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys=OFF")
     report = {"before": {}, "after": {}, "warnings": [], "dangling": {}}
@@ -210,8 +215,24 @@ def filter_db(db_path, keep, org_name, org_slug):
         raise SystemExit("ERROR: none of the requested sectors exist in the sectors table. "
                          "Run with --list-sectors to see exact names.")
 
+    emp_ids = sorted({int(i) for i in include_employees})
+    if emp_ids:
+        ep = ",".join("?" for _ in emp_ids)
+        rows = conn.execute(f"SELECT id, sector FROM sector_employees WHERE id IN ({ep})", emp_ids).fetchall()
+        missing_emp = sorted(set(emp_ids) - {r[0] for r in rows})
+        if missing_emp:
+            conn.close()
+            raise SystemExit(f"ERROR: --include-employee id(s) not found in sector_employees: {missing_emp}")
+
     with conn:
         conn.execute(f"DELETE FROM sectors WHERE name NOT IN ({placeholders})", keep_list)
+        if emp_ids:
+            conn.execute(f"UPDATE sector_employees SET sector=? WHERE id IN ({ep})", [keep_list[0]] + emp_ids)
+            report["reassigned_employees"] = [{"id": r[0], "from_sector": r[1], "to_sector": keep_list[0]}
+                                              for r in rows]
+            report["warnings"].append(
+                "employees re-assigned in the copy: " +
+                ", ".join(f"#{r[0]} {r[1]!r} -> {keep_list[0]!r}" for r in rows))
         for t in sector_tables:
             conn.execute(f'DELETE FROM "{t}" WHERE sector IS NULL OR sector NOT IN ({placeholders})',
                          keep_list)
@@ -324,6 +345,9 @@ def main():
     ap.add_argument("--list-sectors", action="store_true")
     ap.add_argument("--apply", action="store_true", help="write the target DB and copy files")
     ap.add_argument("--allow-dangling", action="store_true")
+    ap.add_argument("--include-employee", action="append", default=[], type=int,
+                    help="sector_employees id referenced by kept rows but registered under another "
+                         "sector; copied and re-assigned to the first kept sector (repeatable)")
     args = ap.parse_args()
 
     source_root = os.path.abspath(args.source_root)
@@ -350,7 +374,7 @@ def main():
         tmp_db = os.path.join(workdir, "forest_ai.db")
         source_hash_before = sha256(source_db)
         copy_source_db(source_db, tmp_db)
-        report = filter_db(tmp_db, keep, args.org_name, args.org_slug)
+        report = filter_db(tmp_db, keep, args.org_name, args.org_slug, args.include_employee)
         copy_plan, file_problems = resolve_files(report["files"], source_root, target_root)
         print_report(report, keep, copy_plan, file_problems)
 
@@ -378,6 +402,7 @@ def main():
             "source_db": source_db,
             "source_db_sha256_at_copy": source_hash_before,
             "kept_sectors": sorted(keep),
+            "reassigned_employees": report.get("reassigned_employees", []),
             "organization": {"id": 1, "name": args.org_name, "slug": args.org_slug},
             "rows_source": report["before"],
             "rows_kept": report["after"],
