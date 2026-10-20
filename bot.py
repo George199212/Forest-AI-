@@ -15,6 +15,12 @@ from services.robez_ocr_vision import analyze_robez_plan_ocr_vision
 from services.ai_resolution import generate_incident_recommendation
 from services import demo_scenarios
 from services import session_track
+import logging
+
+# Importing demo_scenarios enables INFO logging (logging.basicConfig). At INFO, httpx (used by
+# python-telegram-bot) logs every request URL, which contains the bot token -> keep it at WARNING.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:

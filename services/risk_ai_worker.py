@@ -209,6 +209,41 @@ def _volume_number(text):
         return None
     return float(m.group(1).replace(" ", "").replace("\u00a0", "") + ("." + m.group(2) if m.group(2) else ""))
 
+def _worker_label(w):
+    """'Name (employee #id)' when employee_id links to a sector_employees row (name from the DB only)."""
+    if not w["employee_id"]:
+        return "not linked to an employee"
+    if w["full_name"]:
+        return f"{w['full_name']} (employee #{w['employee_id']})"
+    return f"employee #{w['employee_id']}"
+
+def _admin_closed(w):
+    """Finish time written by an administrative close (step-3 data fix) or the bot's auto-close at check-in."""
+    comment = w["comment"] or ""
+    return "Slēgta administratīvi" in comment or "Auto-closed" in comment
+
+def _duration_text(minutes):
+    unit = lambda n, word: f"{n} {word}" + ("" if n == 1 else "s")
+    if minutes < 60:
+        return unit(minutes, "minute")
+    hours, rest = divmod(minutes, 60)
+    return unit(hours, "hour") + (" " + unit(rest, "minute") if rest else "")
+
+def _timing_facts(r):
+    """Event time, registration time and current time as separate facts; the delay is computed
+    from occurred -> registered only, never from 'now'."""
+    occurred, registered, now = _parse_ts(r["occurred_at"]), _parse_ts(r["created_at"]), _now()
+    fmt = lambda t: t.strftime("%Y-%m-%d %H:%M") if t else "not recorded"
+    lines = ["Event timing:",
+             f"- Event occurred at (UTC): {fmt(occurred)}" if occurred else "- Event time not recorded",
+             f"- Risk registered at (UTC): {fmt(registered)}",
+             f"- Current time (UTC): {fmt(now)}"]
+    if occurred and registered:
+        delay = int((registered - occurred).total_seconds() // 60)
+        lines.append(f"- Registration delay: {_duration_text(delay)}" if delay >= 0
+                     else "- Registration delay: not computable (event time is after registration time)")
+    return "\n".join(lines)
+
 def _sector_facts(sector, session_id=None):
     """Sector facts passed to the model, and whether they evidence operational activity.
     GPS check-ins only count as evidence when made by employees registered to this sector.
@@ -228,13 +263,13 @@ def _sector_facts(sector, session_id=None):
     distinct_workers = conn.execute(
         "SELECT COUNT(DISTINCT COALESCE('e' || employee_id, 't' || user_id)) FROM work_sessions WHERE sector=?",
         (sector,)).fetchone()[0]
-    sessions = conn.execute(
-        "SELECT id, employee_id, check_in_time, finish_time FROM work_sessions WHERE sector=? "
-        "ORDER BY check_in_time DESC, id DESC LIMIT ?", (sector, FACTS_MAX_SESSIONS)).fetchall()
+    session_cols = ("SELECT w.id, w.employee_id, w.check_in_time, w.finish_time, w.comment, e.full_name "
+                    "FROM work_sessions w LEFT JOIN sector_employees e ON e.id = w.employee_id ")
+    sessions = conn.execute(session_cols + "WHERE w.sector=? ORDER BY w.check_in_time DESC, w.id DESC LIMIT ?",
+                            (sector, FACTS_MAX_SESSIONS)).fetchall()
     risk_session_added = bool(session_id) and session_id not in [w["id"] for w in sessions]
     if risk_session_added:
-        sessions += conn.execute("SELECT id, employee_id, check_in_time, finish_time FROM work_sessions "
-                                 "WHERE id=?", (session_id,)).fetchall()
+        sessions += conn.execute(session_cols + "WHERE w.id=?", (session_id,)).fetchall()
     conn.close()
     status = (s["status"] or "").strip()
     volume = (s["approved_volume"] or "").strip()
@@ -255,9 +290,11 @@ def _sector_facts(sector, session_id=None):
         f"- distinct_workers among these check-ins: {distinct_workers}",
         f"- Work sessions ({'all' if len(sessions) >= checkins else f'the {FACTS_MAX_SESSIONS} most recent'}"
         f"{', plus the session of this risk' if risk_session_added and len(sessions) < checkins else ''}, times UTC):",
-        *[f"  - Session #{w['id']}: worker {'employee #' + str(w['employee_id']) if w['employee_id'] else 'not linked to an employee'}, "
+        *[f"  - Session #{w['id']}: worker {_worker_label(w)}, "
           f"check-in {w['check_in_time'] or 'not recorded'}, "
-          + (f"finish {w['finish_time']}" if w['finish_time'] else "finish time not recorded") for w in sessions],
+          + (f"finish {w['finish_time']}" if w['finish_time'] else "finish time not recorded")
+          + (" (finish time set administratively, not recorded by the worker)" if _admin_closed(w) else "")
+          for w in sessions],
         f"- Notes: {notes or 'none'}",
         f"- Worker presence evidenced by check-ins: {'YES' if checkins > 0 else 'NO'} "
         f"(presence is not evidence of logging operations)",
@@ -268,6 +305,7 @@ def _sector_facts(sector, session_id=None):
 
 def _build_prompt(r):
     facts, operational = _sector_facts(r["sector"], r["session_id"])
+    facts = _timing_facts(r) + "\n\n" + facts
     created = _parse_ts(r["created_at"])
     return WORKER_PROMPT_TEMPLATE.format(
         sector=r["sector"] or "unknown",
