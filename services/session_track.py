@@ -297,8 +297,10 @@ def exit_route(risk_id):
         events = conn.execute(
             "SELECT event_type, details, created_at FROM risk_events WHERE risk_id=? "
             "AND event_type IN ('DETECTED','STILL_OUTSIDE') ORDER BY created_at, id", (risk_id,)).fetchall()
-        exit_at = events[-1]["created_at"] if events else risk["created_at"]
-        s = conn.execute(
+        exit_at = events[-1]["created_at"] if events else (risk["occurred_at"] or risk["created_at"])
+        s = conn.execute("SELECT * FROM work_sessions WHERE id=?", (risk["session_id"],)).fetchone() \
+            if risk["session_id"] else None
+        s = s or conn.execute(
             "SELECT * FROM work_sessions WHERE employee_id=? AND check_in_time<=? "
             "AND (finish_time IS NULL OR finish_time='' OR finish_time>=?) "
             "ORDER BY check_in_time DESC, id DESC LIMIT 1",

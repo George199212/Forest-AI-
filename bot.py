@@ -761,6 +761,21 @@ def _is_inside_sector(sector, latitude, longitude):
     sector_lon = (sector_row.get("center_lon") if sector_row else None) or 24.1034
     return calculate_distance_meters(latitude, longitude, sector_lat, sector_lon) <= 10000
 
+def resolve_employee(telegram_user_id, sector):
+    """Employee behind a Telegram id. Several employees can share one id: take the one assigned
+    to `sector`; if none or more than one is, keep the old first-row fallback and report it.
+    Returns (id, full_name, home_sector, ambiguous, shared_count) or None."""
+    rows = db_fetchall("SELECT id, full_name, sector FROM sector_employees WHERE telegram_user_id=?",
+                       (telegram_user_id,))
+    if not rows:
+        return None
+    if len(rows) == 1:
+        return (*rows[0], False, 1)
+    in_sector = [r for r in rows if sector and r[2] == sector]
+    if len(in_sector) == 1:
+        return (*in_sector[0], False, len(rows))
+    return (*rows[0], True, len(rows))
+
 def upsert_live_location(employee_id, telegram_user_id, sector, latitude, longitude, live_period, new_share=False):
     """One row per person — UPSERT by telegram_user_id so live-location edits
     (sent every few seconds by Telegram) update the same row instead of
@@ -923,6 +938,9 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                            or not track.get("ll_refreshed"))
         if first_of_share:
             sector_name = active["sector"]  # a new live share takes the active session's sector
+        employee_id, employee_name, employee_sector, identity_ambiguous, identity_shared = resolve_employee(
+            telegram_user_id, (active or {}).get("sector") or sector_name)
+        session_id = active["id"] if active else None
         old_status, new_status = upsert_live_location(
             employee_id, telegram_user_id, sector_name,
             loc.latitude, loc.longitude, loc.live_period, new_share=first_of_share
@@ -939,10 +957,12 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if old_status == "IN" and new_status == "OUT":
             incident_reason = f"Worker {employee_name} left sector boundary"
 
+            # Same incident only for the same employee, sector and work session.
             existing = db_fetchone(
                 "SELECT id FROM risks WHERE entity_type='EMPLOYEE' AND entity_id=? "
-                "AND rule_code='SECTOR_EXIT' AND status IN ('OPEN','NOTIFIED') ORDER BY id DESC LIMIT 1",
-                (employee_id,)
+                "AND rule_code='SECTOR_EXIT' AND status IN ('OPEN','NOTIFIED') "
+                "AND sector=? AND session_id IS ? ORDER BY id DESC LIMIT 1",
+                (employee_id, sector_name, session_id)
             )
             if existing:
                 incident_id = existing[0]
@@ -952,6 +972,8 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     sector_name, "HIGH", incident_reason,
                     entity_type="EMPLOYEE", entity_id=employee_id, rule_code="SECTOR_EXIT"
                 )
+                db_execute("UPDATE risks SET session_id=?, identity_ambiguous=?, identity_shared_count=? WHERE id=?",
+                           (session_id, 1 if identity_ambiguous else 0, identity_shared, incident_id))
                 add_risk_event(incident_id, "DETECTED", actor="system")
 
                 import asyncio
@@ -1058,14 +1080,12 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await ask_sector_again(update.message, context, "No sector selected for this check-in.")
         return
 
-    employee_row = db_fetchone(
-        "SELECT id, full_name FROM sector_employees WHERE telegram_user_id=?",
-        (str(update.effective_user.id),)
-    )
-    if employee_row:
-        employee_id, employee = employee_row
+    resolved = resolve_employee(str(update.effective_user.id), sector_name)
+    if resolved:
+        employee_id, employee, _, identity_ambiguous, identity_shared = resolved
     else:
         employee_id, employee = None, update.effective_user.full_name or str(update.effective_user.id)
+        identity_ambiguous, identity_shared = False, 0
 
     checked_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
@@ -1103,6 +1123,8 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     """, (str(update.effective_user.id), employee, employee_id, contractor, sector_name, checked_at, "",
           loc.latitude, loc.longitude, distance, "YES" if approved else "NO", ""))
+    db_execute("UPDATE work_sessions SET identity_ambiguous=?, identity_shared_count=? WHERE id=?",
+               (1 if identity_ambiguous else 0, identity_shared, session_id))
 
     if loc.live_period:
         upsert_live_location(

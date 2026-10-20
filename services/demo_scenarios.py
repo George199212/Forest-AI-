@@ -231,7 +231,14 @@ def _ensure_equipment(sector_name, equipment_code, equipment_type, operator_empl
 
 def _existing_open_incident(entity_type, entity_id, rule_code, sector=None):
     conn = _conn()
-    if entity_id is not None:
+    if entity_id is not None and sector is not None:
+        # Same rule as the live geofence: same employee, same sector, same (here: no) session.
+        row = conn.execute(
+            "SELECT * FROM risks WHERE entity_type=? AND entity_id=? AND rule_code=? AND sector=? "
+            "AND session_id IS NULL AND status IN ('OPEN','NOTIFIED') ORDER BY id DESC LIMIT 1",
+            (entity_type, entity_id, rule_code, sector),
+        ).fetchone()
+    elif entity_id is not None:
         row = conn.execute(
             "SELECT * FROM risks WHERE entity_type=? AND entity_id=? AND rule_code=? "
             "AND status IN ('OPEN','NOTIFIED') ORDER BY id DESC LIMIT 1",
@@ -375,7 +382,7 @@ def trigger_worker_exit(triggered_by="demo_trigger"):
     distance_out = geo.distance_to_polygon_edge_m(out_lat, out_lon, boundary)
     inside = geo.point_in_polygon(out_lat, out_lon, boundary)
 
-    existing = _existing_open_incident("EMPLOYEE", worker["id"], "SECTOR_EXIT")
+    existing = _existing_open_incident("EMPLOYEE", worker["id"], "SECTOR_EXIT", sector=SECTOR_EXIT_SECTOR)
     if existing:
         incident_id = existing["id"]
         database.add_risk_event(incident_id, "STILL_OUTSIDE", actor=triggered_by,

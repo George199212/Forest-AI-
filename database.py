@@ -106,6 +106,13 @@ def _migrate():
     # every existing row; the worker sets REQUESTED/RUNNING/DONE/FAILED.
     _add_column_if_missing(cur, "risks", "ai_status", "TEXT")
     _add_column_if_missing(cur, "risks", "ai_attempts", "INTEGER DEFAULT 0")
+    # Sector-exit attribution: the work session an incident belongs to, and whether the
+    # employee behind a shared Telegram id could not be resolved unambiguously.
+    _add_column_if_missing(cur, "risks", "session_id", "INTEGER")
+    _add_column_if_missing(cur, "risks", "identity_ambiguous", "INTEGER")
+    _add_column_if_missing(cur, "risks", "identity_shared_count", "INTEGER")
+    # When the incident happened, if that differs from when its row was created (created_at).
+    _add_column_if_missing(cur, "risks", "occurred_at", "TEXT")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS risk_events (
@@ -297,6 +304,8 @@ def _migrate():
         ("distance_m",    "REAL"),
         ("approved",      "TEXT"),
         ("comment",       "TEXT"),
+        ("identity_ambiguous",    "INTEGER"),
+        ("identity_shared_count", "INTEGER"),
     ]:
         _add_column_if_missing(cur, "work_sessions", column, definition)
 

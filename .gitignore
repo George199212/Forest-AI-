@@ -23,3 +23,8 @@ forest.db
 diagnostic_dump.txt
 DIAGNOSTIC_DUMP.md
 LEAFLET_CHECK.txt
+
+# Local screenshots, generated images and Leaflet diagnostics (not for git)
+LEAFLET_*.txt
+Screenshot*.png
+kling_*.png
