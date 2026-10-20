@@ -56,7 +56,8 @@ def list_catalog(organization_id=1):
             # never "Connected".
             "display_status": (row["connection_status"] if row else
                                 ("Demo" if entry.status_claim == "demo" else
-                                 "Available" if entry.status_claim == "available" else "Planned")),
+                                 "Available" if entry.status_claim == "available" else
+                                 "Not configured" if entry.status_claim == "not_configured" else "Planned")),
         })
     return out
 

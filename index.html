@@ -745,7 +745,7 @@ function formatSnapshotDateTime(createdAt) {
   return `${day}.${month}.${year} · ${hh}:${mm}`;
 }
 function statusBadge(s) {
-  if (!s) return '';
+  if (!s) return '–';
   const l = s.toLowerCase();
   if (l.includes('active')||l==='yes'||l==='ok') return badge(s,'b-green');
   if (l.includes('pause')||l.includes('missing')||l==='no') return badge(s,'b-amber');
@@ -1217,7 +1217,7 @@ async function openSector(name, push=true) {
   const data = await api('/api/sectors/'+encodeURIComponent(name));
   currentDetailData = data;
   const s = data.sector;
-  document.getElementById('detail-meta').textContent = `${s.contractor||''} · ${s.status||''} · ${s.approved_volume||''}`;
+  document.getElementById('detail-meta').textContent = [s.contractor, s.status, s.approved_volume].filter(Boolean).join(' · ');
 
   document.getElementById('detail-stats').innerHTML = `
     <div class="stat-box"><div class="stat-box-n">${data.gps_sessions.length}</div><div class="stat-box-l">GPS</div></div>
@@ -1262,6 +1262,7 @@ async function openSector(name, push=true) {
           <div style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Estimated Financial Exposure</div>
           <div style="font-size:20px;font-weight:600;color:${s.exposure_low>0?'var(--red)':'var(--green)'};font-family:var(--mono)">${s.exposure_label||'€0'}</div>
           ${s.vol_at_risk>0?`<div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--mono)">${s.vol_at_risk} m³ · €60–120/m³ market rate</div>`:''}
+          ${s.exposure_basis==='flat_per_open_high_risk'?`<div style="font-size:11px;color:var(--text3);margin-top:4px">Приблизительная оценка: фиксированный коэффициент за каждый открытый риск высокого уровня</div>`:''}
         </div>
         ${s.timber_miss_vol>0||s.truck_discrepancy>0||s.rejected_gps>0?`
         <div style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--text2)">

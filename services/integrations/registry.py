@@ -17,6 +17,7 @@ SCALAR, LVM GEO, Planet/Maxar/ICEYE, generic ERP) is a catalog entry for a
 *possible future* integration, not a claim that any current client uses it.
 """
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional, Type
 
@@ -32,7 +33,7 @@ class ProviderEntry:
     implemented: bool = False
     demo_available: bool = False
     adapter_class: Optional[Type[IntegrationAdapter]] = None
-    status_claim: str = "planned"      # planned | available | demo | connected (connected only if implemented)
+    status_claim: str = "planned"      # planned | available | demo | not_configured | connected (connected only if implemented)
     confirmed_customer_use: Optional[str] = None   # None, or a short factual note
     notes: str = ""
 
@@ -65,7 +66,7 @@ def _catalog() -> list[ProviderEntry]:
         # ── Fleet / GPS / logistics ──────────────────────────────────────
         ProviderEntry("zf_scalar", "fleet", "ZF SCALAR", "ZF", status_claim="planned"),
         ProviderEntry(
-            "krauzers_fleet", "fleet", "KRAUZERS Fleet GPS", "KRAUZERS (exact vendor TBD",
+            "krauzers_fleet", "fleet", "KRAUZERS Fleet GPS", "KRAUZERS (exact vendor TBD)",
             status_claim="planned",
             confirmed_customer_use=(
                 "KRAUZERS is confirmed to use GPS/electronic fleet systems for timber trucks; "
@@ -108,7 +109,9 @@ def _catalog() -> list[ProviderEntry]:
 
         # ── Workers / communication ───────────────────────────────────────
         ProviderEntry(
-            "telegram_bot", "worker", "Telegram Bot", "Telegram", status_claim="available",
+            "telegram_bot", "worker", "Telegram Bot", "Telegram",
+            # Instances without a bot (e.g. client instances) have no token in their .env.
+            status_claim="available" if os.environ.get("TELEGRAM_BOT_TOKEN", "").strip() else "not_configured",
             notes="Already live in production via bot.py — this catalog entry documents it, "
                   "it is not managed through the generic adapter sync pipeline.",
         ),

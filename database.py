@@ -1141,6 +1141,43 @@ def get_route(entity_type, entity_id, start, end):
     return rows
 
 
+# ── Work Sessions ─────────────────────────────────────────────────────────────
+# A session is open while finish_time is empty or NULL. bot.py keeps the active
+# session only in memory, so these let it close/find open sessions from the DB.
+
+def close_open_sessions(user_id, finish_time, note):
+    """Close every open session of a Telegram user (finish_time = `finish_time`,
+    `note` appended to comment with ' | '). Returns the ids closed."""
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM work_sessions WHERE user_id=? AND (finish_time IS NULL OR finish_time='')",
+                (str(user_id),))
+    ids = [r[0] for r in cur.fetchall()]
+    for session_id in ids:
+        cur.execute("""
+        UPDATE work_sessions SET finish_time=?,
+            comment=CASE WHEN comment IS NULL OR comment='' THEN ? ELSE comment || ' | ' || ? END
+        WHERE id=? AND (finish_time IS NULL OR finish_time='')
+        """, (finish_time, note, note, session_id))
+    conn.commit()
+    conn.close()
+    return ids
+
+def get_latest_open_session(user_id):
+    """Most recent open session of a Telegram user as a dict, or None."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("""
+    SELECT * FROM work_sessions
+    WHERE user_id=? AND (finish_time IS NULL OR finish_time='')
+    ORDER BY check_in_time DESC, id DESC LIMIT 1
+    """, (str(user_id),))
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 # ── Incidents (risks, extended with Incident-lifecycle fields) ─────────────
 
 def add_incident(sector, risk_level, reason, entity_type=None, entity_id=None,

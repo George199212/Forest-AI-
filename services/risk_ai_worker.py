@@ -15,6 +15,7 @@ every failure as AI_ANALYSIS_FAILED. Existing AI output is never overwritten.
 
 import json
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -59,7 +60,8 @@ WORKER_PROMPT_TEMPLATE = (
     "5. If the event text describes a forecast, a warning or an unconfirmed event, say so explicitly "
     "and do not describe damage as having occurred.\n"
     "6. Each option's message_text is a ready-to-send Telegram message (2-3 sentences, no markdown) to "
-    "the person who would carry out that option.\n\n"
+    "the person who would carry out that option.\n"
+    "7. Do not state counts, statuses or open/closed states that are not given explicitly in the facts.\n\n"
     "Return ONLY valid JSON, no markdown code fences, no text outside the JSON object, with exactly "
     "these fields:\n"
     "{{\n"
@@ -73,9 +75,12 @@ WORKER_PROMPT_TEMPLATE = (
     "}}"
 )
 OPERATIONS_RULE_NO = (
-    "The sector data shows no logging operations. Do not mention crews, workers on duty, felling, "
-    "machinery, timber or suspending works. Recommend only what the data supports: visitor safety, "
-    "inspection, photo documentation, monitoring the forecast."
+    "The sector data shows no logging operations. You may refer to people named or referenced in the "
+    "event text or in the facts (e.g. the worker in the event, by the name or employee reference given "
+    "there) and to their presence. Do not assume or describe logging, felling, harvesting, timber removal, "
+    "machinery, crews or contractors' operations that are not stated in the facts, and do not suggest "
+    "suspending works. Recommend only what the data supports: visitor safety, inspection, photo "
+    "documentation, monitoring the forecast, and contacting the people referenced above."
 )
 OPERATIONS_RULE_YES = (
     "The sector data shows operational activity (listed above). Recommendations may address the "
@@ -191,9 +196,23 @@ def _language():
     return code, LANGUAGE_NAMES.get(code.lower(), code)
 
 
-def _sector_facts(sector):
+FACTS_MAX_SESSIONS = 10   # most recent work sessions listed individually in the facts
+
+# First standalone number in a free-text volume ("300 m3", "1 200 m³", "1200,5"); a digit glued
+# to a letter (the 3 in "m3") is not a number.
+_VOLUME_NUMBER = re.compile(r"(?<!\w)(\d{1,3}(?:[ \u00a0]\d{3})+|\d+)(?:[.,](\d+))?")
+
+def _volume_number(text):
+    """Approved volume as a number, or None when the text has no number (e.g. "Nav…", "–")."""
+    m = _VOLUME_NUMBER.search(text or "")
+    if not m:
+        return None
+    return float(m.group(1).replace(" ", "").replace("\u00a0", "") + ("." + m.group(2) if m.group(2) else ""))
+
+def _sector_facts(sector, session_id=None):
     """Sector facts passed to the model, and whether they evidence operational activity.
-    GPS check-ins only count as evidence when made by employees registered to this sector."""
+    GPS check-ins only count as evidence when made by employees registered to this sector.
+    `session_id` (the risk's own work session) is always listed, even if older than the rest."""
     conn = _conn()
     s = conn.execute("SELECT status, approved_volume, notes FROM sectors WHERE name=? LIMIT 1", (sector,)).fetchone()
     if not s:
@@ -205,12 +224,25 @@ def _sector_facts(sector):
     staff_checkins = conn.execute(
         "SELECT COUNT(*) FROM work_sessions w WHERE w.sector=? AND w.employee_id IN "
         "(SELECT id FROM sector_employees WHERE sector=? AND active=1)", (sector, sector)).fetchone()[0]
+    # Distinct people behind the check-ins: by employee_id, else by Telegram user id.
+    distinct_workers = conn.execute(
+        "SELECT COUNT(DISTINCT COALESCE('e' || employee_id, 't' || user_id)) FROM work_sessions WHERE sector=?",
+        (sector,)).fetchone()[0]
+    sessions = conn.execute(
+        "SELECT id, employee_id, check_in_time, finish_time FROM work_sessions WHERE sector=? "
+        "ORDER BY check_in_time DESC, id DESC LIMIT ?", (sector, FACTS_MAX_SESSIONS)).fetchall()
+    risk_session_added = bool(session_id) and session_id not in [w["id"] for w in sessions]
+    if risk_session_added:
+        sessions += conn.execute("SELECT id, employee_id, check_in_time, finish_time FROM work_sessions "
+                                 "WHERE id=?", (session_id,)).fetchall()
     conn.close()
     status = (s["status"] or "").strip()
     volume = (s["approved_volume"] or "").strip()
     notes = (s["notes"] or "").strip()[:1000]
-    operational = (status.lower().startswith("active") or bool(volume) or equipment > 0
-                   or vehicles > 0 or staff_checkins > 0)
+    # Check-ins show that people were present, not that logging is going on, so they are not evidence.
+    volume_number = _volume_number(volume)
+    operational = (status.lower().startswith("active") or (volume_number or 0) > 0 or equipment > 0
+                   or vehicles > 0)
     lines = [
         "Sector data (from the database):",
         f"- Status: {status or 'not set'}",
@@ -219,14 +251,23 @@ def _sector_facts(sector):
         f"- Active vehicles registered: {vehicles}",
         f"- GPS check-ins by employees registered to this sector: {staff_checkins}",
         f"- GPS check-ins by people not registered to this sector: {checkins - staff_checkins}",
+        f"- check-ins (work sessions) in this sector: {checkins}",
+        f"- distinct_workers among these check-ins: {distinct_workers}",
+        f"- Work sessions ({'all' if len(sessions) >= checkins else f'the {FACTS_MAX_SESSIONS} most recent'}"
+        f"{', plus the session of this risk' if risk_session_added and len(sessions) < checkins else ''}, times UTC):",
+        *[f"  - Session #{w['id']}: worker {'employee #' + str(w['employee_id']) if w['employee_id'] else 'not linked to an employee'}, "
+          f"check-in {w['check_in_time'] or 'not recorded'}, "
+          + (f"finish {w['finish_time']}" if w['finish_time'] else "finish time not recorded") for w in sessions],
         f"- Notes: {notes or 'none'}",
+        f"- Worker presence evidenced by check-ins: {'YES' if checkins > 0 else 'NO'} "
+        f"(presence is not evidence of logging operations)",
         f"- Operational activity evidenced by this data: {'YES' if operational else 'NO'}",
     ]
     return "\n".join(lines), operational
 
 
 def _build_prompt(r):
-    facts, operational = _sector_facts(r["sector"])
+    facts, operational = _sector_facts(r["sector"], r["session_id"])
     created = _parse_ts(r["created_at"])
     return WORKER_PROMPT_TEMPLATE.format(
         sector=r["sector"] or "unknown",

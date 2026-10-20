@@ -100,8 +100,11 @@ def n(sql, params=()):
 # ── Risk Score Calculator ─────────────────────────────────────────────────────
 
 def calc_risk_score(sector_name: str) -> dict:
-    high_risks   = n("SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='HIGH'", (sector_name,))
-    medium_risks = n("SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='MEDIUM'", (sector_name,))
+    # Only open risks count. Terminal statuses as in database.update_incident_status /
+    # risk_conclusion.CLOSED_STATUSES; NULL/'' (legacy add_risk() rows) counts as open.
+    open_risk = "AND COALESCE(status,'') NOT IN ('RESOLVED','DISMISSED')"
+    high_risks   = n(f"SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='HIGH' {open_risk}", (sector_name,))
+    medium_risks = n(f"SELECT COUNT(*) AS n FROM risks WHERE sector=? AND risk_level='MEDIUM' {open_risk}", (sector_name,))
     rejected_gps = n("SELECT COUNT(*) AS n FROM work_sessions WHERE sector=? AND approved='NO'", (sector_name,))
     timber_miss  = n("SELECT COUNT(*) AS n FROM timber_movements WHERE sector=? AND status='MISSING_VOLUME'", (sector_name,))
     timber_over  = n("SELECT COUNT(*) AS n FROM timber_movements WHERE sector=? AND status='OVER_VOLUME'", (sector_name,))
@@ -114,6 +117,11 @@ def calc_risk_score(sector_name: str) -> dict:
     elif score <= 60:
         level, color = "MEDIUM", "yellow"
     else:
+        level, color = "HIGH", "red"
+
+    # Floor: one open HIGH risk makes the sector HIGH, whatever the additive score.
+    if high_risks > 0:
+        score = max(score, 61)
         level, color = "HIGH", "red"
 
     # ── Financial exposure calculator ─────────────────────────────────────────
@@ -167,6 +175,10 @@ def calc_risk_score(sector_name: str) -> dict:
         "exposure_low":  exposure_low,
         "exposure_high": exposure_high,
         "exposure_label": f"€{exposure_low:,}–€{exposure_high:,}" if exposure_low > 0 else "€0",
+        # "flat_per_open_high_risk" when the range is only the per-HIGH-risk constant,
+        # "calculated" when volume or GPS components contribute, "none" when it is 0.
+        "exposure_basis": ("none" if exposure_low == 0 else
+                           "flat_per_open_high_risk" if vol_at_risk == 0 and rejected_gps == 0 else "calculated"),
         "vol_at_risk": round(float(vol_at_risk), 1),
         "timber_miss_vol": round(float(timber_miss_vol), 1),
         "truck_discrepancy": round(truck_discrepancy, 1),
@@ -632,6 +644,7 @@ def get_sectors():
         s["exposure_low"]  = rs["exposure_low"]
         s["exposure_high"] = rs["exposure_high"]
         s["exposure_label"] = rs["exposure_label"]
+        s["exposure_basis"] = rs["exposure_basis"]
         s["gps_count"]    = n("SELECT COUNT(*) AS n FROM work_sessions WHERE sector=?", (s["name"],))
         s["photo_count"]  = n("SELECT COUNT(*) AS n FROM work_photos WHERE sector=?", (s["name"],))
         s["risk_count"]   = n("SELECT COUNT(*) AS n FROM risks WHERE sector=?", (s["name"],))
@@ -1393,6 +1406,7 @@ def get_sector_detail(name: str):
     sector["exposure_low"] = rs["exposure_low"]
     sector["exposure_high"] = rs["exposure_high"]
     sector["exposure_label"] = rs["exposure_label"]
+    sector["exposure_basis"] = rs["exposure_basis"]
     sector["vol_at_risk"] = rs["vol_at_risk"]
     sector["timber_miss_vol"] = rs["timber_miss_vol"]
     sector["truck_discrepancy"] = rs["truck_discrepancy"]

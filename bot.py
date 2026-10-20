@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters, ApplicationHandlerStop
-from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event, set_ai_recommendation, get_active_incident_for_employee
+from database import init_db, add_sector, get_sectors, add_risk, get_risks, parse_boundary, calc_centroid, calc_area_ha, add_incident, add_risk_event, set_ai_recommendation, get_active_incident_for_employee, close_open_sessions, get_latest_open_session
 from services.robez_ocr_vision import analyze_robez_plan_ocr_vision
 from services.ai_resolution import generate_incident_recommendation
 from services import demo_scenarios
@@ -1117,6 +1117,9 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         distance = calculate_distance_meters(loc.latitude, loc.longitude, sector_lat, sector_lon)
         approved = distance <= allowed_radius
 
+    # A new check-in supersedes this user's open sessions (otherwise they stay open forever).
+    close_open_sessions(str(update.effective_user.id), checked_at, "Auto-closed: superseded by new check-in")
+
     session_id = db_execute("""
     INSERT INTO work_sessions
     (user_id,employee,employee_id,contractor,sector,check_in_time,finish_time,latitude,longitude,distance_m,approved,comment)
@@ -1236,6 +1239,13 @@ async def save_comment_text(update, context):
 
 async def finish_work(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = context.user_data.get("active_work_session")
+    if not session:
+        # In-memory state is lost on bot restart: fall back to the user's latest open session in the DB.
+        row = get_latest_open_session(str(update.effective_user.id))
+        if row:
+            session = {"id": row["id"], "employee": row["employee"], "contractor": row["contractor"],
+                       "sector": row["sector"], "check_in_time": row["check_in_time"],
+                       "approved": row["approved"] == "YES"}
     if not session:
         await update.message.reply_text("⚠️ No active session. Use 📍 GPS Check-in first.", reply_markup=main_keyboard())
         return

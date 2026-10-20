@@ -208,6 +208,8 @@
     // ── Risk detail / AI ─────────────────────────────────────────────────
     '🤖 AI Recommendation': '🤖 AI ieteikums', 'AI Recommendation': 'AI ieteikums', '✓ Approve & Send': '✓ Apstiprināt un nosūtīt',
     'Estimated Financial Exposure': 'Prognozētie finanšu zaudējumi', 'Financial Risk Breakdown': 'Finanšu riska sadalījums',
+    'Приблизительная оценка: фиксированный коэффициент за каждый открытый риск высокого уровня':
+      'Aptuvens novērtējums: fiksēts koeficients par katru atvērtu augsta riska ierakstu',
     'Risk & Financial Exposure': 'Risks un finanšu ietekme', 'Send this message to the worker via Telegram?': 'Nosūtīt šo ziņu darbiniekam caur Telegram?',
     'Отправить это сообщение работнику?': 'Nosūtīt šo ziņu darbiniekam?', '🤖 AI Анализ': '🤖 AI analīze',
     '🤖 AI Анализ (все секторы)': '🤖 AI analīze (visi sektori)', 'Анализ секторов': 'Sektoru analīze',
