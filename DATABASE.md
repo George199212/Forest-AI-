@@ -1,10 +1,10 @@
 # DATABASE.md — Forest AI
 
-**Verified against code:** commit `574bd97` (2026-10-20), `database.py` (2026 lines).
+**Verified against code:** commit `5f82a8d` (2026-10-21 — `574bd97` + demo-layer Stage 1), `database.py`.
 Column lists below were generated on 2026-10-21 by running `database.init_db()` on an empty
 file and reading `PRAGMA table_info` — i.e. exactly what the code creates. The production DB
 may additionally carry columns/rows from manual scripts — **[NOT VERIFIED]** (no VPS access).
-**Supersedes:** earlier DATABASE.md versions (they described 16–17 tables; code now has **37**).
+**Supersedes:** earlier DATABASE.md versions (they described 16–17 tables; code now has **38**).
 
 ## 1. Engine and access
 
@@ -14,7 +14,7 @@ may additionally carry columns/rows from manual scripts — **[NOT VERIFIED]** (
 - No WAL / busy-timeout configured in code; `api.py` (+ its AI worker thread) and `bot.py` write concurrently.
 - **No FOREIGN KEY constraints anywhere.** Relations are by convention, most via the free-text
   `sector` name (`sectors.name` has no UNIQUE constraint either).
-- Only declared indexes/uniques: `idx_session_track_points_session (session_id, recorded_at)`,
+- Only declared indexes/uniques: `idx_session_track_points_session (session_id, recorded_at)`, `idx_risk_evidence_risk (risk_id)`, `risk_evidence (risk_id, source_provider, evidence_type, ref_table, ref_id)` UNIQUE,
   `organizations.slug` UNIQUE, `integration_records.deduplication_key` UNIQUE,
   `integration_webhook_events.payload_hash` UNIQUE, `photo_cmp_point_photos (run_id, photo_id)` UNIQUE.
 
@@ -26,13 +26,13 @@ may additionally carry columns/rows from manual scripts — **[NOT VERIFIED]** (
 - Seeds one row `organizations(id=1, 'Default Organization', 'default')` if empty.
 - There is no migration version table; schema state = "whatever init_db() last added".
 
-## 3. Tables (37)
+## 3. Tables (38)
 
 ### Core operations
 
-**`sectors`** — `id` INTEGER PK · `name` TEXT · `contractor` TEXT · `status` TEXT · `approved_volume` TEXT · `map_url` TEXT · `image_path` TEXT · `boundary_json` TEXT · `center_lat` REAL · `center_lon` REAL · `area_ha` REAL · `color` TEXT DEFAULT 'red' · `created_at` TEXT · `updated_at` TEXT · `tree_species` TEXT · `cut_plan_notes` TEXT · `notes` TEXT · `boundary_plan_id` INTEGER · `object_name` TEXT · `pixel_boundary_json` TEXT · `satellite_file_path` TEXT
+**`sectors`** — `id` INTEGER PK · `name` TEXT · `contractor` TEXT · `status` TEXT · `approved_volume` TEXT · `map_url` TEXT · `image_path` TEXT · `boundary_json` TEXT · `center_lat` REAL · `center_lon` REAL · `area_ha` REAL · `color` TEXT DEFAULT 'red' · `created_at` TEXT · `updated_at` TEXT · `tree_species` TEXT · `cut_plan_notes` TEXT · `notes` TEXT · `boundary_plan_id` INTEGER · `object_name` TEXT · `pixel_boundary_json` TEXT · `satellite_file_path` TEXT · `data_origin` TEXT DEFAULT 'REAL' (REAL | SIMULATED)
 
-**`risks`** — `id` INTEGER PK · `sector` TEXT · `risk_level` TEXT · `reason` TEXT · `created_at` TEXT · `entity_type` TEXT · `entity_id` INTEGER · `status` TEXT DEFAULT 'OPEN' · `rule_code` TEXT · `ai_recommendation` TEXT · `distance_m` REAL · `duration_min` REAL · `notified_at` TEXT · `resolved_at` TEXT · `telegram_message_id` TEXT · `photo_path` TEXT · `photo_path_2` TEXT · `is_demo` INTEGER DEFAULT 0 · `pinned_order` INTEGER DEFAULT NULL · `ai_status` TEXT · `ai_attempts` INTEGER DEFAULT 0 · `session_id` INTEGER · `identity_ambiguous` INTEGER · `identity_shared_count` INTEGER · `occurred_at` TEXT
+**`risks`** — `id` INTEGER PK · `sector` TEXT · `risk_level` TEXT · `reason` TEXT · `created_at` TEXT · `entity_type` TEXT · `entity_id` INTEGER · `status` TEXT DEFAULT 'OPEN' · `rule_code` TEXT · `ai_recommendation` TEXT · `distance_m` REAL · `duration_min` REAL · `notified_at` TEXT · `resolved_at` TEXT · `telegram_message_id` TEXT · `photo_path` TEXT · `photo_path_2` TEXT · `is_demo` INTEGER DEFAULT 0 · `pinned_order` INTEGER DEFAULT NULL · `ai_status` TEXT · `ai_attempts` INTEGER DEFAULT 0 · `session_id` INTEGER · `identity_ambiguous` INTEGER · `identity_shared_count` INTEGER · `occurred_at` TEXT · `data_origin` TEXT (REAL | DEMO_SCENARIO | SIMULATED_INTEGRATION; backfilled from `is_demo` + `rule_code` on every `_migrate`)
 
 **`risk_events`** — `id` INTEGER PK · `risk_id` INTEGER NOT NULL · `event_type` TEXT NOT NULL · `actor` TEXT · `details` TEXT · `created_at` TEXT NOT NULL
 
@@ -120,6 +120,11 @@ may additionally carry columns/rows from manual scripts — **[NOT VERIFIED]** (
 **`photo_cmp_changes`** — `id` INTEGER PK · `point_id` INTEGER NOT NULL · `kind` TEXT NOT NULL · `cell` TEXT NOT NULL · `class` TEXT NOT NULL · `description` TEXT · `limits` TEXT · `verification` TEXT · `verification_reason` TEXT · `verify_attempts` INTEGER NOT NULL DEFAULT 0 · `confidence` TEXT · `discarded` INTEGER NOT NULL DEFAULT 0 · `review_status` TEXT NOT NULL DEFAULT 'UNREVIEWED' · `reviewer` TEXT · `reviewed_at` TEXT · `created_at` TEXT · `source` TEXT NOT NULL DEFAULT 'system' · `created_by` TEXT
 
 **`photo_cmp_events`** — `id` INTEGER PK · `run_id` INTEGER · `point_id` INTEGER · `change_id` INTEGER · `event_type` TEXT NOT NULL · `actor` TEXT · `purpose` TEXT · `model` TEXT · `input_tokens` INTEGER · `output_tokens` INTEGER · `details` TEXT · `created_at` TEXT
+
+### Risk evidence (provenance, Stage 1 of demo layer)
+
+**`risk_evidence`** — `id` INTEGER PK · `risk_id` INTEGER NOT NULL · `source_provider` TEXT NOT NULL · `data_origin` TEXT NOT NULL (REAL | SIMULATED) · `evidence_type` TEXT NOT NULL · `summary` TEXT NOT NULL · `ref_table` TEXT · `ref_id` INTEGER · `observed_at` TEXT · `created_at` TEXT NOT NULL  
+  Constraints: UNIQUE (risk_id, source_provider, evidence_type, ref_table, ref_id); INDEX (risk_id). Written via `database.add_risk_evidence()` (idempotent, also for NULL refs); read via `get_risk_evidence()`. **No writer or API endpoint uses it yet** (planned Stage 3/T18).
 
 ### Risk conclusion (Slēdziens)
 

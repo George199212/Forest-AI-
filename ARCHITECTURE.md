@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Forest AI
 
-**Verified against code:** `github.com/George199212/Forest-AI-`, branch `master`,
+**Verified against code:** `github.com/George199212/Forest-AI-`, branch `master` (now `5f82a8d`; full inspection at
 commit `574bd97` (2026-10-20). Inspected 2026-10-21 by direct clone + reading source.
 **Supersedes:** all earlier ARCHITECTURE.md versions (repo copy describes commit `0db0a79`, 2026-09-08).
 
@@ -25,7 +25,7 @@ process, one SQLite file, one single-file SPA.
      ┌────────────────────────┼─────────────────────────────┐
      ▼                        ▼                             ▼
  database.py            services/*                    External APIs
- SQLite, 37 tables      ai_resolution, risk_ai_worker,  Anthropic (claude-sonnet-4-5)
+ SQLite, 38 tables      ai_resolution, risk_ai_worker,  Anthropic (claude-sonnet-4-5)
  data/forest_ai.db      photo_compare, risk_conclusion, Copernicus CDSE / Sentinel Hub
                         session_track, robez_ocr_vision, Telegram Bot API (sendMessage)
                         demo_scenarios, geo,

@@ -1,6 +1,6 @@
 # DATA_MODEL.md — Forest AI
 
-**Verified against code:** commit `574bd97` (2026-10-20): `database.py`, `api.py`, `bot.py`, `services/*`.
+**Verified against code:** commit `5f82a8d` (2026-10-21): `database.py`, `api.py`, `bot.py`, `services/*`.
 Physical tables and columns: see DATABASE.md. This file describes meaning, relations and lifecycles.
 **Supersedes:** earlier DATA_MODEL.md versions.
 
@@ -24,6 +24,7 @@ Physical tables and columns: see DATABASE.md. This file describes meaning, relat
 | Weighbridge ticket | `weighbridge_records` | `id` | Currently only written by the `weighbridge_demo` adapter |
 | Risk (manual/legacy) | `risks` with `entity_type IS NULL` | `id` | Created by `add_risk()` |
 | Incident (attributed risk) | `risks` with `entity_type IS NOT NULL` | `id` | `entity_type` ∈ EMPLOYEE / SATELLITE (+ fleet/integration values); `rule_code` drives dedup |
+| Risk evidence item (provenance) | `risk_evidence` | `risk_id` + source + type + ref | Points to the row it describes (session/photo/photo-run/sector/integration_record); origin REAL or SIMULATED. Schema only, not yet populated |
 | Audit event | `risk_events` | `risk_id` | Append-only log of every detection, message, AI call, decision |
 | Risk conclusion | `risk_conclusions` | `risk_id` | Versioned: newer row supersedes older; undo keeps the decided row |
 | Photo comparison | `photo_cmp_runs/points/point_photos/changes/events` | `run_id` | Two-date comparison for one sector |
@@ -53,6 +54,13 @@ integrations.id ◄─ integration_credentials / sync_runs / logs / records / we
 
 Renaming a sector does **not** cascade; deleting a sector (`DELETE /api/sectors/{name}`) leaves all
 dependent rows orphaned.
+
+## 2a. Data origin (provenance) — added in `5f82a8d`
+
+- `risks.data_origin`: `REAL` (default for `add_risk`/`add_incident`), `DEMO_SCENARIO` (set by `demo_scenarios._mark_demo`), `SIMULATED_INTEGRATION` (set by `risk_rules.database_update_is_demo`). Legacy rows backfilled from `is_demo` + rule code.
+- `sectors.data_origin`: `REAL` default; `SIMULATED` reserved for demo-only sectors (no writer yet).
+- Resets: global `/api/demo/reset` deletes only `DEMO_SCENARIO` (+ `SIMULATED_INTEGRATION` with `?include_simulated=1`), never `REAL`; per-integration reset deletes only its own `SIMULATED_INTEGRATION` rows + their evidence.
+- Not yet done (plan stages 2–7): origin badge in UI, evidence on Risk Detail, demo adapters restricted to SIMULATED sectors, `CONNECTED` status for demo adapters (finding F-c in `docs/demo-layer-plan.md`).
 
 ## 3. Lifecycles
 

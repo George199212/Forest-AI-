@@ -1,7 +1,8 @@
 # CURRENT_STATUS.md — Forest AI
 
-**As of:** 2026-10-21. **Code basis:** `github.com/George199212/Forest-AI-` `master` @ `574bd97`
-(2026-10-20 08:00 UTC, 87 commits). Method: fresh clone, source reading, `init_db()` on an empty DB,
+**As of:** 2026-10-21. **Code basis:** `github.com/George199212/Forest-AI-` `master` @ `5f82a8d`
+(= `574bd97` inspected in full + docs commit `ac347e2` + demo-layer Stage 1 `5f82a8d`).
+**Production MAIN (`/root/forest_ai`) == GitHub `master` as of 2026-10-21 12:39** — verified: prod `git diff` applied cleanly on `574bd97`, committed, `git status` empty. Running processes still execute pre-Stage-1 code until the next `systemctl restart forest-api` (migration is additive). Method: fresh clone, source reading, `init_db()` on an empty DB,
 route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyproj check of CRS math.
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
@@ -23,6 +24,7 @@ No VPS access in this session — everything about the running servers is **[NOT
 | Integration Layer | Framework + catalog + 3 demo adapters + risk rules + encrypted credentials + webhook endpoint; tests pass |
 | Client instances | Script-based separate copies (Rīgas meži: port 8002, LV UI overlay, no bot) |
 | Reports | Sector PDF (needs `reportlab`), bot CSV ZIP |
+| Provenance (Stage 1) | `risks.data_origin`, `sectors.data_origin`, `risk_evidence` table + helpers; demo resets can no longer delete REAL risks; 38/38 tests pass |
 
 ## 2. Demo / not real yet (must not be presented as live capability)
 
@@ -65,19 +67,22 @@ Severity: **P0** wrong data / exposure, **P1** security or reliability, **P2** h
 | 54 API routes | **106 + 1 webhook** |
 | "No requirements.txt" | Exists (pinned), but missing `reportlab` |
 | "AI Inspector is a client-side calculator, no streaming" | Real SSE streaming endpoint exists since 2026-09-09 |
-| Persistent AI Inspector chat via `ai_inspector_chat_messages` | **Not in code** — no table, no endpoint, no frontend call. Either never committed or lives only on the server → **[NOT VERIFIED]** |
+| Persistent AI Inspector chat via `ai_inspector_chat_messages` | **Not in code and not on prod MAIN** (prod code == GitHub). The feature does not exist; the earlier note was wrong. |
 | Satellite Intelligence Engine "implemented" | Modules exist; decision/trigger layer not called anywhere |
 | `/api/sectors` lacks exposure_low/high (KPI shows €0) | Fixed (commit `34e05da`) |
 | CORS wildcard removed | Correct — no CORS middleware |
 | Hardcoded Sentinel credentials | Not in current code — read from env |
 
 ## 5. Not verified (needs VPS session)
-- Production code == `574bd97`? (commit `8afb109` says "as deployed 2026-10-13" — code was committed after deployment.)
+- Production MAIN code == GitHub: **verified 2026-10-21**. RM instance (`/root/forest_ai_rm`) code version: not verified (plan says `data/DEPLOYED_COMMIT` = `574bd97`).
 - systemd units/state for `forest-api`, `forest-bot`, `forest-rm-api`; orphaned uvicorn on :8001.
 - nginx/TLS in front of :8000 / :8002.
 - Real `.env` contents per instance; which integrations are configured; DB sizes; presence of `ai_inspector_chat_messages` on prod.
 
-## 6. Readiness for the LVM GEO integration task
+## 6. Work in progress: Rīgas meži demo layer
+`docs/demo-layer-plan.md` (approved 2026-10-20, decisions Q1–Q15, amendments A1–A4). Stage 1 committed (`5f82a8d`). Next: Stage 2 (catalog statuses/grouping, demo adapters never shown as Connected). Stages are implemented by Claude Code on the VPS, verified on /tmp copies and a temp server :8011, committed by the user.
+
+## 7. Readiness for the LVM GEO integration task
 Framework fit is good: `lvm_geo` already sits in the registry as a planned `gis` provider and the
 `GISIntegrationAdapter` category exists. Blockers before any LVM GEO work: finding #1 (CRS), plus a
 decision on whether external reference layers are browser-side WMS (Leaflet) or server-side proxied.
