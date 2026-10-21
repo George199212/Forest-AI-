@@ -1,181 +1,188 @@
 # ARCHITECTURE.md — Forest AI
 
-**Обновлено:** 2026-09-09, по прямому клонированию и построчной инспекции
-`github.com/George199212/Forest-AI-` (ветка `master`, коммит `0db0a79`,
-2026-09-08 16:54 UTC).
-**Источник истины:** реальный код в этом коммите. Всё, что требует проверки
-на живом VPS (systemd-статусы, осиротевшие процессы, аптайм), помечено явно
-как непроверенное в этой сессии — здесь нет SSH-доступа к серверу, только
-git clone публичного репозитория.
+**Verified against code:** `github.com/George199212/Forest-AI-`, branch `master`,
+commit `574bd97` (2026-10-20). Inspected 2026-10-21 by direct clone + reading source.
+**Supersedes:** all earlier ARCHITECTURE.md versions (repo copy describes commit `0db0a79`, 2026-09-08).
+
+Legend: **[CODE]** confirmed in source · **[TEST]** confirmed by running code locally ·
+**[NOT VERIFIED]** needs the live VPS (no SSH access in this session).
 
 ---
 
-## 1. Обзор системы
+## 1. System overview
 
-Forest AI — платформа мониторинга лесохозяйственных операций: полевой ввод
-через Telegram, геозона-контроль GPS, учёт техники/сотрудников, риски и
-инциденты с AI-рекомендациями, спутниковый мониторинг (Sentinel Hub), Web SPA
-дашборд.
+Forest AI is a single-tenant monolith: one FastAPI process, one Telegram polling bot
+process, one SQLite file, one single-file SPA.
 
 ```
-                    ┌─────────────────────┐
-   Браузер ────────►│   index.html (SPA)  │  2612 строк, без сборки/фреймворка,
-   (HTTP Basic)     │                      │  JS/CSS инлайн, Chart.js с CDN
-                    └──────────┬──────────┘
-                               │ fetch() → /api/*
-                               ▼
-                    ┌─────────────────────┐
-                    │      api.py          │  FastAPI, 1811 строк, 54 роута,
-                    │  (uvicorn, :8000)     │  HTTP Basic Auth на всём app
-                    └──────────┬──────────┘
-                               │
-       ┌───────────────────────┼───────────────────────┐
-       ▼                       ▼                        ▼
-  database.py            services/                Copernicus/Sentinel Hub
-  (SQLite,           ai_resolution.py          (спутниковые снимки, NDVI —
-  data/forest_ai.db)  robez_ocr_vision.py        endpoints /api/satellite/*)
-  908 строк           (оба — Anthropic SDK,
-                       claude-sonnet-4-5)
+ Browser (HTTP Basic) ──► index.html (vanilla JS SPA, 4207 lines, no build step)
+                              │  fetch('/api/...'), SSE via fetch+ReadableStream
+                              ▼
+                         api.py  FastAPI, 2767 lines, 106 routes
+                         + mounted sub-app /api/webhooks (no Basic Auth, HMAC optional)
+                         + background thread: services/risk_ai_worker.py
+                              │
+     ┌────────────────────────┼─────────────────────────────┐
+     ▼                        ▼                             ▼
+ database.py            services/*                    External APIs
+ SQLite, 37 tables      ai_resolution, risk_ai_worker,  Anthropic (claude-sonnet-4-5)
+ data/forest_ai.db      photo_compare, risk_conclusion, Copernicus CDSE / Sentinel Hub
+                        session_track, robez_ocr_vision, Telegram Bot API (sendMessage)
+                        demo_scenarios, geo,
+                        satellite_intelligence/, integrations/
 
-   Отдельный процесс:
-                    ┌─────────────────────┐
-   Telegram ───────►│      bot.py           │  python-telegram-bot,
-   (polling)         │  1527 строк           │  polling, свой процесс
-                    └──────────┬──────────┘
-                               │ собственный sqlite3.connect()
-                               ▼
-                         тот же forest_ai.db
+ Telegram ──► bot.py  python-telegram-bot 22.8, polling, 1881 lines, own process
+                       opens its own sqlite3 connections to the same DB file
 ```
 
-## 2. Технологический стек (подтверждено кодом)
+## 2. Tech stack [CODE]
 
-- **Backend:** Python, FastAPI + uvicorn (`api.py`), python-telegram-bot
-  (`bot.py`) — два независимых процесса, own event loop у каждого.
-- **База данных:** SQLite, файл `data/forest_ai.db` (путь переопределяется
-  `DB_PATH` env-переменной). Прямые `sqlite3.connect()`-вызовы, без ORM,
-  без connection pool — каждая функция в `database.py`/`api.py` открывает
-  и закрывает своё соединение.
-- **Frontend:** одна HTML-страница (`index.html`), полностью client-side
-  роутинг (`nav()`, `history.pushState`/`popstate`), Chart.js 4.4.1 с CDN
-  (`cdnjs.cloudflare.com`) для графиков на Overview.
-- **AI:** Anthropic Python SDK (`anthropic`), модель `claude-sonnet-4-5`,
-  используется в двух местах — `services/ai_resolution.py` (рекомендации по
-  инцидентам) и `services/robez_ocr_vision.py` (OCR планов границ).
-- **Спутник:** Copernicus Data Space Ecosystem / Sentinel Hub, OAuth
-  client-credentials (`SENTINEL_CLIENT_ID`/`SENTINEL_CLIENT_SECRET`).
-- **Изображения:** Pillow (`PIL`) — опционально импортируется в `api.py`,
-  код деградирует, если пакет недоступен (`_PIL_AVAILABLE` флаг).
-- **⚠️ `requirements.txt` / `pyproject.toml` / `Pipfile` — в репозитории
-  НЕТ.** Список реальных зависимостей нигде не зафиксирован файлом —
-  известен только по факту импортов в коде (`fastapi`, `uvicorn`,
-  `python-telegram-bot`, `anthropic`, `requests`, `Pillow`). Это пробел,
-  стоит завести `requirements.txt` явно.
-- **`config.py` — файл размером 0 байт, нигде не импортируется.**
-  Мёртвый файл-заглушка, подтверждено grep по всему репо. Вся конфигурация
-  идёт через `os.environ.get(...)` напрямую в `api.py`/`bot.py`/`database.py`.
+| Layer | Technology | Source of truth |
+|---|---|---|
+| API | FastAPI 0.136.3 + uvicorn 0.52.4, pydantic 2 | `requirements.txt`, `api.py` |
+| Bot | python-telegram-bot 22.8, `run_polling(allowed_updates=ALL_TYPES)` | `bot.py::main` |
+| DB | SQLite, raw `sqlite3`, no ORM, no pool; connection per call | `database.py` |
+| AI | Anthropic SDK 0.116, default model `claude-sonnet-4-5` (override `ANTHROPIC_MODEL` in worker / photo-compare / conclusion) | 6 call sites, see INTEGRATIONS.md |
+| Satellite | Copernicus Data Space (OAuth client-credentials) + Sentinel Hub Process API | `api.py` lines ~2156–2462 |
+| Images | Pillow (optional import in `api.py`, required in `photo_compare.py`) | |
+| PDF | `reportlab` — imported lazily in `/api/report/pdf/{sector}`; **NOT in requirements.txt** | `api.py::generate_pdf` |
+| Crypto | `cryptography` Fernet for integration credentials | `services/integrations/crypto.py` |
+| Frontend | Vanilla JS, Chart.js 4.4.1 (cdnjs), Leaflet 1.9.4 (unpkg, lazy-loaded), OSM raster tiles, Google Fonts | `index.html` |
+| i18n | Optional display-only LV overlay `assets/i18n-lv.js`, injected when `UI_LANGUAGE=lv` | `api.py::serve_index` |
+| Tests | pytest, `tests/test_integrations.py` — 30 tests, all pass [TEST] | |
 
-## 3. Аутентификация
+`config.py` is 0 bytes and imported nowhere — dead file. All config is `os.environ.get(...)`.
 
-`api.py`: `HTTPBasic()` подключён на уровне всего FastAPI-приложения через
-`app = FastAPI(dependencies=[Depends(verify_credentials)])` — то есть
-**абсолютно все роуты**, включая `/` (сама SPA-страница) и `/photos/file/*`,
-защищены Basic Auth. Сравнение логина/пароля — через `secrets.compare_digest`
-(защита от timing-атак). Креды — `DASHBOARD_USERNAME`/`DASHBOARD_PASSWORD` из
-env. Явного CORS middleware в коде нет вообще (ни разрешающего, ни
-запрещающего) — по умолчанию FastAPI не отдаёт CORS-заголовки.
+## 3. Processes and runtime
 
-## 4. Модель данных и единая точка схемы
+| Process | Entry | Notes |
+|---|---|---|
+| API | `uvicorn api:app` (port 8000 per docstring) | `@app.on_event("startup")` → `init_db()` + `risk_ai_worker.start()` (daemon thread, polls every 60 s) |
+| Bot | `python bot.py` | Raises at import if `TELEGRAM_BOT_TOKEN` unset. Calls `init_db()` on start. |
+| Webhooks | sub-app mounted at `/api/webhooks` inside API process | separate FastAPI instance → outside global Basic Auth |
 
-`database.py::init_db()` → `_migrate()` — централизованная точка создания
-ВСЕХ 17 таблиц (см. DATABASE.md), включая те, что раньше исторически
-создавал `bot.py` отдельно. И `api.py`, и `bot.py` вызывают `init_db()` на
-старте (`@app.on_event("startup")` в api.py) — любой процесс может поднять
-БД с нуля. Миграции только additive: `_add_column_if_missing()` — helper на
-`ALTER TABLE ADD COLUMN`, плюс один задокументированный managed rebuild
-(`vehicle_gps_pings` — снятие `NOT NULL` с `vehicle_id`, 12-шаговый
-SQLite-паттерн пересоздания таблицы с сохранением данных, guard'ится через
-`PRAGMA table_info`, безопасно перезапускать).
+systemd units (`forest-api.service`, `forest-bot.service`, `forest-rm-api.service`) are
+described in `docs/CLIENT_INSTANCES.md` but no unit files are in the repo — **[NOT VERIFIED]** live state.
+No reverse proxy / TLS config exists in the repo; bot.py hardcodes `http://164.90.188.136:8000`
+(plain HTTP) in three dashboard links — **[NOT VERIFIED]** whether a proxy/TLS exists on the VPS.
 
-## 5. Ключевые потоки данных
+Both processes write the same SQLite file concurrently with no WAL/timeout configuration in code.
 
-### 5.1 Геозона-детекция (Telegram Live Location → инцидент)
-`bot.py::handle_location()` обрабатывает `update.edited_message` (Telegram
-шлёт обновления живой геолокации каждые несколько секунд как edit исходного
-сообщения). Функция апдейтит `live_locations`, сравнивает `old_status` vs
-`new_status` (`IN`/`OUT` относительно границы сектора). При переходе
-`IN → OUT`:
-1. Если для этого employee уже есть открытый инцидент с `rule_code='SECTOR_EXIT'`
-   (`status IN ('OPEN','NOTIFIED')`) — просто пишется `risk_events` запись
-   `STILL_OUTSIDE` (дедупликация по `rule_code` + `entity_id`, не создаётся
-   дубль).
-2. Иначе — `add_incident(..., rule_code="SECTOR_EXIT")`, событие `DETECTED`,
-   и синхронный вызов `generate_incident_recommendation()` через
-   `loop.run_in_executor` (чтобы не блокировать asyncio event loop
-   bot.py на время сетевого вызова к Anthropic API) — результат пишется в
-   `risks.ai_recommendation` через `set_ai_recommendation()`.
+## 4. Multi-instance model (client accounts) [CODE: docs + scripts]
 
-Второй, независимый триггер — `rule_code="EMERGENCY"` (кнопка тревоги в
-Telegram-меню, `emergency_button()` в bot.py), та же дедупликация и та же
-генерация AI-рекомендации.
+Per `docs/CLIENT_INSTANCES.md` (implemented 2026-10-13): a client account = **full copy of
+the code in its own directory**, own `.env`, own `data/`, own port, own systemd unit.
+First instance: Rīgas meži (`/root/forest_ai_rm`, port 8002, no Telegram bot, `UI_LANGUAGE=lv`).
+Created by `deploy/create_client_instance.sh` + `scripts/clone_sector_instance.py`
+(clones one sector's data into a new DB).
 
-**Важно:** это единственные ДВА rule_code, которые реально генерируются
-автоматическим кодом (`grep add_incident bot.py` подтверждает). Другие
-rule_code, встречающиеся в демо-данных (например `EQUIPMENT_BREAKDOWN`,
-упомянутый в handling `/api/incidents/{id}/approve` — см. API.md), в текущем
-коде **не создаются никаким автоматическим правилом** — такие инциденты
-попадают в БД только через прямую ручную вставку (скрипт/консоль), не через
-живую логику `bot.py`. Это не баг, а осознанное ограничение MVP/демо —
-но следует явно понимать, что "живой" auto-detection покрывает пока только
-sector exit и emergency-кнопку.
+Reason it's copies, not shared code: `photo_compare.APP_DIR` resolves photo paths
+relative to the code directory. Operational tables have no `organization_id`;
+`organizations`/`organization_id` exists only in Integration Layer tables and is always `1`.
 
-### 5.2 Финансовый risk score (`api.py::calc_risk_score()`)
-Считается по требованию для каждого сектора (вызывается внутри
-`/api/sectors`). Формула: `score = min(100, HIGH*25 + MEDIUM*10 +
-rejected_gps*15 + timber_missing*20 + timber_over*15)`. Дополнительно
-считается денежная "exposure" (€60–120/м³ рыночная цена, плюс фиксированные
-надбавки за rejected GPS и HIGH-риски) — это тот же расчёт, что суммируется
-в KPI-карточке "Общий финансовый риск" на странице AI Inspector, и это
-**отдельный, чисто rule-based** расчёт от AI-генерируемого
-`estimated_exposure_eur_low/high` внутри `ai_recommendation` конкретных
-инцидентов (два разных источника чисел, не путать при доработке).
+## 5. Authentication and access control
 
-### 5.3 AI-рекомендации по инцидентам (`services/ai_resolution.py`)
-Единая точка вызова Claude API для инцидентов. Промпт строго ограничен
-("Based ONLY on the information given above... do not invent"), просит
-вернуть строгий JSON (`summary`, `options[]` с готовыми текстами сообщений
-на русском, `recommended_option_id`, `estimated_exposure_eur_low/high`,
-`exposure_basis`). `max_tokens=2048`. Любая ошибка (нет ключа, сетевая
-ошибка, API-ошибка) — ловится, логируется через `print()`, функция
-возвращает `None`, никогда не поднимает исключение — вызывающий код
-(`handle_location`, ручная демо-вставка) должен быть готов к `None`.
+**API [CODE+TEST]:** `FastAPI(dependencies=[Depends(verify_credentials)])` — HTTP Basic,
+single shared login from `DASHBOARD_USERNAME`/`DASHBOARD_PASSWORD`, `secrets.compare_digest`.
+No CORS middleware. No roles, no per-user identity beyond the Basic username
+(used as `actor` in audit events).
 
-## 6. AI Inspector — важное уточнение (актуально на 0db0a79)
+Exceptions that are reachable **without** Basic Auth [TEST, local TestClient]:
+- `/docs`, `/redoc`, `/openapi.json` (FastAPI built-ins are not APIRoutes → app-level dependency not applied) — full API map is public.
+- `/api/webhooks/*` + `/api/webhooks/docs|openapi.json` — by design; HMAC checked only if `WEBHOOK_SECRET_<PROVIDER>` is set, otherwise accepted with `signature_valid=NULL` and only logged (no domain writes). In-memory rate limit 30/min per provider+IP.
 
-Раздел "AI Inspector" в дашборде состоит из ДВУХ независимых частей —
-подробности и точный код см. в отдельном разборе для текущей рабочей
-задачи (streaming). Кратко для архитектурной картины:
+**Telegram bot [CODE]:** no authorization on any command except `/demo_*`
+(`demo_scenarios.is_demo_admin`, defaults to `DISPATCHER_CHAT_ID`). Any Telegram user who
+finds the bot can run `/add_sector`, `/add_risk`, `/add_timber`, `/add_truck`, `/sectors`,
+`/risks`, `/report`, and `/export_report` (ZIP of CSVs: all work sessions with worker names,
+Telegram user ids and GPS coordinates; sector boundaries; timber; trucks; risks), and can self-link to
+any unlinked employee of a sector via the check-in "Это вы?" buttons.
 
-- `loadInspector()` (index.html) — чисто клиентский JS-калькулятор
-  (if/else пороги на данных из `/api/sectors`, `/api/risks`, `/api/gps`,
-  `/api/timber`, `/api/trucks`). **Не вызывает LLM.**
-- `loadIncidentsEquipment()` — отображает уже сгенерированные
-  `ai_recommendation` из инцидентов через `/api/incidents`. Вызывает
-  реальный AI только на этапе создания инцидента (см. 5.1), не в момент
-  просмотра дашборда.
-- В `index.html` есть функция `startTypewriter(elId, text)` — это
-  **имитация печати** (`setInterval` по уже полностью готовой строке,
-  15мс/символ), используется на Risk Detail для показа `ai_recommendation.
-  summary`. Это НЕ настоящий стриминг: текст уже полностью в памяти
-  браузера до начала "печати". В коде нет ни `EventSource`, ни
-  `ReadableStream`, ни `text/event-stream` — ни на фронте, ни в `api.py`.
-  Backend-эндпоинта для streaming-анализа в реальном времени не существует.
+## 6. Key data flows
 
-## 7. Что не проверено в этой сессии (нужна живая VPS-сессия)
+### 6.1 Check-in and geofence (bot.py)
+1. `📍 GPS Check-in` → choose sector (inline) → optional self-link to employee → send location.
+2. `handle_location` (new message): point-in-polygon on `sectors.boundary_json`; if no
+   boundary → 10 km radius around `center_lat/lon`, falling back to hardcoded Riga
+   (56.9587, 24.1034). Inserts `work_sessions` (`approved` YES/NO), auto-closes the
+   user's previous open sessions. Rejected → `add_risk(HIGH)`.
+3. Live location edits (`edited_message`): upsert `live_locations` (one row per Telegram id),
+   append `session_track_points` while a session is active; on IN→OUT transition →
+   `add_incident(rule_code='SECTOR_EXIT')` deduped per employee+sector+session,
+   synchronous AI recommendation via `run_in_executor`, worker + dispatcher Telegram alerts.
+4. Session state lives in `context.user_data` (in memory, no persistence). After a bot
+   restart, `/finish` falls back to the latest open DB session; live-tracking state does not.
 
-- Актуальный статус systemd-юнитов (`forest-api.service`/`forest-bot.service`)
-  — репозиторий не содержит `.service`-файлов (они и не должны быть в git,
-  но и подтвердить их состояние по коду нельзя).
-- Осиротевший процесс на порту 8001 (упоминался в памяти проекта) —
-  не проверялся, требует SSH.
-- Реальное содержимое `.env` на сервере (в репо только `.env.example` с
-  пустыми значениями, что и ожидаемо).
+### 6.2 Incident lifecycle
+`risks.status`: `OPEN` → `NOTIFIED` (Telegram sent: approve endpoint, SOS, report-issue,
+demo) → `RESOLVED` (`confirm_return` button, conclusion accept) / `DISMISSED`.
+Every step writes `risk_events` (audit log, 40+ event types — see DATA_MODEL.md).
+
+Auto-generated `rule_code`s from live code: `SECTOR_EXIT`, `EMERGENCY` (bot.py);
+`EQUIPMENT_BREAKDOWN` and others via AI Inspector report-issue / demo scenarios;
+`FLEET_SECTOR_EXIT`, `SATELLITE_UNREGISTERED_CHANGE`, `WEIGHBRIDGE_WAYBILL_MISMATCH`,
+`TIMBER_VOLUME_OVER_PERMIT` via Integration Layer **demo** adapters only.
+Legacy `add_risk()` rows (fuel discrepancy >5 L, rejected check-in, timber/truck mismatch)
+have no `entity_type`/`rule_code`.
+
+### 6.3 AI layers (all `claude-sonnet-4-5` by default)
+| Component | Trigger | Output | Guards |
+|---|---|---|---|
+| `ai_resolution.generate_incident_recommendation` | incident creation (bot, report-issue, demo, integration rules), worker reply | JSON: summary, options[] with Telegram texts, exposure EUR range | never raises; returns None |
+| `risk_ai_worker` (thread in API) | any risk without AI, id ≥ 60, age ≥ 120 s | same JSON contract, language `AI_OUTPUT_LANGUAGE` (default lv) | 1 risk/60 s, max 2 attempts, **30 paid calls/UTC day** |
+| AI Inspector `/api/inspector/analyze*` | user click | real SSE stream (text) + `---JSON---` block | persisted to `ai_inspector_analyses` |
+| `photo_compare` | explicit authenticated steps only | point matching, same-place check, change detection on 3×3 grid, independent verification | max 40 points/run, 2 attempts/call, forbidden-wording regex (no cause/weather claims) |
+| `risk_conclusion` | user click | conclusion text; **close/keep-open decided by fixed rules R0–R3 in code, never by the model** | text checked for money/cause/coverage/decision wording |
+| `robez_ocr_vision` | Telegram plan photo | coordinates from boundary-plan scan | no caching by file hash |
+
+### 6.4 Financial numbers — two independent sources (do not merge)
+- `api.py::calc_risk_score()` — rule-based: open HIGH×25 + MEDIUM×10 + rejected GPS×15 +
+  timber missing×20 + over×15, capped 100, HIGH floor 61. Exposure = volume at risk × €60–120
+  + flat GPS/HIGH add-ons. Used by `/api/sectors`, `/api/map`, Inspector, PDF.
+- `calc_financial_risk_from_incidents()` — sum of AI-estimated
+  `estimated_exposure_eur_low/high` from `risks.ai_recommendation`. Used by `/api/summary`
+  (Overview KPI) and `/api/risks/financial-breakdown`. **These are AI estimates, not measured losses.**
+
+### 6.5 Satellite
+- **Live imagery (works):** `/api/satellite/image|ndvi|object/*` call Sentinel Hub Process API on
+  every request (512×512, no caching, no persistence). Default date window hardcoded
+  `2024-06-01..2024-06-30`.
+- **Satellite Intelligence Engine (partially wired):** providers, `satellite_monitoring_score`,
+  tier decision engine, cost estimation, and 7 event triggers exist in
+  `services/satellite_intelligence/`, **but no code in the repo calls any `events.trigger_*`
+  function or `decide_and_request`.** `satellite_*` tables are filled only by the
+  `sentinel_demo` integration adapter (fabricated deterministic scenes) or by out-of-repo scripts.
+  There is **no automatic change detection from real Sentinel imagery**.
+- Commercial providers (PlanetScope, SkySat, ICEYE) are stubs that report "not configured".
+
+### 6.6 Integration Layer (`services/integrations/`)
+Registry (single catalog) → category adapter classes → `sync()` pipeline:
+`fetch → normalize → validate → save (integration_records staging + domain table) → risk_rules`.
+Only 3 adapters are implemented and all are **demo** (no network): `fleet_gps_demo`,
+`sentinel_demo`, `weighbridge_demo`. `lvm_geo` exists as a catalog entry with
+`status_claim="planned"`, no adapter. `GISIntegrationAdapter` category exists but, by design,
+does not write sector boundaries automatically (stage 1 = staging only).
+
+## 7. Coordinate systems — CRITICAL [CODE+TEST]
+
+Storage CRS is WGS84 `[lat, lon]` everywhere (`boundary_json`, GPS). Leaflet + OSM (EPSG:3857 display).
+
+The LKS-92 (EPSG:3059) → WGS84 conversion `lks92_to_wgs84()` is duplicated in
+`bot.py`, `api.py::_lks92_to_wgs84`, `services/robez_ocr_vision.py`. It is a linear
+approximation documented as "accurate to ~100 m". **Checked against pyproj EPSG:3059 on
+2026-10-21: error is 150–190 km** (e.g. X=310280, Y=504908 → true 56.936 N 24.081 E;
+formula gives 56.503 N 26.750 E). Any sector created from OCR coordinates or from a drawn
+polygon with a solved georef scale lands in the wrong place. Sectors entered directly in
+WGS84 (`/add_sector`, `POST /api/sectors`) are unaffected. Not fixed — see CURRENT_STATUS.md.
+
+## 8. Repository hygiene findings [CODE]
+- `install.sh` (403 lines) is an unrelated third-party installer for `codebase-memory-mcp`,
+  committed into this repo.
+- `bot.py::analyze_robez_plan_ocr` (Tesseract) is dead code; the live path is Claude Vision.
+- `tools/i18n_check/make_fixture.py` contains a real person's full name and Telegram ID in a **public** repo.
+- Timestamp formats differ in the same column: `add_incident` writes `YYYY-MM-DD HH:MM:SS UTC`,
+  `add_risk` writes ISO `YYYY-MM-DDTHH:MM:SS.ffffff`.
+
+## 9. Not verified in this session
+Live systemd status, nginx/TLS presence, port 8001 orphan, whether production code equals
+`574bd97`, contents of production `.env`, size of production DB.

@@ -1,141 +1,231 @@
 # API.md — Forest AI
 
-**Обновлено:** 2026-09-09, по построчному чтению `api.py` (1811 строк,
-коммит `0db0a79`). Все 54 роута ниже — реальные, извлечены grep'ом по
-`@app.get/post/put/delete/patch`. **Все роуты требуют HTTP Basic Auth**
-(`DASHBOARD_USERNAME`/`DASHBOARD_PASSWORD`) — задано на уровне всего
-FastAPI-приложения.
+**Verified against code:** commit `574bd97` (2026-10-20). Route list generated on 2026-10-21 by
+importing `api.py` and enumerating `app.routes` / `webhook_app.routes` — **106 routes on the main app + 1 webhook route**.
+Descriptions from reading each handler. **Supersedes:** earlier API.md (54 routes, commit `0db0a79`).
 
-## Frontend / статика
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/` | Отдаёт `index.html` (`FileResponse`, изменения на диске подхватываются без рестарта) |
-| GET | `/photos/file/{filename}` | Отдаёт файл фото с диска |
+## Conventions
 
-## Summary
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/summary` | KPI для Overview: счётчики, `red_sectors`/`yellow_sectors`, финансовый риск — **суммируется из `ai_recommendation.estimated_exposure_eur_*` по всем инцидентам** (`calc_financial_risk_from_incidents()`), НЕ из `calc_risk_score()` |
+- **Auth:** HTTP Basic on every main-app route (`DASHBOARD_USERNAME`/`DASHBOARD_PASSWORD`), single shared login.
+  Exceptions reachable without auth (verified with TestClient): `/docs`, `/redoc`, `/openapi.json`, and everything under `/api/webhooks`.
+- **Errors:** inconsistent. Mix of `HTTPException` (`{"detail": ...}`), hand-built `Response` with `{"error": ...}`, and
+  `200 {"error": "Not found"}` (`GET /api/sectors/{name}`). Clients must handle all three.
+- **Pagination:** none. List endpoints return everything or a fixed LIMIT (200/300).
+- **Sector identity:** path parameter is the sector **name** (free text, URL-encoded).
+- **Coordinates:** WGS84, boundary arrays are `[[lat, lon], ...]` (note: Sentinel bbox uses `[minLon, minLat, maxLon, maxLat]`).
+- **Paid/quota calls** (Anthropic / Sentinel Hub) happen in: inspector analyze*, inspector report-issue, photo-compare match/process, conclusion draft (`use_ai=true`), satellite image/ndvi/object (Sentinel Hub processing units), demo triggers, background AI worker. `approve` does **not** call AI — it sends the already-stored recommendation text.
+- **Body** column: Pydantic model name or multipart fields. **Query** column: query parameters.
+
+
+## Frontend & files
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/` | `serve_index` | — | — | SPA. Injects `assets/i18n-{UI_LANGUAGE}.js` when set. |
+| GET | `/photos/file/{filename}` | `serve_photo_file` | — | — | Serves `PHOTOS_DIR/{filename}`. |
+| GET | `/assets/{filename}` | `serve_asset` | — | — | Serves `assets/{filename}`. |
+
+## Overview
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/summary` | `summary` | — | — | Overview KPIs. `exposure_*` = sum of **AI-estimated** incident exposure; counts return 0 on empty tables. |
 
 ## Sectors
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/sectors` | Список секторов + `risk_score/level/color/exposure_label` (из `calc_risk_score()`) и счётчики. **⚠️ Не включает `exposure_low`/`exposure_high` числом** — см. §"Известные несостыковки" ниже |
-| POST | `/api/sectors` | Создать сектор (`SectorIn`: name/contractor/status/approved_volume/boundary/color) |
-| PUT | `/api/sectors/{name}` | Обновить сектор (тот же body что POST) |
-| DELETE | `/api/sectors/{name}` | Удалить сектор |
-| GET | `/api/sectors/{name}` | Детали сектора, **включает** `exposure_low/high/vol_at_risk` числом (в отличие от списка выше) |
-| PATCH | `/api/sectors/{name}/notes` | Частичное обновление `tree_species`/`cut_plan_notes`/`notes` |
-| POST | `/api/sectors/{name}/polygon` | Задать/обновить полигон границы |
-| GET | `/api/sectors/{name}/vehicles/{vehicle_id}/route` | Трек движения техники по сектору за период |
 
-## Objects (группировка секторов по одному Robežu Plāns)
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/objects` | Сектора, сгруппированные по `boundary_plan_id` |
-| POST | `/api/objects` | Создать объект |
-| POST | `/api/objects/{plan_id}/boundary-plan` | Привязать скан плана к объекту |
-| POST | `/api/objects/{plan_id}/satellite` | Загрузить спутниковый снимок объекта |
-| GET | `/api/objects/{plan_id}/satellite-image` | Получить снимок |
-| POST | `/api/objects/{plan_id}/sectors` | Создать сектора внутри объекта (обычно из результата OCR) |
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/sectors` | `get_sectors` | — | — | All sectors + `calc_risk_score` fields (score/level/color/exposure_low/high/label/basis) + per-sector counts + parsed `boundary`. N+1 queries per sector. |
+| POST | `/api/sectors` | `create_sector` | SectorIn | — | Upsert via `database.add_sector`. `boundary` ≥ 4 points `[[lat,lon],...]` WGS84. |
+| PUT | `/api/sectors/{name}` | `update_sector` | SectorIn | — | Same upsert by path name. |
+| DELETE | `/api/sectors/{name}` | `delete_sector` | — | — | Deletes sector row only — dependent rows are orphaned. 404 if missing. |
+| PATCH | `/api/sectors/{name}/notes` | `update_sector_notes` | SectorNotesIn | — | Update tree_species / cut_plan_notes / notes. |
+| GET | `/api/sectors/{name}` | `get_sector_detail` | — | — | Sector + score + risks, trucks, timber, sessions, photos, comments, employees, vehicles (+fuel), snapshots (+linked risks). Returns `{error}` with **200** when not found. |
+| GET | `/api/map` | `get_map_data` | — | — | Map markers: center (or last GPS), boundary, risk color. |
 
-## Boundary plans (OCR границ)
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/boundary-plans/{plan_id}/scan` | Файл скана плана |
-| GET | `/api/boundary-plans/{plan_id}/annotated` | Скан с наложенной разметкой |
+## Objects & boundary plans
 
-## Sector snapshots + Snapshot risks
-| Метод | Путь | Что делает |
-|---|---|---|
-| POST | `/api/sectors/{name}/snapshots` | Загрузить снимок сектора по дате |
-| GET | `/api/sectors/{name}/snapshots` | Список снимков сектора |
-| GET | `/api/sectors/snapshots/{id}/image` | Файл снимка |
-| DELETE | `/api/sectors/snapshots/{id}` | Удалить снимок (+ файл с диска) |
-| POST | `/api/sectors/snapshots/{id}/risks` | Привязать риск к снимку |
-| GET | `/api/sectors/snapshots/{id}/risks` | Риски, привязанные к снимку |
-| DELETE | `/api/sectors/snapshots/{id}/risks/{risk_id}` | Отвязать риск от снимка |
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/objects` | `get_objects` | — | — | Sectors grouped by `boundary_plan_id`. |
+| GET | `/api/boundary-plans/{plan_id}/scan` | `get_boundary_plan_scan` | — | — | Original plan scan file. |
+| POST | `/api/objects` | `create_object` | ObjectCreate | — | Creates empty `boundary_plans` row (`document_type=manual_object`). |
+| POST | `/api/objects/{plan_id}/boundary-plan` | `upload_boundary_plan` | file | — | Multipart `file` → `data/boundary_plans/manual_{id}{ext}`. No type/size validation. |
+| POST | `/api/objects/{plan_id}/satellite` | `upload_object_satellite` | file | — | Multipart manual satellite image for an object. |
+| GET | `/api/objects/{plan_id}/satellite-image` | `get_object_satellite_image` | — | — | Manual image if present, else redirect to live Sentinel. |
+| POST | `/api/objects/{plan_id}/sectors` | `create_sector_from_drawing` | SectorPolygonIn | — | Sector from pixel polygon; converted to lat/lon only if plan has `georef_scale` (**uses the broken LKS-92 approximation**). |
+| POST | `/api/sectors/{name}/polygon` | `update_sector_polygon` | SectorPolygonIn | — | Redraw pixel outline; recompute WGS84 boundary if georef available (same conversion). |
+| GET | `/api/boundary-plans/{plan_id}/annotated` | `get_boundary_plan_annotated` | — | — | Plan scan with all sector outlines drawn (Pillow, JPEG). |
+| GET | `/api/sectors/{name}/plan-crop` | `get_sector_plan_crop` | — | — | Crop of plan around one sector. |
 
-## Sector satellite (одиночный сектор, не объект)
-| Метод | Путь | Что делает |
-|---|---|---|
-| POST | `/api/sectors/{name}/satellite` | Загрузить снимок для сектора |
-| GET | `/api/sectors/{name}/satellite-image` | Получить снимок сектора |
-| GET | `/api/sectors/{name}/plan-crop` | Кроп исходного плана по границе сектора |
+## Snapshots
 
-## Employees
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/employees` | Все сотрудники |
-| GET | `/api/employees/{sector}` | Сотрудники сектора |
-| POST | `/api/employees` | Создать (`EmployeeIn`: sector/full_name/role/phone/id_number/notes/telegram_user_id) |
-| DELETE | `/api/employees/{eid}` | Удалить |
-| PATCH | `/api/employees/{eid}` | Частичное обновление любого поля из `EmployeePatchIn` (динамический `SET` только по переданным полям) |
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| POST | `/api/sectors/{name}/snapshots` | `upload_sector_snapshot` | file snapshot_date label note risk_level | — | Multipart dated historical image (`snapshot_date` required, `label`, `note`, `risk_level` ∈ ''/LOW/MEDIUM/HIGH). Never overwrites. |
+| GET | `/api/sectors/{name}/snapshots` | `get_sector_snapshots_route` | — | — | List snapshots of a sector. |
+| GET | `/api/sectors/snapshots/{id}/image` | `get_sector_snapshot_image` | — | — | Snapshot image file. |
+| DELETE | `/api/sectors/snapshots/{id}` | `delete_sector_snapshot_route` | — | — | Delete snapshot (row + file per `database.delete_sector_snapshot`). |
+| POST | `/api/sectors/snapshots/{id}/risks` | `link_snapshot_risk` | SnapshotRiskIn | — | Link a risk to a snapshot. |
+| GET | `/api/sectors/snapshots/{id}/risks` | `get_snapshot_risks_route` | — | — | Risks linked to snapshot. |
+| DELETE | `/api/sectors/snapshots/{id}/risks/{risk_id}` | `unlink_snapshot_risk` | — | — | Remove link. |
 
-## Vehicles
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/vehicles` | Все грузовики |
-| GET | `/api/vehicles/{sector}` | Грузовики сектора (+ последние 5 `fuel_logs` на каждый) |
-| POST | `/api/vehicles` | Создать |
-| POST | `/api/vehicles/fuel-log` | Записать заправку; **если расхождение > 5л — автоматически создаётся `risk` MEDIUM** через `add_risk()` (не `add_incident()` — это ручной риск, не инцидент с AI-рекомендацией) |
-| DELETE | `/api/vehicles/{vid}` | Удалить |
-| PATCH | `/api/vehicles/{vid}` | Частичное обновление |
+## GPS, routes, tracks
 
-## Risks / Incidents
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/risks` | Все риски (и ручные, и инциденты вперемешку) |
-| GET | `/api/risks/by-sector` | Группировка HIGH/MEDIUM/LOW по сектору (для чарта Overview) |
-| GET | `/api/risks/{risk_id}` | Детали одного риска/инцидента |
-| GET | `/api/risks/{risk_id}/photo` | Первое фото |
-| GET | `/api/risks/{risk_id}/photo2` | Второе фото |
-| GET | `/api/incidents` | Только инциденты (`entity_type IS NOT NULL`), опц. `?status=` |
-| GET | `/api/equipment` | Список техники, опц. `?sector=` |
-| POST | `/api/incidents/{incident_id}/approve` | Диспетчер утверждает AI-рекомендацию → шлёт Telegram-сообщение работнику с кнопкой (`🛠 Ремонт техники` если `rule_code=='EQUIPMENT_BREAKDOWN'`, иначе `✓ I HAVE RETURNED`) → статус `NOTIFIED` |
-| POST | `/api/risks/{risk_id}/send-message` | Диспетчер шлёт произвольное текстовое сообщение работнику через Telegram |
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/sectors/{name}/vehicles/{vehicle_id}/route` | `get_vehicle_route` | — | — | Vehicle pings ordered by time (path `name` is ignored in the query). |
+| GET | `/api/sectors/{name}/session-tracks` | `get_sector_session_tracks` | — | — | Work sessions of a sector with track metadata. |
+| GET | `/api/risks/{risk_id}/exit-route` | `get_risk_exit_route` | — | — | Track segment around a SECTOR_EXIT incident; 404 if none. |
+| GET | `/api/sessions/{session_id}/track` | `get_session_track` | — | — | Full session route: points, gaps (>120 s), photos placed within 60 s, summary. |
+| GET | `/api/gps` | `get_gps` | — | — | Last 200 work_sessions. |
+| GET | `/api/gps/activity` | `gps_activity` | — | — | Check-ins per day, last 30 days with data. |
 
-## GPS / Timber / Trucks / Photos
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/gps` | Последние 200 `work_sessions` |
-| GET | `/api/gps/activity` | Агрегированная активность |
-| GET | `/api/timber` | Все `timber_movements` |
-| GET | `/api/timber/volume-by-sector` | Агрегация для чарта Overview |
-| GET | `/api/trucks` | Все `truck_reports` |
-| GET | `/api/photos` | Все фото |
+## Employees & vehicles
 
-## Map / Report
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/map` | Данные для карты (сектора + позиции) |
-| GET | `/api/report/pdf/{sector_name}` | Генерация PDF-отчёта по сектору |
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/employees` | `get_all_employees` | — | — | All employees. |
+| GET | `/api/employees/{sector}` | `get_sector_employees` | — | — | Employees of sector. |
+| POST | `/api/employees` | `create_employee` | EmployeeIn | — | Create employee (incl. `id_number`, `telegram_user_id`). |
+| DELETE | `/api/employees/{eid}` | `delete_employee` | — | — | Hard delete; references in risks/sessions are orphaned. |
+| PATCH | `/api/employees/{eid}` | `update_employee` | EmployeePatchIn | — | Partial update; only non-null fields. |
+| GET | `/api/vehicles` | `get_all_vehicles` | — | — | All vehicles. |
+| GET | `/api/vehicles/{sector}` | `get_sector_vehicles` | — | — | Vehicles of sector + last 5 fuel logs. |
+| POST | `/api/vehicles` | `create_vehicle` | VehicleIn | — | Create vehicle. |
+| POST | `/api/vehicles/fuel-log` | `add_fuel_log` | FuelLogIn | — | Fuel log; |discrepancy| > 5 L auto-creates MEDIUM risk. |
+| DELETE | `/api/vehicles/{vid}` | `delete_vehicle` | — | — | Hard delete. |
+| PATCH | `/api/vehicles/{vid}` | `update_vehicle` | VehiclePatchIn | — | Partial update. |
 
-## Satellite (Sentinel Hub)
-| Метод | Путь | Что делает |
-|---|---|---|
-| GET | `/api/satellite/token-check` | Проверка валидности OAuth-токена Sentinel Hub |
-| GET | `/api/satellite/sectors` | Список секторов, доступных для спутникового анализа |
-| GET | `/api/satellite/image/{sector_name}` | Спутниковый снимок сектора |
-| GET | `/api/satellite/object/{plan_id}` | Спутниковый снимок объекта |
-| GET | `/api/satellite/ndvi/{sector_name}` | NDVI-слой для сектора |
+## Risks & incidents
 
----
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/risks` | `get_risks` | — | — | All risks, pinned first, then HIGH→LOW, newest first. No pagination. |
+| GET | `/api/risks/by-sector` | `risks_by_sector` | — | — | HIGH/MEDIUM/LOW counts per sector (all statuses). |
+| GET | `/api/risks/financial-breakdown` | `risks_financial_breakdown` | — | — | Per-risk AI-estimated exposure rows behind the Overview KPI. |
+| GET | `/api/risks/{risk_id}` | `get_risk_detail` | — | — | Risk + events + `ai_state`; for EMPLOYEE: name, telegram_connected, last live location, assigned equipment/vehicle. |
+| POST | `/api/risks/{risk_id}/ai-retry` | `retry_risk_ai` | — | — | Queue risk for background AI worker (daily cap applies). |
+| GET | `/api/risks/{risk_id}/photo` | `get_risk_photo` | — | — | `risks.photo_path` file. |
+| GET | `/api/risks/{risk_id}/photo2` | `get_risk_photo2` | — | — | `risks.photo_path_2` file. |
+| GET | `/api/incidents` | `get_incidents_route` | — | status | Incidents (entity_type NOT NULL), optional `status` filter. |
+| GET | `/api/equipment` | `get_equipment_route` | — | sector | Equipment, optional `sector` filter. |
+| POST | `/api/incidents/{incident_id}/approve` | `approve_incident` | ApproveIn | — | Dispatcher approves: sends chosen AI option text to worker via Telegram, status→NOTIFIED, events APPROVED + TELEGRAM_SENT (actor = Basic username). |
+| POST | `/api/risks/{risk_id}/send-message` | `send_risk_message` | SendMessageIn | — | Free-text dispatcher→worker Telegram message; event DISPATCHER_MESSAGE. |
 
-## Известные несостыковки, найденные при инспекции (не выдумки, видно в коде)
+## Risk conclusion (Slēdziens)
 
-1. **`/api/sectors` (список) не отдаёт `exposure_low`/`exposure_high`
-   числом** — только `exposure_label` (строка). `/api/sectors/{name}`
-   (детали одного сектора) — отдаёт. Это значит, что любой frontend-код,
-   суммирующий `sector.exposure_low` по массиву из `/api/sectors` (именно
-   так делает `loadInspector()` в `index.html` — см. отдельный разбор для
-   AI Inspector), **всегда получит 0**, даже если у секторов есть реальная
-   rule-based exposure. Нужно решить с пользователем — либо добавить эти
-   поля в `/api/sectors`, либо это осознанно не нужно (т.к. Overview уже
-   показывает AI-based финансовый риск из другого источника).
-2. **Нет `/api/inspector/*`** — раздела AI Inspector с backend-эндпоинтом
-   не существует вообще, вся его "аналитика" сейчас — чистый client-side JS
-   (см. ARCHITECTURE.md §6). Это отправная точка для текущей рабочей задачи
-   (streaming AI-анализ).
-3. **Нет пагинации** почти нигде (кроме `/api/gps` — жёсткий `LIMIT 200`).
-   При росте данных `/api/risks`, `/api/employees` и т.п. отдают всё целиком.
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/risks/{risk_id}/conclusion` | `risk_conclusion_get` | — | — | Current conclusion state + history. |
+| POST | `/api/risks/{risk_id}/conclusion/draft` | `risk_conclusion_draft` | RiskConclusionDraftIn | — | Build evidence + rule result; optional AI text (`use_ai`); manual `weather_text/source`. |
+| POST | `/api/risks/{risk_id}/conclusion/{conclusion_id}/close` | `risk_conclusion_close` | RiskConclusionCloseIn | — | Accept and close → risk RESOLVED; `override_reason` required when against rule recommendation. |
+| POST | `/api/risks/{risk_id}/conclusion/{conclusion_id}/continue` | `risk_conclusion_continue` | RiskConclusionContinueIn | — | Interim conclusion, risk stays open, `next_steps` required. |
+| POST | `/api/risks/{risk_id}/conclusion/{conclusion_id}/undo` | `risk_conclusion_undo` | RiskConclusionUndoIn | — | Undo a decision (reason required); restores draft. |
+
+## AI Inspector
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/inspector/analyze/{sector_name}` | `inspector_analyze_sector` | — | — | SSE stream (`text/event-stream`): `data:{chunk}` events, then `event: done` with risk_breakdown/exposure/suggested_actions, or `event: error`. Paid Claude call. Saves `ai_inspector_analyses`. |
+| GET | `/api/inspector/analyze-all` | `inspector_analyze_all` | — | — | Same SSE contract over all sectors (portfolio + satellite pending requests). |
+| POST | `/api/inspector/actions/report-issue` | `inspector_report_issue` | ReportIssueIn | — | Creates HIGH incident for equipment operator, generates AI recommendation (sync), sends Telegram with inline button. 400 if operator not linked to Telegram; 502 if Telegram fails (incident stays OPEN). |
+
+## Photo comparison
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/photo-compare/runs` | `photo_cmp_list_runs` | — | sector | List runs (optional `sector`). |
+| POST | `/api/photo-compare/runs` | `photo_cmp_create_run` | PhotoCmpRunIn | — | Create run for sector + baseline/follow-up dates (optional explicit photo ids). |
+| GET | `/api/photo-compare/runs/{run_id}` | `photo_cmp_get_run` | — | — | Run with points, photos, changes. |
+| GET | `/api/photo-compare/runs/{run_id}/events` | `photo_cmp_get_events` | — | — | Audit log incl. paid-call token counts. |
+| POST | `/api/photo-compare/runs/{run_id}/match` | `photo_cmp_match` | — | — | Start AI matching pass (paid, background thread). |
+| POST | `/api/photo-compare/runs/{run_id}/confirm-all` | `photo_cmp_confirm_all` | — | — | Human confirms all points. |
+| POST | `/api/photo-compare/points/{point_id}/confirm` | `photo_cmp_confirm_point` | — | — | Human confirms one point. |
+| POST | `/api/photo-compare/points/{point_id}/not-same-place` | `photo_cmp_not_same_place` | PhotoCmpForceIn | — | Human marks point not comparable. |
+| POST | `/api/photo-compare/runs/{run_id}/reassign` | `photo_cmp_reassign` | PhotoCmpReassignIn | — | Move a photo to another point or `new`. |
+| POST | `/api/photo-compare/runs/{run_id}/process` | `photo_cmp_process` | PhotoCmpProcessIn | — | Run check→detect→verify on confirmed points (paid; `limit`, `point_ids`, `force`). |
+| POST | `/api/photo-compare/points/{point_id}/observations` | `photo_cmp_add_observation` | PhotoCmpObservationIn | — | Reviewer observation (`change_class` possible_change|possible_damage). |
+| POST | `/api/photo-compare/changes/{change_id}/withdraw` | `photo_cmp_withdraw_observation` | — | — | Withdraw own observation. |
+| POST | `/api/photo-compare/changes/{change_id}/undo` | `photo_cmp_undo_review` | — | — | Undo review decision. |
+| POST | `/api/photo-compare/changes/{change_id}/review` | `photo_cmp_review_change` | PhotoCmpReviewIn | — | `action` confirm|reject|reshoot. |
+
+## Timber & trucks
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/timber` | `get_timber` | — | — | Last 200 timber movements. |
+| GET | `/api/timber/volume-by-sector` | `timber_volume` | — | — | Actual vs planned volume per sector. |
+| GET | `/api/trucks` | `get_trucks` | — | — | Last 200 truck reports. |
+
+## Photos
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/photos` | `get_photos` | — | sector photo_type | Work photos, filters `sector`, `photo_type`, max 300. |
+
+## Reports
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/report/pdf/{sector_name}` | `generate_pdf` | — | — | Sector PDF (reportlab). Returns 500 JSON if reportlab missing — **reportlab is not in requirements.txt**. |
+
+## Satellite (imagery)
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| POST | `/api/sectors/{name}/satellite` | `upload_sector_satellite` | file | — | Multipart manual satellite image for a sector. |
+| GET | `/api/sectors/{name}/satellite-image` | `get_sector_satellite_image` | — | — | Manual image if present, else redirect to `/api/satellite/image/{name}`. |
+| GET | `/api/satellite/token-check` | `satellite_token_check` | — | — | Copernicus OAuth check; returns first 20 chars of client id. |
+| GET | `/api/satellite/sectors` | `satellite_sectors` | — | — | Sectors with bbox for imagery browser (falls back to Riga point). |
+| GET | `/api/satellite/image/{sector_name}` | `satellite_image` | — | date_from date_to | Live Sentinel-2 L2A true-colour JPEG 512×512, query `date_from`/`date_to` (default 2024-06-01..30), cloud ≤50%. Not cached. |
+| GET | `/api/satellite/object/{plan_id}` | `satellite_object` | — | date_from date_to | Same over all sectors of an object. |
+| GET | `/api/satellite/ndvi/{sector_name}` | `satellite_ndvi` | — | date_from date_to | Live NDVI colour-classified JPEG (4 classes). |
+
+## Satellite Intelligence
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/satellite-intel/providers` | `satellite_intel_providers` | — | — | Provider list + configured flag + last observation. |
+| GET | `/api/satellite-intel/sectors` | `satellite_intel_sectors` | — | — | Latest satellite score/band/tier, pending request per sector. |
+| GET | `/api/satellite-intel/sector/{sector_name}` | `satellite_intel_sector_detail` | — | — | Score, requests, observations, timeline for one sector. |
+
+## Integration Layer
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| GET | `/api/integrations` | `list_integrations_route` | — | category | Catalog merged with configured instances; optional `category`. |
+| POST | `/api/integrations` | `create_integration_route` | CreateIntegrationIn | — | Create instance for a catalog provider (400 if unknown). |
+| GET | `/api/integrations/health` | `integrations_health_route` | — | — | Counts by status; connected-but-never-synced ids. |
+| GET | `/api/integrations/{integration_id}` | `get_integration_route` | — | — | Instance + catalog entry. |
+| PATCH | `/api/integrations/{integration_id}` | `update_integration_route` | UpdateIntegrationIn | — | Update name/config/frequency/status; `credentials` encrypted (Fernet) and never returned. |
+| DELETE | `/api/integrations/{integration_id}` | `delete_integration_route` | — | — | Delete instance. |
+| POST | `/api/integrations/{integration_id}/test` | `test_integration_route` | — | — | Adapter `test_connection`. |
+| POST | `/api/integrations/{integration_id}/sync` | `sync_integration_route` | — | — | Run sync now (only demo adapters are implemented). |
+| GET | `/api/integrations/{integration_id}/logs` | `get_integration_logs_route` | — | limit | Logs + sync history. |
+| GET | `/api/integrations/{integration_id}/records` | `get_integration_records_route` | — | limit | Staged normalized records. |
+| POST | `/api/integrations/{integration_id}/reset-demo` | `reset_integration_demo_route` | — | — | Remove demo records of a demo integration. |
+
+## Demo
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| POST | `/api/demo/reset` | `demo_reset_route` | — | — | Deletes is_demo rows. |
+| POST | `/api/demo/{scenario}` | `run_demo_scenario` | — | — | `scenario` ∈ breakdown, worker-exit, volume-mismatch, wetland, logging-boundary. Creates real incident + real Telegram message. |
+
+## Webhooks (no Basic Auth)
+
+| Method | Path | Handler | Body | Query | Behaviour |
+|---|---|---|---|---|---|
+| POST | `/api/webhooks/{provider}` | `integration_webhook_route` | — | — | Raw body; HMAC-SHA256 via `X-Signature`/`X-Hub-Signature-256` if `WEBHOOK_SECRET_<PROVIDER>` set (401 on mismatch); replay-dedup by payload hash; 429 over 30/min per provider+IP. Stage 1: only logged, not routed to adapters. |
+
+## Telegram bot surface (bot.py) — not HTTP, listed for completeness
+
+Commands: `/start` `/help` `/checkin` `/finish` `/add_sector` `/add_risk` `/add_timber` `/add_truck` `/sectors` `/risks` `/report` `/export_report`,
+demo (admin-only): `/demo_breakdown` `/demo_worker_exit` `/demo_volume_mismatch` `/demo_wetland` `/demo_logging_boundary` `/demo_reset`.
+Callbacks: `checkin_sector:` `linkemp:` `vehgps_sector:` `vehgps_vehicle:` `plan_*` `repair_menu:` `repair_choice:` `confirm_return:` `brk_diag:` `brk_action|sxt_action|wtl_action|vol_action|log_action:`.
+Message handlers: location (check-in, live-location edits, vehicle ping), photo (work photo, plan OCR, demo evidence), text (menu router; worker reply capture at group −1).
+**Only `/demo_*` is access-controlled.** Pipe-separated command formats: see `bot.py` handlers.
+
+## Endpoints referenced by the frontend
+All 64 distinct `/api/...` path patterns referenced in `index.html` map to existing routes (scripted check 2026-10-21; one pattern built by string concatenation verified manually). No frontend call to any chat/history endpoint for AI Inspector exists.
