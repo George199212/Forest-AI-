@@ -159,15 +159,12 @@ def reset_demo(integration_id, organization_id=1):
         conn = sqlite3.connect(database.DB_NAME)
         cur = conn.cursor()
         placeholders = ",".join("?" * len(rule_codes))
-        cur.execute(
-            f"DELETE FROM risk_events WHERE risk_id IN "
-            f"(SELECT id FROM risks WHERE is_demo=1 AND rule_code IN ({placeholders}))",
-            rule_codes,
-        )
-        cur.execute(
-            f"DELETE FROM risks WHERE is_demo=1 AND rule_code IN ({placeholders})",
-            rule_codes,
-        )
+        # Only simulated-integration rows: never a REAL or a demo-scenario risk with the same rule code.
+        scope = (f"SELECT id FROM risks WHERE is_demo=1 AND rule_code IN ({placeholders}) "
+                 f"AND COALESCE(data_origin, 'SIMULATED_INTEGRATION')='SIMULATED_INTEGRATION'")
+        cur.execute(f"DELETE FROM risk_events WHERE risk_id IN ({scope})", rule_codes)
+        cur.execute(f"DELETE FROM risk_evidence WHERE risk_id IN ({scope})", rule_codes)
+        cur.execute(f"DELETE FROM risks WHERE id IN ({scope})", rule_codes)
         deleted_incidents = cur.rowcount
         conn.commit()
         conn.close()

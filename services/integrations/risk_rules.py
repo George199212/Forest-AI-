@@ -90,7 +90,7 @@ def database_update_is_demo(incident_id):
     import sqlite3
     conn = sqlite3.connect(database.DB_NAME)
     cur = conn.cursor()
-    cur.execute("UPDATE risks SET is_demo=1 WHERE id=?", (incident_id,))
+    cur.execute("UPDATE risks SET is_demo=1, data_origin='SIMULATED_INTEGRATION' WHERE id=?", (incident_id,))
     conn.commit()
     conn.close()
 

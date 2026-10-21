@@ -120,7 +120,7 @@ def _tg_send(chat_id, text, buttons=None):
 
 def _mark_demo(incident_id):
     conn = _conn()
-    conn.execute("UPDATE risks SET is_demo=1 WHERE id=?", (incident_id,))
+    conn.execute("UPDATE risks SET is_demo=1, data_origin='DEMO_SCENARIO' WHERE id=?", (incident_id,))
     conn.commit()
     conn.close()
 
@@ -940,16 +940,22 @@ def handle_logging_action(incident_id, action, actor):
 # Reset
 # ─────────────────────────────────────────────────────────────────────────
 
-def reset_demo():
+def reset_demo(include_simulated_integrations=False):
     """Wipes ONLY rows this module flagged is_demo=1 (plus the transient
     live_locations rows it wrote for demo employees) — never touches any
-    other risk, sector, employee or equipment. Safe to run repeatedly."""
+    other risk, sector, employee or equipment. Safe to run repeatedly.
+    Risks of simulated integrations (data_origin SIMULATED_INTEGRATION, also is_demo=1) are kept
+    unless include_simulated_integrations is set; REAL risks are never deleted."""
     conn = _conn()
-    demo_incident_ids = [r["id"] for r in conn.execute("SELECT id FROM risks WHERE is_demo=1").fetchall()]
+    origins = ("DEMO_SCENARIO", "SIMULATED_INTEGRATION") if include_simulated_integrations else ("DEMO_SCENARIO",)
+    demo_incident_ids = [r["id"] for r in conn.execute(
+        f"SELECT id FROM risks WHERE is_demo=1 AND COALESCE(data_origin, 'DEMO_SCENARIO') "
+        f"IN ({','.join('?' * len(origins))})", origins).fetchall()]
     if demo_incident_ids:
         placeholders = ",".join("?" * len(demo_incident_ids))
         conn.execute(f"DELETE FROM risk_events WHERE risk_id IN ({placeholders})", demo_incident_ids)
-    conn.execute("DELETE FROM risks WHERE is_demo=1")
+        conn.execute(f"DELETE FROM risk_evidence WHERE risk_id IN ({placeholders})", demo_incident_ids)
+        conn.execute(f"DELETE FROM risks WHERE id IN ({placeholders})", demo_incident_ids)
     conn.execute("DELETE FROM sector_equipment WHERE is_demo=1")
     conn.execute("DELETE FROM timber_movements WHERE is_demo=1")
 

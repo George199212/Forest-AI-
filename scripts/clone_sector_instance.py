@@ -62,6 +62,7 @@ CHILD_RULES = [
     ("snapshot_risks",         "snapshot_id NOT IN (SELECT id FROM sector_snapshots) "
                                "OR risk_id NOT IN (SELECT id FROM risks)"),
     ("risk_conclusions",       "risk_id NOT IN (SELECT id FROM risks) OR risk_id IS NULL"),
+    ("risk_evidence",          "risk_id NOT IN (SELECT id FROM risks) OR risk_id IS NULL"),
     ("photo_cmp_points",       "run_id NOT IN (SELECT id FROM photo_cmp_runs) OR run_id IS NULL"),
     ("photo_cmp_point_photos", "run_id NOT IN (SELECT id FROM photo_cmp_runs) OR run_id IS NULL"),
     ("photo_cmp_changes",      "point_id NOT IN (SELECT id FROM photo_cmp_points) OR point_id IS NULL"),

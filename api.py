@@ -1738,9 +1738,10 @@ _DEMO_TRIGGERS = {
 }
 
 @app.post("/api/demo/reset")
-def demo_reset_route(username: str = Depends(verify_credentials)):
+def demo_reset_route(include_simulated: bool = False, username: str = Depends(verify_credentials)):
+    # Simulated-integration risks are kept unless explicitly asked: POST /api/demo/reset?include_simulated=1
     try:
-        return _demo.reset_demo()
+        return _demo.reset_demo(include_simulated_integrations=include_simulated)
     except Exception as e:
         print(f"DEMO RESET ERROR: {e}")
         return Response(content=json.dumps({"error": str(e)}), media_type="application/json", status_code=500)

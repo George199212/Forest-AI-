@@ -72,6 +72,8 @@ def _migrate():
         ("sectors", "object_name",   "TEXT"),
         ("sectors", "pixel_boundary_json", "TEXT"),
         ("sectors", "satellite_file_path", "TEXT"),
+        # REAL | SIMULATED (a sector that exists only for a demo; demo adapters may only touch these).
+        ("sectors", "data_origin", "TEXT DEFAULT 'REAL'"),
     ]
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -113,6 +115,18 @@ def _migrate():
     _add_column_if_missing(cur, "risks", "identity_shared_count", "INTEGER")
     # When the incident happened, if that differs from when its row was created (created_at).
     _add_column_if_missing(cur, "risks", "occurred_at", "TEXT")
+    # Provenance (docs/demo-layer-plan.md §2). is_demo alone cannot carry it: the global demo
+    # reset deletes every is_demo=1 row. REAL | DEMO_SCENARIO | SIMULATED_INTEGRATION.
+    _add_column_if_missing(cur, "risks", "data_origin", "TEXT")
+    # Rule codes the integration demo adapters raise (risk_rules.RULE_CODES_BY_CATEGORY).
+    cur.execute("""
+    UPDATE risks SET data_origin = CASE
+        WHEN COALESCE(is_demo, 0) = 0 THEN 'REAL'
+        WHEN rule_code IN ('FLEET_SECTOR_EXIT', 'SATELLITE_UNREGISTERED_CHANGE',
+                           'WEIGHBRIDGE_WAYBILL_MISMATCH', 'TIMBER_VOLUME_OVER_PERMIT') THEN 'SIMULATED_INTEGRATION'
+        ELSE 'DEMO_SCENARIO' END
+    WHERE data_origin IS NULL
+    """)
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS risk_events (
@@ -607,6 +621,7 @@ def _migrate():
 
     _create_photo_compare_tables(cur)
     _create_risk_conclusion_table(cur)
+    _create_risk_evidence_table(cur)
 
     # Seed exactly one default organization so every existing (pre-multi-tenant)
     # row and every new integration has somewhere to point organization_id=1 —
@@ -756,6 +771,28 @@ def _create_risk_conclusion_table(cur):
 
 
 # ── Geo helpers ───────────────────────────────────────────────────────────────
+
+def _create_risk_evidence_table(cur):
+    # Evidence items behind a risk, each with its source system and origin. Points to the row it
+    # describes (integration_records for simulated data; session/photo/photo-comparison/sector rows
+    # for real data) instead of copying it. Re-attaching the same item is an update, not a new row.
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS risk_evidence (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        risk_id         INTEGER NOT NULL,
+        source_provider TEXT    NOT NULL,
+        data_origin     TEXT    NOT NULL,
+        evidence_type   TEXT    NOT NULL,
+        summary         TEXT    NOT NULL,
+        ref_table       TEXT,
+        ref_id          INTEGER,
+        observed_at     TEXT,
+        created_at      TEXT    NOT NULL,
+        UNIQUE (risk_id, source_provider, evidence_type, ref_table, ref_id)
+    )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_risk_evidence_risk ON risk_evidence(risk_id)")
+
 
 def calc_centroid(points):
     """Calculate centroid from list of [lat, lon] pairs."""
@@ -978,8 +1015,8 @@ def add_risk(sector, risk_level, reason):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
-    INSERT INTO risks (sector, risk_level, reason, created_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO risks (sector, risk_level, reason, created_at, data_origin)
+    VALUES (?, ?, ?, ?, 'REAL')
     """, (sector, risk_level, reason, now))
     conn.commit()
     conn.close()
@@ -1181,17 +1218,20 @@ def get_latest_open_session(user_id):
 # ── Incidents (risks, extended with Incident-lifecycle fields) ─────────────
 
 def add_incident(sector, risk_level, reason, entity_type=None, entity_id=None,
-                  rule_code=None, distance_m=None, duration_min=None, ai_recommendation=None):
+                  rule_code=None, distance_m=None, duration_min=None, ai_recommendation=None,
+                  data_origin="REAL", occurred_at=None):
+    """data_origin: REAL unless the caller marks the row as demo. Callers that flag is_demo
+    after the insert (demo_scenarios, risk_rules) also set data_origin there."""
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
     INSERT INTO risks
         (sector, risk_level, reason, created_at, entity_type, entity_id, status,
-         rule_code, distance_m, duration_min, ai_recommendation)
-    VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?)
+         rule_code, distance_m, duration_min, ai_recommendation, data_origin, occurred_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?)
     """, (sector, risk_level, reason, now, entity_type, entity_id,
-          rule_code, distance_m, duration_min, ai_recommendation))
+          rule_code, distance_m, duration_min, ai_recommendation, data_origin, occurred_at))
     conn.commit()
     last_id = cur.lastrowid
     conn.close()
@@ -1298,6 +1338,47 @@ def get_active_incident_by_rule(rule_code, entity_type=None, entity_id=None, sec
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+# ── Risk Evidence (source + origin of every item behind a risk) ──────────────
+
+def add_risk_evidence(risk_id, source_provider, data_origin, evidence_type, summary,
+                      ref_table=None, ref_id=None, observed_at=None):
+    """Attach one evidence item to a risk (data_origin REAL | SIMULATED). Idempotent: the same
+    (risk, source, type, ref) updates summary/observed_at instead of adding a row; this also holds
+    for items without a ref (NULLs never conflict in a SQLite UNIQUE). Returns its id."""
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("BEGIN IMMEDIATE")
+    row = cur.execute(
+        "SELECT id FROM risk_evidence WHERE risk_id=? AND source_provider=? AND evidence_type=? "
+        "AND ref_table IS ? AND ref_id IS ?", (risk_id, source_provider, evidence_type, ref_table, ref_id)
+    ).fetchone()
+    if row:
+        evidence_id = row[0]
+        cur.execute("UPDATE risk_evidence SET data_origin=?, summary=?, observed_at=? WHERE id=?",
+                    (data_origin, summary, observed_at, evidence_id))
+    else:
+        cur.execute("""
+        INSERT INTO risk_evidence
+            (risk_id, source_provider, data_origin, evidence_type, summary, ref_table, ref_id, observed_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (risk_id, source_provider, data_origin, evidence_type, summary, ref_table, ref_id, observed_at, now))
+        evidence_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return evidence_id
+
+def get_risk_evidence(risk_id):
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM risk_evidence WHERE risk_id=? ORDER BY COALESCE(observed_at, created_at), id",
+                (risk_id,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
 
 
 def get_active_incident_for_employee(employee_id):
