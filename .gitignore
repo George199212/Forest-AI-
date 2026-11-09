@@ -42,3 +42,6 @@ index.html.backup-*
 # Verification evidence stays on the VPS; only its README is versioned
 docs/evidence/*
 !docs/evidence/README.md
+
+# i18n coverage tool: local copies of Chart.js / Leaflet (npm pack)
+tools/i18n_check/vendor/
