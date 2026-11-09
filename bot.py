@@ -1833,6 +1833,11 @@ def main():
     init_work_tables()
     init_plan_tables()
     app = Application.builder().token(TOKEN).build()
+    # Multi-tenant routing (docs/TELEGRAM_TENANTS.md): off unless explicitly enabled.
+    # When on, registered tenant users are routed before any legacy handler can write.
+    if os.environ.get("FOREST_TENANT_ROUTING") == "1":
+        from telegram_tenant_router import install as install_tenant_router
+        install_tenant_router(app)
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_worker_message), group=-1)
 
