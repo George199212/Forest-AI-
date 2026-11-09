@@ -92,55 +92,12 @@ def source_association(row,designation):
     props=json.loads(row['properties']);valid=bool(row['source_verified'] and props.get('kadastrs')==row['kadastrs']==designation and str(props.get('objectid'))==row['objectid'] and str(props.get('kvart'))==row['kvart'] and str(props.get('nog'))==row['nog'])
     return {'status':'verified_source_attribute' if valid else 'unverified','classification':'authoritative_vmd_attribute' if valid else 'unverified','source_field':'kadastrs','requested_designation':designation,'source_designation':props.get('kadastrs'),'source_feature_id':row['external_id'],'source_file':row['source_file'],'source_record':row['source_row'],'source_region':row['source_region'],'source_date':row['source_date'],'archive_sha256':row['archive_sha256'],'cadastral_boundary_verified':False,'reason':'Sākotnējais DBF atribūts un avota integritāte validēta valsts indeksa izveidē.'}
 
-def compartment_validation(row, designation, parcel_check=None, *, exact=True):
-    """One authoritative VMD/VZD relationship decision shared by search and map inspection.
-
-    Measurements are calculated from immutable native geometry. No repair or tolerance
-    is applied to the geometry used for the registration decision.
-    """
-    base=parcel_check or parcel_validation(designation)
-    g=shapely.from_geojson(json.dumps(original(row)));parcel=native_parcel_geometry(designation)
-    if row['source_crs']!='EPSG:10306':
-        from pyproj import Transformer
-        from shapely.ops import transform
-        g=transform(Transformer.from_crs(row['source_crs'],'EPSG:10306',always_xy=True).transform,g)
-    valid=bool(g.is_valid and not g.is_empty and g.area>0)
-    test=g if valid else shapely.make_valid(g)
-    intersects=test.intersects(parcel)
-    intersection=test.intersection(parcel).area if intersects else 0.0
-    inside=valid and parcel.covers(g)
-    ratio=min(1.0,intersection/max(g.area,1e-20))
-    check={**base,'land_unit_geometry':None,'status':'verified' if inside else 'boundary_review_required',
-        'compartment_relationship_verified':inside,'registration_allowed':inside,'geometry_valid':valid,
-        'fully_inside':inside,'overlap_percent':ratio*100,'intersection_area_m2':intersection,
-        'outside_area_m2':max(0.0,g.area-intersection)}
-    if not valid:check.update(status='geometry_invalid',registration_allowed=False)
-    elif row['repair']:check.update(status='display_review_required',registration_allowed=False)
-    association=source_association(row,designation)
-    if exact and association['status']!='verified_source_attribute':
-        check.update(status='source_conflict',registration_allowed=False,compartment_relationship_verified=False)
-    if not exact:check.update(status='spatial_candidate_only',registration_allowed=False,compartment_relationship_verified=False)
-    return check,association
-
-def native_parcel_geometry(designation):
-    m=release();row=parcel_row(designation,m)
-    return shapely.from_wkb(row['native_geometry']) if row else shapely.GeometryCollection()
-
 def source_reference(row):
     m=release();source=next((x for x in m['sources'] if x.get('archive_sha256')==row['archive_sha256'] and x.get('kind')=='vmd'),None)
     return {'source_url':source.get('url') if source else None,'source_licence':'CC0-1.0','source_region':row['source_region'],'source_date':row['source_date'],'source_archive_sha256':row['archive_sha256'],'source_file':row['source_file'],'source_record':row['source_row'],'dataset_version':m['version']}
 
 def original(row):
     data=row['original_geometry'] if row['original_geometry'] is not None else row['native_geometry'];return mapping(shapely.from_wkb(data))
-
-def original_wgs84(row):
-    """Transform unchanged source geometry to Leaflet coordinates without repair."""
-    g=shapely.from_geojson(json.dumps(original(row)))
-    if row['source_crs']!='EPSG:4326':
-        from pyproj import Transformer
-        from shapely.ops import transform
-        g=transform(Transformer.from_crs(row['source_crs'],'EPSG:4326',always_xy=True).transform,g)
-    return mapping(g)
 
 def empty(designation,state,message,version=None):
     return {'type':'FeatureCollection','features':[],'spatial_candidates':[],'state':state,'states':[state],'search_message':message,'dataset_version':version,'cadastral_validation':{'status':'unverified','registration_allowed':False,'land_unit_exists':None,'land_unit_geometry':None},'cadastral_verification':{'status':'unverified','verified_count':0,'unverified_count':0},'summary':{'found':0,'returned':0,'offset':0,'limit':100,'has_more':False,'bounds':None,'total_compartment_area_ha':0,'cadastral_search':{'field':'kadastrs','value':designation,'match':'exact'}}}
@@ -178,7 +135,12 @@ def search(designation,limit=100,offset=0,review_offset=0):
                 intersection=test.intersection(parcel).area if intersects else 0
                 if not is_exact and intersection<=0:continue
                 ratio=min(1,intersection/max(test.area,1e-20));inside=geometry_valid and parcel.covers(g)
-                check,association=compartment_validation(row,designation,validation,exact=is_exact)
+                association=source_association(row,designation)
+                check={**validation,'land_unit_geometry':None,'status':'verified' if inside else 'boundary_review_required','compartment_relationship_verified':inside,'registration_allowed':inside,'geometry_valid':geometry_valid,'fully_inside':inside,'overlap_percent':ratio*100,'intersection_area_m2':intersection,'outside_area_m2':max(0,test.area-intersection)}
+                if not geometry_valid:check.update(status='geometry_invalid',registration_allowed=False)
+                elif row['repair']:check.update(status='display_review_required',registration_allowed=False)
+                if is_exact and association['status']!='verified_source_attribute':check.update(status='source_conflict',registration_allowed=False,compartment_relationship_verified=False)
+                if not is_exact:check.update(status='spatial_candidate_only',registration_allowed=False,compartment_relationship_verified=False)
                 eligible=is_exact and association['status']=='verified_source_attribute' and check['registration_allowed']
                 descriptor=(row,ratio,inside,association,check,eligible)
                 if is_exact:
@@ -188,8 +150,7 @@ def search(designation,limit=100,offset=0,review_offset=0):
             def render(descriptor):
                 row,ratio,inside,association,check,eligible=descriptor;feature=data._feature(src,row,ratio,inside,app);props=feature['properties']
                 if not eligible and not props.get('sector'):props['import_status']='REVIEW REQUIRED'
-                feature['geometry']=original_wgs84(row)
-                props.update(cadastral_association=association,cadastral_validation=check,geometry_valid=bool(row['geometry_valid']),importable=bool(props['importable'] and eligible),source_region=row['source_region'],source_date=row['source_date'],source_crs=row['source_crs'],source_layer=row['source_layer'],source_record=row['source_row'],association_classification='source_attribute_exact' if row['kadastrs']==designation else 'spatial_inferred',geometry_role='transformed_original_source')
+                props.update(cadastral_association=association,cadastral_validation=check,geometry_valid=bool(row['geometry_valid']),importable=bool(props['importable'] and eligible),source_region=row['source_region'],source_date=row['source_date'],association_classification='source_attribute_exact' if row['kadastrs']==designation else 'spatial_inferred',geometry_role='vmd_compartment')
                 return feature
             exact_features=[render(value) for value in exact_descriptors[offset:offset+limit]];spatial_features=[render(value) for value in spatial_descriptors[review_offset:review_offset+limit]]
         review_count=sum(value[4]['status']!='verified' for value in exact_descriptors)+len(spatial_descriptors)
@@ -202,3 +163,51 @@ def search(designation,limit=100,offset=0,review_offset=0):
     except (SourceError,sqlite3.Error,OSError,ValueError,shapely.errors.GEOSException) as error:
         state=error.state if isinstance(error,SourceError) else 'SOURCE_ERROR';log.error('event=nationwide_search_error state=%s designation=%s error_type=%s',state,designation,type(error).__name__)
         return empty(designation,state,str(error) if isinstance(error,SourceError) else 'Valsts datu avota nolasīšana neizdevās.')
+
+
+# Forest Map inspection helpers (added for the map only; search() and registration are unchanged).
+
+def compartment_validation(row, designation, parcel_check=None, *, exact=True):
+    """One authoritative VMD/VZD relationship decision shared by search and map inspection.
+
+    Measurements are calculated from immutable native geometry. No repair or tolerance
+    is applied to the geometry used for the registration decision.
+    """
+    base=parcel_check or parcel_validation(designation)
+    g=shapely.from_geojson(json.dumps(original(row)));parcel=native_parcel_geometry(designation)
+    if row['source_crs']!='EPSG:10306':
+        from pyproj import Transformer
+        from shapely.ops import transform
+        g=transform(Transformer.from_crs(row['source_crs'],'EPSG:10306',always_xy=True).transform,g)
+    valid=bool(g.is_valid and not g.is_empty and g.area>0)
+    test=g if valid else shapely.make_valid(g)
+    intersects=test.intersects(parcel)
+    intersection=test.intersection(parcel).area if intersects else 0.0
+    inside=valid and parcel.covers(g)
+    ratio=min(1.0,intersection/max(g.area,1e-20))
+    check={**base,'land_unit_geometry':None,'status':'verified' if inside else 'boundary_review_required',
+        'compartment_relationship_verified':inside,'registration_allowed':inside,'geometry_valid':valid,
+        'fully_inside':inside,'overlap_percent':ratio*100,'intersection_area_m2':intersection,
+        'outside_area_m2':max(0.0,g.area-intersection)}
+    if not valid:check.update(status='geometry_invalid',registration_allowed=False)
+    elif row['repair']:check.update(status='display_review_required',registration_allowed=False)
+    association=source_association(row,designation)
+    if exact and association['status']!='verified_source_attribute':
+        check.update(status='source_conflict',registration_allowed=False,compartment_relationship_verified=False)
+    if not exact:check.update(status='spatial_candidate_only',registration_allowed=False,compartment_relationship_verified=False)
+    return check,association
+
+
+def native_parcel_geometry(designation):
+    m=release();row=parcel_row(designation,m)
+    return shapely.from_wkb(row['native_geometry']) if row else shapely.GeometryCollection()
+
+
+def original_wgs84(row):
+    """Transform unchanged source geometry to Leaflet coordinates without repair."""
+    g=shapely.from_geojson(json.dumps(original(row)))
+    if row['source_crs']!='EPSG:4326':
+        from pyproj import Transformer
+        from shapely.ops import transform
+        g=transform(Transformer.from_crs(row['source_crs'],'EPSG:4326',always_xy=True).transform,g)
+    return mapping(g)
