@@ -1,0 +1,42 @@
+{
+ "server": [
+  {
+   "seconds": 0.377,
+   "bytes": 45752,
+   "entities": 107
+  },
+  {
+   "seconds": 0.123,
+   "bytes": 45752,
+   "entities": 107
+  },
+  {
+   "seconds": 0.138,
+   "bytes": 45752,
+   "entities": 107
+  }
+ ],
+ "browser": [
+  {
+   "poll": 1,
+   "markers_in_dom": 104,
+   "gps_markers": 104,
+   "gps_render_ms": 270.7,
+   "longtask_ms_during_poll_window": 492,
+   "longest_task_ms": 371
+  },
+  {
+   "poll": 2,
+   "markers_in_dom": 104,
+   "gps_markers": 104,
+   "gps_render_ms": 55.7,
+   "longtask_ms_during_poll_window": 181,
+   "longest_task_ms": 98
+  }
+ ],
+ "pan_with_100_markers": {
+  "longtask_ms": 794,
+  "longest_task_ms": 115
+ },
+ "errors": []
+}

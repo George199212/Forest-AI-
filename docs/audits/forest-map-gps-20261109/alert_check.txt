@@ -1,0 +1,3 @@
+flag on, real BIK-001 session 2026-10-11 -> new incidents: []
+risks with rule: 0
+alert loop starts when flag on: True thread alive: True

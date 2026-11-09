@@ -1,0 +1,17 @@
+== live_locations range [('2026-09-17 05:37:23 UTC', '2026-10-11 05:38:52 UTC')]
+   last 7d: 0
+   last 30d: 1
+== session_track_points range [('2026-10-11 05:24:27 UTC', '2026-10-11 05:38:48 UTC')]
+   last 7d: 0
+   last 30d: 29
+== vehicle_gps_pings range [('2026-09-08 07:21:36 UTC', '2026-09-08 07:21:36 UTC')]
+   last 7d: 0
+   last 30d: 0
+live_locations rows: [(2, 'BIK-001', 3600, '2026-10-11 05:38:52 UTC', '2026-10-11 06:25:03 UTC', 'IN'), (4, 'A-005', 0, '2026-09-17 05:37:23 UTC', '2026-09-17 05:37:22 UTC', 'IN')]
+track points per session: [(32, 'BIK-001', 29, '2026-10-11 05:24:27 UTC', '2026-10-11 05:38:48 UTC', 28, 3.0, 22)]
+track point interval s: median 31.0 max 36.0 n>120s 0
+vehicle_gps_pings: [(4, 'VEHICLE', None, None, 'A-005', None, None, '2026-09-08 07:21:36 UTC', 0), (5, 'VEHICLE', None, None, 'A-005', None, None, '2026-09-08 07:21:36 UTC', 0), (6, 'VEHICLE', None, None, 'A-005', None, None, '2026-09-08 07:21:36 UTC', 0)]
+sector_equipment: [(7, 'A-005', 'JD-1270G-DEMO', 'HARVESTER', None, 1, None, None, None, None)]
+sector_vehicles: [(1, 'A-004', 'HD - 3665', 'Mercedes', 0, 0), (3, 'A-004', 'LV-9042', 'Лесовоз', 1, 1), (4, 'A-005', 'JD-1270G-DEMO', 'Harvester', 1, 0), (5, 'A-005', 'PONSSE-W11-DEMO', 'Forwarder', 1, 0), (6, 'A-005', 'VOLVO-EW160E-DEMO', 'Excavator', 1, 0)]
+sectors with data_origin: [('REAL', 47)]
+work_sessions last 30d: [(1,)]

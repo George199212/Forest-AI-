@@ -1,0 +1,126 @@
+{
+ "console": [],
+ "failed": [],
+ "http_errors": [],
+ "checks": {
+  "default_markers_hide_unknown": {
+   "ok": true,
+   "detail": [
+    "fm-gps fm-o-REAL fm-stale",
+    "fm-gps fm-o-REAL fm-stale",
+    "fm-gps fm-o-SIMULATED",
+    "fm-gps fm-o-SIMULATED"
+   ]
+  },
+  "origins_distinct_classes": {
+   "ok": true,
+   "detail": [
+    "fm-gps fm-o-REAL fm-stale",
+    "fm-gps fm-o-REAL fm-stale",
+    "fm-gps fm-o-SIMULATED",
+    "fm-gps fm-o-SIMULATED"
+   ]
+  },
+  "stale_workers_marked": {
+   "ok": true,
+   "detail": [
+    "fm-gps fm-o-REAL fm-stale",
+    "fm-gps fm-o-REAL fm-stale",
+    "fm-gps fm-o-SIMULATED",
+    "fm-gps fm-o-SIMULATED"
+   ]
+  },
+  "layer_label_count": {
+   "ok": true,
+   "detail": "GPS pozīcijas (4/7)"
+  },
+  "unknown_filter_shows_all": {
+   "ok": true,
+   "detail": 7
+  },
+  "only_active": {
+   "ok": true,
+   "detail": [
+    "fm-gps fm-o-SIMULATED",
+    "fm-gps fm-o-SIMULATED"
+   ]
+  },
+  "type_filter_vehicles_off": {
+   "ok": true,
+   "detail": [
+    "fm-gps fm-o-REAL fm-stale",
+    "fm-gps fm-o-REAL fm-stale"
+   ]
+  },
+  "sector_filter": {
+   "ok": true,
+   "detail": [
+    "fm-gps fm-o-REAL fm-stale"
+   ]
+  },
+  "worker_popup_lv": {
+   "ok": true,
+   "detail": "Test User · Darbinieks | Piešķirtais sektors | BIK-001 | Pēdējā atjaunošana | 11.10.26 08:38 · pirms 29 dienām · novecojis | Precizitāte | ± 3 m | Izcelsme | REĀLS — Telegram tiešraides atrašanās vieta / bota ieraksts | Telpiskais statuss | Reģistrētā sektorā BIK-001 | Šodien | Pēdējās 24 h | Pielāgots | Rādīt maršrutu"
+  },
+  "real_track_summary": {
+   "ok": true,
+   "detail": "Test User · Maršruta periods: 11.10.26 03:00 – 12.10.26 03:00 |  | 29 punkti · 0 pārtraukumi virs 120 s (nav zīmēti) · 0 foto |  | Reģistrētā sektorā: 22 | Ārpus meža reģistra (ceļš, lauks, apdzīvota vieta); pats par sevi nav trauksme: 7 | Notīrīt maršrutu"
+  },
+  "track_drawn_on_track_pane": {
+   "ok": true,
+   "detail": 1
+  },
+  "track_start_end": {
+   "ok": true,
+   "detail": null
+  },
+  "simulated_popup_labelled": {
+   "ok": true,
+   "detail": "DEMO-101 · Transportlīdzeklis | Piešķirtais sektors | A-005 | Pēdējā atjaunošana | 09.11.26 13:05 · pirms 12 min | Precizitāte | — | Izcelsme | SIMULĒTS — Simulēti demonstrācijas dati (fleet_gps_demo). Nekad nerada incidentus. | Telpiskais statuss | Reģistrētā sektorā A-005 | Šodien | Pēdējās 24 h | Pielāgots | Rādīt maršrutu"
+  },
+  "polling_30s": {
+   "ok": true,
+   "detail": {
+    "before": 2,
+    "after": 3
+   }
+  },
+  "lv_filter_text": {
+   "ok": true,
+   "detail": "GPS filtrs | Darbinieki | Transportlīdzekļi | Tehnika | REĀLS | SIMULĒTS | SMILŠU KASTE | Izcelsme nezināma | Visi sektori | A-005 | A-006 | BIK-001 | Tikai aktīvie | Novecojis pēc (min) |  | rādīti 4 no 7 |  | Test User · Maršruta periods: 11.10.26 03:00 – 12.10.26 03:00 |  | 29 punkti · 0 pārtraukumi virs 120 s (nav zīmēti) · 0 foto |  | Reģistrētā sektorā: 22 | Ārpus meža reģistra (ceļš, lauks, apdzīvota vieta); pats par sevi nav trauksme: 7 | Notīrīt maršrutu"
+  },
+  "en_filter_text": {
+   "ok": true,
+   "detail": "GPS filter | Workers | Vehicles | Machines | REAL | SIMULATED | SANDBOX | Origin unknown | All sectors | A-005 | A-006 | BIK-001 | Only active | Stale after (min) |  | 4 of 7 shown"
+  },
+  "en_worker_popup": {
+   "ok": true,
+   "detail": "Test User · Worker | Assigned sector | BIK-001 | Last update | 11/10/2026, 08:38 · 29 days ago · stale | Accuracy | ± 3 m | Origin | REAL — Telegram live location / bot record | Spatial status | Inside registered sector BIK-001 | Today | Last 24 h | Custom | Show track"
+  },
+  "compartment_popup_still_works": {
+   "ok": true,
+   "detail": null
+  },
+  "karte_page_no_errors": {
+   "ok": true,
+   "detail": []
+  },
+  "lvm_geodata_no_errors": {
+   "ok": true,
+   "detail": []
+  },
+  "no_console_errors": {
+   "ok": true,
+   "detail": []
+  },
+  "no_failed_requests": {
+   "ok": true,
+   "detail": []
+  },
+  "no_http_errors": {
+   "ok": true,
+   "detail": []
+  }
+ },
+ "positions_requests": 5
+}
