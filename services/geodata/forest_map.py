@@ -3,7 +3,7 @@
 Tiles are public-source visualization only. Inspection and registration reread
 full source records; no simplified geometry ever enters the import API.
 """
-import json, math, os, threading, time
+import gzip, json, math, os, threading, time
 from collections import OrderedDict
 from contextlib import closing
 from functools import lru_cache
@@ -12,17 +12,26 @@ from pathlib import Path
 import numpy as np
 import shapely
 from shapely.geometry import box, mapping, Point
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 
 from . import nationwide as nw, vmd_dataset as data
 from .registration_identity import context
 
-MAX_FEATURES = 600
-MAX_TILE_BYTES = 400_000
+# Compartment boundaries are drawn from DETAIL_MIN_ZOOM (median compartment about 8 px);
+# below it the map shows record-density cells. Limits are about 2x the census maximum over
+# all 9,312 occupied zoom-13 tiles (967 records, 333 KB input; 2026-11-09), so no tile at a
+# boundary zoom falls back. Responses are gzip-compressed on the wire.
+DETAIL_MIN_ZOOM = 13
+MAX_FEATURES = 2000
+MAX_TILE_BYTES = 1_500_000
 MAX_INPUT_BYTES = 4_000_000
-CACHE_BYTES = 24_000_000
+MAX_VERTICES = 100_000
+CACHE_BYTES = 48_000_000
 GRID_ZOOM = 14
+WORKER_WAIT_SECONDS = 10
+# Coarse bounding envelope of Latvia (west, south, east, north); a warning flag, not a border test.
+LATVIA_ENVELOPE = (20.9, 55.6, 28.3, 58.1)
 ROOT = Path(__file__).resolve().parents[2]
 DISPLAY_ROOT = Path(os.environ.get('FOREST_MAP_CACHE_ROOT', ROOT/'data/geodata/forest-map'))
 _cache = OrderedDict()
@@ -51,27 +60,24 @@ def overview(version):
 
 
 def coverage(version, z, x, y):
+    """Record density at the overview's own ~1.3 km (zoom-14) cells; no cell is enlarged.
+
+    Cells are keyed by the bbox centre of each catalogue record (scripts/build_forest_map_overview.py),
+    so they show where records are, not exact forest area or boundaries.
+    """
     xs, ys, counts, _ = overview(version)
-    cell_z = min(GRID_ZOOM, z+4)
-    shift = GRID_ZOOM-cell_z
-    cx, cy = xs >> shift, ys >> shift
-    tile_shift = cell_z-z
-    if tile_shift < 0:
-        # Dense high-zoom fallback: the coarser presence cell is clipped below.
-        mask = ((xs << (z-GRID_ZOOM)) <= x) & (((xs+1) << (z-GRID_ZOOM)) > x) & ((ys << (z-GRID_ZOOM)) <= y) & (((ys+1) << (z-GRID_ZOOM)) > y)
+    if z <= GRID_ZOOM:
+        shift = GRID_ZOOM-z
+        mask = ((xs >> shift) == x) & ((ys >> shift) == y)
+        origin_x, origin_y = x << shift, y << shift
     else:
-        mask = ((cx >> tile_shift) == x) & ((cy >> tile_shift) == y)
-    keys, inv = np.unique(cx[mask].astype(np.int64)*2**cell_z+cy[mask], return_inverse=True)
-    totals = np.bincount(inv, weights=counts[mask]).astype(int)
-    clip = box(*tile_bounds(z,x,y))
-    features=[]
-    for key,count in zip(keys,totals):
-        px,py=divmod(int(key),2**cell_z)
-        cell=box(*tile_bounds(cell_z,px,py))
-        if cell.intersects(clip):
-            center=cell.centroid
-            features.append({'type':'Feature','geometry':mapping(center),'properties':{'compartment_count':int(count),'display_only':True,'meaning':'bbox_center_presence_sample'}})
-    return {'type':'FeatureCollection','features':features,'mode':'generalized_presence','display_only':True,'dataset_version':version,'notice':'Punkti rāda indeksētu nogabalu aptuveno klātbūtni pēc avota robežtaisnstūra centra; tie nav meža laukumi vai precīzas robežas.'}
+        shift = z-GRID_ZOOM
+        mask = (xs == x >> shift) & (ys == y >> shift)
+        origin_x, origin_y = xs[mask].min() if mask.any() else 0, ys[mask].min() if mask.any() else 0
+    cells = {'zoom':GRID_ZOOM,'x0':int(origin_x),'y0':int(origin_y),
+             'dx':(xs[mask]-origin_x).astype(int).tolist(),'dy':(ys[mask]-origin_y).astype(int).tolist(),'count':counts[mask].astype(int).tolist()}
+    return {'type':'FeatureCollection','features':[],'cells':cells,'mode':'generalized_presence','display_only':True,'dataset_version':version,
+            'notice_code':'density_cells','notice':'Record density per ~1.3 km cell (bbox centre of each VMD record); not forest area or boundaries.'}
 
 
 def _encode(payload):
@@ -82,10 +88,10 @@ def _generate(layer,z,x,y,manifest):
     version=manifest['version'];bounds=tile_bounds(z,x,y);w,s,e,n=bounds
     empty={'type':'FeatureCollection','features':[],'mode':'detail','display_only':True,'dataset_version':version}
     if e<20 or w>29 or n<55 or s>59:return _encode(empty)
-    if layer=='forest' and z<=10:return _encode(coverage(version,z,x,y))
+    if layer=='forest' and z<DETAIL_MIN_ZOOM:return _encode(coverage(version,z,x,y))
     if layer=='parcels' and z<14:return _encode({**empty,'mode':'zoom_required','notice':'Zoom to 14 for parcel boundaries; exact cadastral search is available at every zoom.'})
     table='compartments' if layer=='forest' else 'parcels'
-    fields='c.id,c.external_id,c.kadastrs,length(c.geometry) AS geometry_bytes,c.repair,c.geometry_valid' if layer=='forest' else 'c.id,c.designation,length(c.geometry) AS geometry_bytes,c.geometry_valid'
+    fields='c.id,c.external_id,c.kadastrs,c.kvart,c.nog,c.nog_plat,c.area_m2,length(c.geometry) AS geometry_bytes,c.repair,c.geometry_valid' if layer=='forest' else 'c.id,c.designation,length(c.geometry) AS geometry_bytes,c.geometry_valid'
     path=manifest['forest_db' if layer=='forest' else 'parcel_db']
     def fallback():
         return _encode(coverage(version,z,x,y) if layer=='forest' else {**empty,'mode':'zoom_required','notice':'Dense parcel tile: zoom in for boundaries.'})
@@ -106,9 +112,13 @@ def _generate(layer,z,x,y,manifest):
             if z<17:g=g.simplify(tolerance,preserve_topology=True)
             if g.geom_type not in ('Polygon','MultiPolygon') or not g.is_valid:continue
             vertices+=shapely.get_num_coordinates(g)
-            if vertices>20000:return fallback()
+            if vertices>MAX_VERTICES:return fallback()
             props={'display_only':True,'geometry_valid':bool(row['geometry_valid'])}
-            if layer=='forest':props.update(id=row['external_id'],kadastrs=row['kadastrs'],review_required=bool(row['repair']) or not row['geometry_valid'])
+            if layer=='forest':
+                declared=row['nog_plat'] is not None and row['nog_plat']>0
+                props.update(id=row['external_id'],kadastrs=row['kadastrs'],kvart=row['kvart'],nog=row['nog'],
+                    area_ha=round(row['nog_plat'],4) if declared else (round(row['area_m2']/10000,4) if row['area_m2'] is not None else None),area_declared=declared,
+                    review_required=bool(row['repair']) or not row['geometry_valid'])
             else:props.update(designation=row['designation'])
             features.append({'type':'Feature','geometry':mapping(g),'properties':props})
         except shapely.errors.GEOSException:return fallback()
@@ -124,7 +134,8 @@ def tile(layer,z,x,y):
     with _lock:
         if key in _cache:
             value=_cache.pop(key);_cache[key]=value;return value,True
-    if not _workers.acquire(timeout=.05):raise HTTPException(503,'Map is busy; retry this tile')
+    # Wait in a bounded queue instead of rejecting at once; a rejected tile used to stay blank.
+    if not _workers.acquire(timeout=WORKER_WAIT_SECONDS):raise HTTPException(503,'Map is busy; retry this tile')
     try:
         # Queries and geometry processing have separate finite budgets.
         value=_generate(layer,z,x,y,manifest)
@@ -159,7 +170,19 @@ def feature(fid,actor):
         f['geometry']=nw.original_wgs84(row)
         p.update(cadastral_association=association,cadastral_validation=validation,geometry_valid=bool(row['geometry_valid']),source_crs=row['source_crs'],source_geometry_crs='EPSG:4326',source_region=row['source_region'],source_date=row['source_date'],source_layer=row['source_layer'],source_record=row['source_row'],source_reference=nw.source_reference(row),geometry_role='transformed_original_source',importable=eligible,display_only=False)
         if not eligible and not p['sector']:p['import_status']='REVIEW REQUIRED'
+        f['properties']=_without_server_paths(p,m)
         return {'feature':f,'dataset_version':m['version'],'geometry_role':'full_source_display','registration_geometry':'reread_from_immutable_native_source_by_existing_import_workflow'}
+
+
+def _without_server_paths(value,manifest):
+    """Show source files relative to the dataset release; never expose server directories."""
+    root=str(manifest.get('root') or '').rstrip('/')
+    if isinstance(value,dict):return {k:_without_server_paths(v,manifest) for k,v in value.items()}
+    if isinstance(value,list):return [_without_server_paths(v,manifest) for v in value]
+    if isinstance(value,str) and value.startswith('/'):
+        if root and value.startswith(root+'/'):return value[len(root)+1:]
+        return Path(value).name
+    return value
 
 
 def municipality_catalogue(name,limit=100,offset=0,actor=None):
@@ -178,19 +201,19 @@ def municipality_catalogue(name,limit=100,offset=0,actor=None):
 
 def identify(lat,lon,zoom,actor):
     if not 55<=lat<=59 or not 20<=lon<=29:raise HTTPException(422,'Coordinates must be in Latvia')
-    if zoom<11:return {'feature':None,'notice':'Zoom in to inspect individual compartments.'}
+    if zoom<11:return {'feature':None,'notice_code':'zoom_in','notice':'Zoom in to inspect individual compartments.'}
     radius=360/2**zoom/256*6
     with closing(nw.db(nw.release()['forest_db'])) as c:
         sizes=c.execute('SELECT c.id,c.external_id,length(c.geometry) AS bytes FROM spatial_index r JOIN compartments c ON c.id=r.id WHERE r.min_lon<=? AND r.max_lon>=? AND r.min_lat<=? AND r.max_lat>=? LIMIT 129',(lon+radius,lon-radius,lat+radius,lat-radius)).fetchall()
-        if len(sizes)>128:return {'feature':None,'notice':'Dense location; zoom in to inspect.'}
-        if sum(r['bytes'] for r in sizes)>MAX_INPUT_BYTES:return {'feature':None,'notice':'Complex geometry; use exact cadastral review.'}
+        if len(sizes)>128:return {'feature':None,'notice_code':'dense','notice':'Dense location; zoom in to inspect.'}
+        if sum(r['bytes'] for r in sizes)>MAX_INPUT_BYTES:return {'feature':None,'notice_code':'complex','notice':'Complex geometry; use exact cadastral review.'}
         ids=[r['id'] for r in sizes]
         rows=c.execute('SELECT external_id,geometry FROM compartments WHERE id IN ('+','.join('?' for _ in ids)+')',ids).fetchall() if ids else []
     point=Point(lon,lat);hits=[]
     for row in rows:
         g=shapely.from_wkb(row['geometry']);distance=g.distance(point)
         if distance<=radius:hits.append((distance,g.area,row['external_id']))
-    return feature(min(hits)[2],actor) if hits else {'feature':None,'notice':'No forest compartment at this location.'}
+    return feature(min(hits)[2],actor) if hits else {'feature':None,'notice_code':'none','notice':'No forest compartment at this location.'}
 
 
 def sectors(actor):
@@ -198,7 +221,7 @@ def sectors(actor):
     with closing(data._app_connection()) as c:
         rows=c.execute('SELECT id,name,boundary_json,area_ha,center_lat,center_lon FROM sectors WHERE organization_id=? LIMIT 1001',(identity['organization_id'],)).fetchall()
     if len(rows)>1000:raise HTTPException(413,'Too many sectors for this overlay')
-    features=[];invalid=markers=outside=0
+    features=[];unmapped=[];invalid=markers=outside=0
     for row in rows:
         geometry=None;status='no_boundary';warning=''
         try:
@@ -214,14 +237,17 @@ def sectors(actor):
         except (ValueError,TypeError,IndexError,shapely.errors.GEOSException):status='invalid_boundary';warning='Invalid stored sector boundary';invalid+=1
         if geometry is None:
             lat,lon=row['center_lat'],row['center_lon']
-            if not isinstance(lat,(int,float)) or not isinstance(lon,(int,float)):continue
+            if not isinstance(lat,(int,float)) or not isinstance(lon,(int,float)):
+                unmapped.append({'id':row['id'],'name':row['name'],'reason':status});continue
             if not (55<=lat<=59 and 20<=lon<=29):
                 if status!='outside_map_extent':outside+=1
-                continue
+                unmapped.append({'id':row['id'],'name':row['name'],'reason':'outside_map_extent' if status=='no_boundary' else status,'outside_latvia':True});continue
             geometry={'type':'Point','coordinates':[lon,lat]};markers+=1
             warning=(warning+' · ' if warning else '')+'Stored sector center; no validated polygon is shown and country-border membership is not verified.'
-        features.append({'type':'Feature','geometry':geometry,'properties':{'id':row['id'],'name':row['name'],'area_ha':row['area_ha'],'geometry_status':status,'warning':warning}})
-    return {'type':'FeatureCollection','features':features,'summary':{'total':len(rows),'mapped':len(features),'unmapped':len(rows)-len(features),'invalid_boundaries':invalid,'center_markers':markers,'outside_map_extent':outside}}
+        w,s_,e,n=shapely.geometry.shape(geometry).bounds
+        features.append({'type':'Feature','geometry':geometry,'properties':{'id':row['id'],'name':row['name'],'area_ha':row['area_ha'],'geometry_status':status,'warning':warning,
+            'outside_latvia':not (LATVIA_ENVELOPE[0]<=w and e<=LATVIA_ENVELOPE[2] and LATVIA_ENVELOPE[1]<=s_ and n<=LATVIA_ENVELOPE[3])}})
+    return {'type':'FeatureCollection','features':features,'unmapped':unmapped,'summary':{'total':len(rows),'mapped':len(features),'unmapped':len(rows)-len(features),'invalid_boundaries':invalid,'center_markers':markers,'outside_map_extent':outside}}
 
 
 def router(auth):
@@ -237,9 +263,14 @@ def router(auth):
         if records!=m['reports']['vmd']['indexed']:raise HTTPException(503,'Forest overview source count mismatch')
         return private({'dataset_version':m['version'],'feature_count':m['reports']['vmd']['indexed'],'parcel_count':m['reports']['vzd']['indexed'],'overview_records':records,'crs':'EPSG:4326','max_tile_features':MAX_FEATURES,'max_tile_bytes':MAX_TILE_BYTES,'display_only':True})
     @r.get('/tiles/{layer}/{z}/{x}/{y}')
-    def get_tile(layer:str,z:int,x:int,y:int):
+    def get_tile(request:Request,layer:str,z:int,x:int,y:int,v:str=Query('',max_length=128)):
         raw,hit=call(tile,layer,z,x,y)
-        return Response(raw,media_type='application/geo+json',headers={'Cache-Control':'private, max-age=120','Vary':'Authorization','X-Forest-Cache':'HIT' if hit else 'MISS'})
+        # Tiles of a dataset version never change, so a URL carrying that version may be cached.
+        current=v and v==nw.release()['version']
+        headers={'Cache-Control':'private, max-age=86400, immutable' if current else 'private, no-cache','Vary':'Authorization, Accept-Encoding','X-Forest-Cache':'HIT' if hit else 'MISS'}
+        if 'gzip' in request.headers.get('accept-encoding','') and len(raw)>1024:
+            raw=gzip.compress(raw,5);headers['Content-Encoding']='gzip'
+        return Response(raw,media_type='application/geo+json',headers=headers)
     @r.get('/feature')
     def get_feature(id:str=Query(min_length=1,max_length=200),actor=Depends(auth)):return private(call(feature,id,actor))
     @r.get('/catalogue')

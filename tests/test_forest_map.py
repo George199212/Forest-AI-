@@ -51,10 +51,39 @@ def test_source_geometry_unchanged_and_tile_geometry_is_display_only(catalogue):
 
 def test_dense_tiles_generalize_instead_of_silently_truncating(catalogue,monkeypatch):
     monkeypatch.setattr(fm,'MAX_FEATURES',0)
-    raw,_=fm.tile('forest',*tile_at(24.002,56.992,12));result=json.loads(raw)
-    assert result['mode']=='generalized_presence'
-    assert all('id' not in f['properties'] for f in result['features'])
-    assert all(f['geometry']['type']=='Point' for f in result['features'])
+    raw,_=fm.tile('forest',*tile_at(24.002,56.992,16));result=json.loads(raw)
+    assert result['mode']=='generalized_presence' and result['features']==[]
+    assert result['cells']['count']==[1] and result['notice_code']=='density_cells'
+
+
+def test_below_detail_zoom_returns_true_size_density_cells_without_records(catalogue):
+    for z in (7,10,12):
+        result=json.loads(fm.tile('forest',*tile_at(24.002,56.992,z))[0])
+        cells=result['cells']
+        assert result['mode']=='generalized_presence' and result['features']==[]
+        assert cells['zoom']==fm.GRID_ZOOM and sum(cells['count'])==1
+        assert len(cells['dx'])==len(cells['dy'])==len(cells['count'])==1
+        # The cell is reported at its own zoom-14 position, never enlarged to the map zoom.
+        assert (cells['x0']+cells['dx'][0])>>(fm.GRID_ZOOM-z)==tile_at(24.002,56.992,z)[1]
+
+
+def test_detail_zoom_draws_every_record_above_old_600_limit(catalogue):
+    m,_=catalogue
+    z,tx,ty=tile_at(24.01,56.97,13);w,s,e,n=fm.tile_bounds(z,tx,ty);dx=(e-w)/31;dy=(n-s)/26
+    with sqlite3.connect(m['forest_db']) as c:
+        for i in range(2,752):
+            x=w+dx*(0.1+(i-2)%30);y=s+dy*(0.1+(i-2)//30);g=box(x,y,x+dx*0.8,y+dy*0.8)
+            c.execute('INSERT INTO compartments(id,external_id,kadastrs,geometry,repair,geometry_valid,kvart,nog,nog_plat,area_m2) VALUES(?,?,?,?,?,?,?,?,?,?)',(i,f'VMD:unit:{i}','00000000002',g.wkb,None,1,'7',str(i),0 if i==2 else 0.5,6000))
+            c.execute('INSERT INTO spatial_index VALUES(?,?,?,?,?)',(i,x,x+dx*0.8,y,y+dy*0.8))
+    z,x,y=z,tx,ty;expected={f'VMD:unit:{i}' for i in range(2,752)}
+    assert len(expected)==750
+    result=json.loads(fm.tile('forest',z,x,y)[0])
+    assert result['mode']=='simplified'
+    assert {f['properties']['id'] for f in result['features']}>=expected
+    p=next(f['properties'] for f in result['features'] if f['properties']['id']=='VMD:unit:3')
+    assert (p['kvart'],p['nog'],p['area_ha'],p['area_declared'])==('7','3',0.5,True)
+    zero=next(f['properties'] for f in result['features'] if f['properties']['id']=='VMD:unit:2')
+    assert zero['area_declared'] is False and zero['area_ha']==0.6
 
 
 def test_municipality_catalogue_is_exact_bounded_and_read_only(catalogue):
@@ -107,7 +136,8 @@ def test_private_sector_response_prohibits_shared_caching(catalogue):
     assert 'Private other organization' not in response.body.decode()
 
 
-def test_tile_work_is_bounded_when_workers_are_busy(catalogue):
+def test_tile_work_is_bounded_when_workers_are_busy(catalogue,monkeypatch):
+    monkeypatch.setattr(fm,'WORKER_WAIT_SECONDS',0.05)
     for _ in range(3):fm._workers.acquire()
     try:
         with pytest.raises(HTTPException) as error:fm.tile('forest',*tile_at(24,57,12))
@@ -133,3 +163,47 @@ def test_foreign_legacy_sector_is_counted_but_not_drawn_on_latvia_map(catalogue)
     with sqlite3.connect(path) as c:c.execute('INSERT INTO sectors VALUES(4,?,?,1,1,58.905,32.705)',('Outside Latvia extent',ring))
     result=fm.sectors('test');assert not any(f['properties']['id']==4 for f in result['features'])
     assert result['summary']['outside_map_extent']==result['summary']['unmapped']==1
+    assert result['unmapped']==[{'id':4,'name':'Outside Latvia extent','reason':'outside_map_extent','outside_latvia':True}]
+
+
+def test_every_hidden_sector_has_a_reason_and_drawn_ones_flag_latvia_envelope(catalogue):
+    path=Path(catalogue[0]['forest_db']).parent/'app.sqlite'
+    north=box(28.71,58.86,28.72,58.87);ring=json.dumps([[y,x] for x,y in north.exterior.coords])
+    with sqlite3.connect(path) as c:
+        c.execute('INSERT INTO sectors VALUES(5,?,NULL,1,1,NULL,NULL)',('No boundary',))
+        c.execute('INSERT INTO sectors VALUES(6,?,?,1,1,58.865,28.715)',('North of Latvia',ring))
+    before=path.read_bytes();result=fm.sectors('test')
+    assert {u['id']:u['reason'] for u in result['unmapped']}=={5:'no_boundary'}
+    flags={f['properties']['id']:f['properties']['outside_latvia'] for f in result['features']}
+    assert flags=={1:False,6:True}
+    assert result['summary']['mapped']+len(result['unmapped'])==result['summary']['total']
+    assert path.read_bytes()==before
+
+
+def test_feature_properties_never_expose_server_paths():
+    m={'root':'/srv/geodata/releases/20261106'}
+    p={'cadastral_validation':{'source_file':'/srv/geodata/releases/20261106/sources/vzd/a/KKParcel.shp','other':'/root/private/x.shp'},'kadastrs':'1','list':['/tmp/y.dbf']}
+    assert fm._without_server_paths(p,m)=={'cadastral_validation':{'source_file':'sources/vzd/a/KKParcel.shp','other':'x.shp'},'kadastrs':'1','list':['y.dbf']}
+
+
+def test_identify_returns_language_neutral_notice_codes(catalogue):
+    assert fm.identify(57,24,10,'test')['notice_code']=='zoom_in'
+    assert fm.identify(58.5,27.5,16,'test')['notice_code']=='none'
+
+
+def test_tiles_are_gzipped_and_cached_only_for_the_current_version(catalogue):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    m,_=catalogue;app=FastAPI();app.include_router(fm.router(lambda:'test'));client=TestClient(app)
+    with sqlite3.connect(m['forest_db']) as c:
+        for i in range(2,40):
+            x=24.0001+i*0.0001;g=box(x,56.9901,x+0.00008,56.9949)
+            c.execute('INSERT INTO compartments(id,external_id,kadastrs,geometry,repair,geometry_valid) VALUES(?,?,?,?,?,?)',(i,f'VMD:unit:{i}','00000000001',g.wkb,None,1))
+            c.execute('INSERT INTO spatial_index VALUES(?,?,?,?,?)',(i,x,x+0.00008,56.9901,56.9949))
+    z,x,y=tile_at(24.002,56.992,16);url=f'/api/geodata/forest-map/tiles/forest/{z}/{x}/{y}'
+    current=client.get(url+'?v='+m['version'],headers={'Accept-Encoding':'gzip'})
+    assert current.status_code==200 and current.headers['content-encoding']=='gzip'
+    assert current.headers['cache-control']=='private, max-age=86400, immutable'
+    assert len(current.json()['features'])==39
+    stale=client.get(url+'?v=older',headers={'Accept-Encoding':'identity'})
+    assert stale.headers['cache-control']=='private, no-cache' and 'content-encoding' not in stale.headers
