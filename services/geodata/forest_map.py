@@ -15,7 +15,7 @@ from shapely.geometry import box, mapping, Point
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 
-from . import nationwide as nw, vmd_dataset as data
+from . import gps_map as gps, nationwide as nw, vmd_dataset as data
 from .registration_identity import context
 
 # Compartment boundaries are drawn from DETAIL_MIN_ZOOM (median compartment about 8 px);
@@ -280,4 +280,19 @@ def router(auth):
     def get_identify(lat:float,lon:float,zoom:int=Query(ge=4,le=19),actor=Depends(auth)):return private(call(identify,lat,lon,zoom,actor))
     @r.get('/sectors')
     def get_sectors(actor=Depends(auth)):return private(call(sectors,actor))
+    @r.get('/gps/positions')
+    def get_gps_positions(stale_minutes:int=Query(gps.STALE_MINUTES,ge=1,le=1440),actor=Depends(auth)):
+        return private(call(gps.positions,context(actor)['organization_id'],stale_minutes))
+    @r.get('/gps/track')
+    def get_gps_track(kind:str=Query(pattern='^(worker|vehicle|equipment|simulated)$'),id:str=Query(min_length=1,max_length=120),
+                      start:str=Query(max_length=40),end:str=Query(max_length=40),actor=Depends(auth)):
+        begin,finish=gps._parse(start),gps._parse(end)
+        if begin is None or finish is None:raise HTTPException(422,'Invalid time window')
+        ident=id
+        if kind!='simulated':
+            try:ident=int(id)
+            except ValueError as exc:raise HTTPException(422,'Invalid entity id') from exc
+        try:return private(call(gps.track,context(actor)['organization_id'],kind,ident,begin,finish))
+        except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+    gps.start_alert_loop()
     return r
