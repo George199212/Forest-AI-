@@ -2765,3 +2765,18 @@ async def integration_webhook_route(provider: str, request: Request):
 
 
 app.mount("/api/webhooks", webhook_app)
+
+
+@app.get("/api/telegram/positions")
+def ingka_telegram_positions():
+    """Registered Ingka workers only. Times distinguish last known from active live GPS."""
+    workers = db("""SELECT m.telegram_user_id, m.sector, m.employee_id, e.full_name,
+        l.latitude, l.longitude, l.updated_at, l.expires_at,
+        (SELECT id FROM work_sessions w WHERE w.user_id=m.telegram_user_id AND w.sector=m.sector ORDER BY id DESC LIMIT 1) AS session_id
+        FROM telegram_tenant_memberships m
+        JOIN sector_employees e ON e.id=m.employee_id
+        LEFT JOIN live_locations l ON l.telegram_user_id=m.telegram_user_id AND l.sector=m.sector
+        WHERE m.tenant='ingka-investments-latvia' AND m.sector='ING-001'""")
+    for w in workers:
+        w['points'] = db("SELECT latitude,longitude,recorded_at FROM session_track_points WHERE session_id=? AND telegram_user_id=? ORDER BY recorded_at,id", (w['session_id'],w['telegram_user_id'])) if w['session_id'] else []
+    return workers

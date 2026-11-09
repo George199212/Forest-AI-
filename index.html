@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Forest AI — Operations Platform</title>
+<title>Ingka Investments Latvia — Forest AI</title>
 <link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
@@ -272,7 +272,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 <div class="layout">
   <!-- SIDEBAR -->
   <div class="sidebar">
-    <div class="logo">
+    <div class="logo"><div style="font-size:12px;margin-bottom:8px">Ingka Investments Latvia</div>
       <div class="logo-mark" onclick="nav('overview')" style="cursor:pointer"><img src="/assets/logo.png" alt="Forest AI" style="width:32px;height:32px;border:1px solid var(--border)"><span class="logo-name">Forest AI</span></div>
     </div>
     <nav>
@@ -2043,6 +2043,23 @@ async function loadMap() {
         bounds.push([s.latitude, s.longitude]);
       }
     });
+
+    // Ingka workers are independent of sector center pins. Show last recorded time.
+    try {
+      const people = await api('/api/telegram/positions');
+      const safeText = v => { const el=document.createElement('span'); el.textContent=String(v||''); return el.innerHTML; };
+      people.forEach(w => {
+        const points=(w.points||[]).map(p=>[p.latitude,p.longitude]);
+        if(points.length>1) L.polyline(points,{color:'#38bdf8',weight:4}).addTo(map);
+        points.forEach(p=>bounds.push(p));
+        if(w.latitude!=null && w.longitude!=null) {
+          const pin=[w.latitude,w.longitude];
+          L.circleMarker(pin,{radius:8,color:'#fff',weight:2,fillColor:'#0284c7',fillOpacity:1}).addTo(map)
+            .bindPopup(`<b>${safeText(w.full_name)}</b><br>${safeText(w.sector)}<br>Last recorded: ${safeText(w.updated_at)}`);
+          bounds.push(pin); hasPins=true;
+        }
+      });
+    } catch(e) { console.warn('Worker positions unavailable'); }
 
     if (!hasPins) {
       container.innerHTML = '<div class="empty" style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center">No GPS or boundary data available yet.<br><small style="color:var(--text3);font-family:var(--mono);margin-top:8px">Add sector boundaries or GPS check-ins</small></div>';
