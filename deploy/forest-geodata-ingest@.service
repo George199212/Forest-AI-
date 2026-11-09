@@ -1,0 +1,27 @@
+[Unit]
+Description=Forest AI official nationwide geodata ingestion (%i)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/forest_ai
+ExecStart=/usr/bin/python3 /root/forest_ai/scripts/ingest_nationwide_geodata.py --root /root/forest_ai/data/geodata/nationwide/releases/%i
+Restart=on-failure
+RestartSec=30
+Nice=10
+CPUQuota=100%
+MemoryMax=2G
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/root/forest_ai/data/geodata/nationwide
+StandardOutput=journal
+StandardError=journal
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
