@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Forest AI — Operations Platform</title>
+<link rel="stylesheet" href="/assets/vmd-workflow.css">
 <link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
@@ -265,6 +266,55 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 .trk-sum div{background:var(--bg3);border-radius:var(--r);padding:6px 10px;font-size:12px;color:var(--text2);}
 .trk-sum b{display:block;color:var(--text);font-family:var(--mono);font-size:13px;}
 .leaflet-tooltip.trk-gap-label{background:rgba(40,40,40,0.75);color:#ddd;border:none;box-shadow:none;font-size:10px;padding:1px 5px;}
+
+/* John Deere integration panel — scoped to this card only. */
+#john-deere-card{padding:0;margin-bottom:24px;border-radius:12px;overflow:hidden;min-width:0;background:var(--bg2);}
+#john-deere-card .jd-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}
+#john-deere-card .jd-technical{min-width:0;padding:28px;}
+#john-deere-card .jd-eyebrow{font:10px var(--mono);letter-spacing:.14em;color:var(--text2);text-transform:uppercase;line-height:1.6;}
+#john-deere-card .jd-title{overflow-wrap:anywhere;font-size:18px;font-weight:600;letter-spacing:.025em;line-height:1.5;margin:6px 0 24px;color:var(--text);}
+#john-deere-card .jd-section{padding:18px 0;border-top:1px solid var(--border);min-width:0;}
+#john-deere-card .jd-section-title{font:10px var(--mono);color:var(--gbright);letter-spacing:.08em;text-transform:uppercase;line-height:1.7;margin-bottom:10px;}
+#john-deere-card .jd-row{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);gap:12px;padding:6px 0;font:11px/1.7 var(--mono);align-items:start;min-width:0;}
+#john-deere-card .jd-label{color:var(--text2);overflow-wrap:anywhere;min-width:0;}
+#john-deere-card .jd-value{color:var(--text);overflow-wrap:anywhere;white-space:pre-line;min-width:0;text-align:right;}
+#john-deere-card .jd-value[data-tone="ready"]{color:var(--gbright);}
+#john-deere-card .jd-value[data-tone="waiting"]{color:var(--amber);}
+#john-deere-card .jd-value[data-tone="error"]{color:#e07070;}
+#john-deere-card .jd-note{font:11px/1.85 var(--mono);color:var(--text2);white-space:pre-line;overflow-wrap:anywhere;padding:6px 0;}
+#john-deere-card .jd-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 8px;}
+#john-deere-card .jd-actions .btn{overflow-wrap:anywhere;min-width:0;min-height:36px;max-width:100%;white-space:normal;text-align:left;font-size:11px;line-height:1.5;padding:8px 12px;}
+#john-deere-card .jd-actions .btn:focus-visible{outline:2px solid var(--gbright);outline-offset:3px;}
+#john-deere-card .jd-actions .btn:disabled{opacity:.55;cursor:wait;}
+#john-deere-card .jd-overview{min-width:0;align-self:stretch;border-left:1px solid var(--border2);padding:40px 32px;background:radial-gradient(ellipse at 50% 10%,rgba(122,184,60,.065),transparent 55%);}
+#john-deere-card .jd-overview-inner{max-width:480px;margin:0 auto;position:sticky;top:24px;}
+#john-deere-card .jd-brand{text-align:center;padding:8px 8px 28px;}
+#john-deere-card .jd-logo-slot{min-height:120px;display:flex;align-items:center;justify-content:center;padding:20px 12px 12px;}
+#john-deere-card .jd-logo-slot img{display:block;max-width:min(250px,100%);max-height:120px;width:auto;height:auto;object-fit:contain;}
+#john-deere-card .jd-logo-slot img[hidden],#john-deere-card .jd-logo-fallback[hidden]{display:none;}
+#john-deere-card .jd-logo-fallback{overflow-wrap:anywhere;min-width:0;font:600 25px/1.3 var(--sans);color:var(--text);letter-spacing:.01em;}
+#john-deere-card .jd-overview-copy{font-size:12px;line-height:1.9;color:var(--text2);max-width:340px;margin:8px auto 0;}
+#john-deere-card .jd-features{border:1px solid var(--border2);border-radius:10px;background:rgba(14,18,8,.5);box-shadow:0 0 28px rgba(122,184,60,.025);overflow:hidden;}
+#john-deere-card .jd-feature{display:flex;gap:16px;padding:20px;align-items:flex-start;min-width:0;}
+#john-deere-card .jd-feature>div{min-width:0;}
+#john-deere-card .jd-feature+.jd-feature{border-top:1px solid var(--border);}
+#john-deere-card .jd-feature-icon{width:24px;height:24px;color:var(--gbright);flex:0 0 24px;margin-top:2px;}
+#john-deere-card .jd-feature h4{font-size:13px;line-height:1.6;font-weight:500;margin-bottom:4px;}
+#john-deere-card .jd-feature p{font-size:11px;line-height:1.9;color:var(--text2);overflow-wrap:anywhere;}
+#john-deere-card .jd-brand-note{font:10px/1.9 var(--mono);text-align:center;color:var(--text2);padding:20px 8px 0;}
+@media(max-width:1050px){
+  #john-deere-card .jd-layout{grid-template-columns:minmax(0,1fr);}
+  #john-deere-card .jd-overview{border-left:0;border-top:1px solid var(--border2);padding:28px;}
+  #john-deere-card .jd-overview-inner{position:static;}
+}
+@media(max-width:520px){
+  #john-deere-card .jd-technical,#john-deere-card .jd-overview{padding:18px 14px;}
+  #john-deere-card .jd-title{font-size:15px;}
+  #john-deere-card .jd-row{grid-template-columns:minmax(0,1fr);gap:1px;padding:7px 0;}
+  #john-deere-card .jd-value{text-align:left;}
+  #john-deere-card .jd-feature{padding:16px 12px;gap:12px;flex-wrap:wrap;}
+}
+
 </style>
 </head>
 <body>
@@ -291,7 +341,9 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
       <div class="nav-item" onclick="nav('inspector')"><span class="nav-icon">◆</span> AI Inspector</div>
       <div class="nav-item" onclick="nav('satellite')"><span class="nav-icon">🛰</span> Satellite</div>
       <div class="nav-group">Admin</div>
+      <div class="nav-item" onclick="nav('lvm-geodata')"><span class="nav-icon">🌲</span> LVM GEO</div>
       <div class="nav-item" onclick="nav('integrations')"><span class="nav-icon">🔌</span> Integrations</div>
+      <div class="nav-item" id="forest-map-nav" style="display:none" onclick="nav('forest-map')"><span class="nav-icon">🌳</span> <span id="forest-map-nav-label">Forest Map</span></div>
     </nav>
     <div class="sidebar-foot" id="last-update">–</div>
   </div>
@@ -304,7 +356,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
         <p id="page-sub">Loading...</p>
       </div>
       <div class="topbar-right">
-        <button class="btn" onclick="refreshCurrent()">↻ Refresh</button>
+        <button class="btn" id="page-refresh" onclick="refreshCurrent()">↻ Refresh</button>
       </div>
     </div>
 
@@ -342,7 +394,8 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
             <span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> All objects</span>
             <button class="btn" onclick="newObjectPrompt()">+ New Object</button>
           </div>
-          <div id="objects-grid" class="objects-grid"><div class="loading"><div class="spinner"></div> loading</div></div>
+          <div id="objects-machines" style="margin-bottom:16px"></div>
+        <div id="objects-grid" class="objects-grid"><div class="loading"><div class="spinner"></div> loading</div></div>
         </div>
       </div>
 
@@ -431,6 +484,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
             <button class="btn" id="pdf-btn" onclick="downloadPDF()">↓ PDF Report</button>
           </div>
         </div>
+        <div class="card" id="lvm-sector-source" style="display:none"></div>
         <div class="stat-row" id="detail-stats"></div>
         <div class="grid2">
           <div id="detail-info-card"></div>
@@ -614,6 +668,26 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 
       <!-- INTEGRATIONS -->
       <div class="section" id="sec-integrations">
+        <div class="card" id="lvm-status" style="display:none">LVM GEO — checking connection…</div>
+        <div class="card" id="john-deere-card">
+          <div class="jd-layout">
+            <div class="jd-technical" id="john-deere-technical" aria-label="John Deere live technical status"></div>
+            <aside class="jd-overview" aria-label="Forest AI John Deere integration overview">
+              <div class="jd-overview-inner">
+                <div class="jd-brand">
+                  <div class="jd-eyebrow">MACHINE DATA INTEGRATION</div>
+                  <div class="jd-logo-slot">
+                    <img id="john-deere-logo" src="/assets/john-deere-logo.png" alt="John Deere" hidden>
+                    <span class="jd-logo-fallback" id="john-deere-logo-fallback">John Deere</span>
+                  </div>
+                  <p class="jd-overview-copy">Connect John Deere Operations Center data to Forest AI. Customer data is shown when available.</p>
+                </div>
+                <div class="jd-features"><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13V8h8l3 5h4v4h-2M3 17H2v-4h12M7 8V4h4v4M17 10V7h3"/><circle cx="6" cy="17" r="3"/><circle cx="18" cy="18" r="2"/></svg><div><h4>Equipment &amp; Machines</h4><p>Real machine data from John Deere Operations Center</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><div><h4>GPS &amp; Location</h4><p>Machine locations and movement history</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16h16M8 15v-4M12 15V7M16 15v-6M20 8l-4-4-4 2"/></svg><div><h4>Hours &amp; Utilization</h4><p>Engine hours and hours of operation</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4M12 2v1"/></svg><div><h4>Alerts</h4><p>Equipment alerts and diagnostic events</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><div><h4>Fleet Integration</h4><p>ISO 15143-3 (AEMP) compatible</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 17H5a4 4 0 0 1-1-8 7 7 0 0 1 13-2 5 5 0 0 1 3 9M10 16v-2a2 2 0 0 1 4 0v2"/><rect x="8" y="16" width="8" height="6" rx="1.5"/></svg><div><h4>Secure OAuth</h4><p>John Deere Operations Center authorization</p></div></div></div>
+                <p class="jd-brand-note">Forest AI integrates with John Deere.<br>Forest AI is an independent product, not an official John Deere product or partner.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
         <div class="kpis" id="int-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px"></div>
         <div class="card" style="margin-bottom:16px">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -632,6 +706,35 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
         <div id="int-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px"></div>
       </div><!-- /sec-integrations -->
 
+      <!-- LVM GEO geodata browser -->
+      <div class="section" id="sec-forest-map"></div>
+      <div class="section" id="sec-lvm-geodata">
+        <header class="vmd-page-head"><div><div class="vmd-eyebrow">LVM GEO · VMD</div><h2>Reģistrēt meža nogabalus</h2><p>Atrodiet īstos nogabalus un pievienojiet tos Forest AI uzraudzībai.</p></div><span id="geodata-build" class="vmd-version"></span></header>
+        <ol class="vmd-progress" aria-label="Sektoru reģistrācijas soļi"><li id="vmd-step-1" aria-current="step"><button type="button" id="vmd-go-1" onclick="VmdLocalDataset.goStep(1)"><span>1</span> Atrodiet nogabalus</button></li><li id="vmd-step-2"><button type="button" id="vmd-go-2" disabled onclick="VmdLocalDataset.goStep(2)"><span>2</span> Pārbaudiet atlasi</button></li><li id="vmd-step-3"><button type="button" id="vmd-go-3" disabled onclick="VmdLocalDataset.goStep(3)"><span>3</span> Reģistrējiet sektorus</button></li></ol><p id="vmd-step-help" class="vmd-hint" role="status"></p>
+        <div class="vmd-workspace">
+          <aside class="vmd-search-panel card">
+            <form novalidate onsubmit="event.preventDefault();VmdLocalDataset.find()">
+              <label class="vmd-field">Kadastra apzīmējums<input id="vmd-kadastrs" oninput="VmdLocalDataset.inputChanged()" placeholder="Piemēram, 40940020002" aria-label="Kadastra apzīmējums" inputmode="numeric" pattern="[0-9]{11}" autocomplete="off" aria-describedby="vmd-cadastral-help"></label>
+              <p id="vmd-cadastral-help" class="vmd-hint">Ievadiet precīzu 11 ciparu zemes vienības apzīmējumu. Vienai zemes vienībai var būt vairāki nogabali.</p>
+              <p id="vmd-search-coverage" class="vmd-hint">Pieejami Centra reģiona VMD dati; datu kopa neaptver visu Latviju.</p><button type="submit" class="btn vmd-primary" id="vmd-find">Atrast nogabalus</button>
+            </form>
+            <button class="btn" id="vmd-cancel-search" hidden onclick="VmdLocalDataset.cancelSearch()">Atcelt meklēšanu</button>
+            <section class="vmd-client"><h3>Sektors un atbildīgā persona</h3><div class="vmd-registration-fields"><label class="vmd-field">Sektora nosaukums<input id="vmd-sector-name" aria-label="Sektora nosaukums" required maxlength="120" autocomplete="off"></label><label class="vmd-field">Vārds<input id="vmd-responsible-first-name" aria-label="Atbildīgās personas vārds" autocomplete="given-name" required maxlength="100"></label><label class="vmd-field">Uzvārds<input id="vmd-responsible-last-name" aria-label="Atbildīgās personas uzvārds" autocomplete="family-name" required maxlength="100"></label></div><p class="vmd-hint">Atlasot vairākus nogabalus, katra sektora nosaukumam pievienos tā avota identifikatoru.</p><p id="vmd-profile-note" class="vmd-hint"></p><p id="vmd-organization" class="vmd-hint"></p></section>
+            <p class="vmd-accuracy">VMD nogabala robeža nav automātiski juridiski apstiprināta kadastra robeža.</p>
+          </aside>
+          <div class="vmd-map-results">
+            <div class="vmd-map-card card"><div class="vmd-map-toolbar"><h3 id="lvm-selected">VMD meža nogabali</h3><div class="vmd-inline-actions"><label class="vmd-basemap-label">Pamatkarte<select id="vmd-basemap" aria-label="Pamatkarte" onchange="lvmSetBasemap(this.value)"><option id="vmd-satellite-option" value="satellite" selected disabled>Satelīts — pārbaude</option><option value="map">Karte</option></select></label></div></div><div id="lvm-map"></div><p id="vmd-basemap-status" class="vmd-hint">Robežu avots: VMD. Pamatkartes attēli neaizstāj avota ģeometriju.</p></div>
+            <section class="vmd-results card" aria-label="Nogabalu rezultāti">
+              <div class="vmd-results-head"><h3>Atrastie nogabali</h3><span id="vmd-results-summary" role="status"></span></div>
+              <div id="vmd-selection-actions" hidden><div class="vmd-selection-toolbar"><div class="vmd-inline-actions"><button class="btn" onclick="VmdLocalDataset.selectAll()">Atlasīt visus</button><button class="btn" onclick="VmdLocalDataset.clearSelection()">Noņemt atlasi</button></div><strong id="vmd-selected-summary" aria-live="polite">Atlasīti: 0 nogabali</strong></div><p class="vmd-hint" id="vmd-selection-help">Atlasīt visus — šīs lapas nogabali. Atlase saglabājas, pāršķirot lapas.</p></div>
+              <div class="vmd-table-scroll"><table class="tbl"><thead id="lvm-feature-head"></thead><tbody id="lvm-feature-rows"></tbody></table><p id="vmd-empty" class="vmd-empty">Ievadiet kadastra apzīmējumu un atrodiet īstos VMD nogabalus.</p></div>
+              <div class="vmd-result-footer"><div class="vmd-inline-actions"><button class="btn" id="vmd-prev" disabled onclick="VmdLocalDataset.page(-1)">Iepriekšējā lapa</button><span id="vmd-page-label">—</span><button class="btn" id="vmd-next" disabled onclick="VmdLocalDataset.page(1)">Nākamā lapa</button></div><button class="btn vmd-primary" id="lvm-import" disabled onclick="VmdLocalDataset.goStep(3)">Pārbaudīt atlasi</button></div>
+              <button class="btn" id="vmd-back" onclick="VmdLocalDataset.goStep(1)" hidden>Atpakaļ uz meklēšanu</button><button class="btn" id="vmd-retry" onclick="VmdLocalDataset.retry()" hidden>Mēģināt vēlreiz</button><details id="vmd-spatial-review" hidden><summary>Telpiskie kandidāti — nepieciešama pārbaude <span id="vmd-spatial-count"></span></summary><p class="vmd-hint">Oranžas robežas ir atsevišķi aprēķināti telpiski kandidāti, nevis apstiprināta piederība kadastra zemes vienībai. Tie nav automātiski reģistrējami.</p><div class="vmd-table-scroll"><table class="tbl"><thead><tr><th>VMD ID</th><th>Avota kadastrs</th><th>Kvartāls</th><th>Nogabals</th><th>Platība (ha)</th><th>Pārklājums</th><th>Saistība</th></tr></thead><tbody id="vmd-spatial-rows"></tbody></table></div><button class="btn" id="vmd-review-prev" disabled onclick="VmdLocalDataset.reviewPage(-1)">Iepriekšējie kandidāti</button><button class="btn" id="vmd-review-next" disabled onclick="VmdLocalDataset.reviewPage(1)">Nākamie kandidāti</button></details><p id="lvm-preview-state" role="status" aria-live="polite"></p>
+            </section>
+          </div>
+        </div>
+        <details class="vmd-source-details card"><summary>VMD datu avots</summary><div id="vmd-local-card"><h3>VMD meža nogabali</h3><p>VMD atvērtie dati · Indeksētie nogabali: <span id="vmd-local-count">—</span> · CRS: EPSG:4326 · <span id="vmd-local-importable">—</span></p><p id="vmd-local-status" role="status">Notiek VMD datu kopas ielāde…</p><p id="vmd-coverage"></p></div></details>
+      </div>
       <!-- INTEGRATION DETAIL (opened via click, not in nav menu) -->
       <div class="section" id="sec-integration-detail">
         <div class="card">
@@ -704,6 +807,11 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   </div>
 </div>
 
+<script src="/assets/vmd-production.js?v=20261106"></script>
+<link rel="stylesheet" href="/assets/forest-map.css?v=20261107">
+<script src="/assets/forest-map.js?v=20261107"></script>
+<script src="/assets/lvm-geodata.js?v=20261106"></script>
+<script src="/assets/lvm-wms-map.js?v=1"></script>
 <script>
 const API = '';
 let cache = {};
@@ -716,6 +824,8 @@ let selectedSnapshotId = null;
 let satImgVersion = Date.now();
 let allPhotos = [];
 let mapLoaded = false;
+let forestMap = null;
+let providerMachineLayer = null;
 let charts = {};
 
 async function api(path) {
@@ -779,19 +889,37 @@ function tbl(headers, keys, rows) {
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
-const titles = {overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor',integrations:'Integrations','integration-detail':'Integration'};
+const titles = {'forest-map':'Forest Map','lvm-geodata':'Slāņi',overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor',integrations:'Integrations','integration-detail':'Integration'};
+
+const geodataNavigationText=new Map();
+function localizeGeodataNavigation(active){
+  if(window.ForestI18n?.lang==='lv')return;
+  const labels={'Overview':'Pārskats','Objects':'Objekti','Sectors':'Sektori','Map':'Karte','Risks':'Riski','GPS Sessions':'GPS sesijas','Truck Reports':'Kokvedēju atskaites','Timber':'Kokmateriāli','Photos':'Foto','AI Inspector':'AI inspektors','Satellite':'Satelīts','Integrations':'Integrācijas','Monitor':'Monitorings','Operations':'Operācijas','Admin':'Administrēšana'};
+  document.querySelectorAll('.sidebar .nav-item,.sidebar .nav-group').forEach(element=>{
+    element.childNodes.forEach(node=>{
+      if(node.nodeType!==3)return;
+      if(!geodataNavigationText.has(node))geodataNavigationText.set(node,node.textContent);
+      const original=geodataNavigationText.get(node),label=labels[original.trim()];
+      node.textContent=active&&label?' '+label:original;
+    });
+  });
+}
 
 function nav(id, push=true) {
+  if(id!=='forest-map')window.ForestMap?.deactivate();
   currentSection = id;
+  document.body.classList.toggle('vmd-workflow-open',id==='lvm-geodata');
+  localizeGeodataNavigation(id==='lvm-geodata');
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el = document.getElementById('sec-'+id);
   if (el) el.classList.add('active');
-  const navMap = {overview:0,objects:1,sectors:2,map:3,risks:4,gps:5,trucks:6,timber:7,photos:8,inspector:9,satellite:10,integrations:11};
+  const navMap = {overview:0,objects:1,sectors:2,map:3,risks:4,gps:5,trucks:6,timber:7,photos:8,inspector:9,satellite:10,'lvm-geodata':11,integrations:12,'forest-map':13};
   const items = document.querySelectorAll('.nav-item');
   if (navMap[id]!==undefined) items[navMap[id]].classList.add('active');
   document.getElementById('page-title').textContent = titles[id]||id;
-  document.getElementById('page-sub').textContent = new Date().toLocaleString();
+  document.getElementById('page-refresh').textContent=id==='lvm-geodata'?'↻ Atjaunot':'↻ Refresh';
+  document.getElementById('page-sub').textContent = id==='lvm-geodata'?new Date().toLocaleString('lv-LV'):new Date().toLocaleString();
   if (push) history.pushState({type:'nav', id}, '', '#'+id);
   load(id);
 }
@@ -804,6 +932,8 @@ const loaders = {
   photos: loadPhotos, inspector: () => Promise.all([loadInspector(), loadIncidentsEquipment()]), satellite: loadSatellite,
   'risk-detail': () => currentRiskId && openRisk(currentRiskId, false),
   integrations: loadIntegrations,
+  'lvm-geodata': loadLvmLayers,
+  'forest-map': () => window.ForestMap.load(),
   'integration-detail': () => currentIntegrationId && openIntegration(currentIntegrationId, false),
 };
 
@@ -885,7 +1015,7 @@ async function loadOverview() {
   const sdata = await api('/api/sectors');
   document.getElementById('ov-sectors').innerHTML = `<table class="tbl"><thead><tr><th>Сектор</th><th>Подрядчик</th><th>Статус</th><th>Risk</th><th>Финансовый риск</th></tr></thead><tbody>
     ${sdata.slice(0,6).map(s=>`<tr>
-      <td><span class="tbl-link" onclick="openSector('${s.name}')">${s.name}</span></td>
+      <td><span class="tbl-link" onclick="openSector(${sectorNameArgument(s.name)})">${sectorNameText(s.name)}</span></td>
       <td>${s.contractor||'–'}</td>
       <td>${statusBadge(s.status)}</td>
       <td>${riskScoreBar(s.risk_score, s.risk_color)}</td>
@@ -895,11 +1025,47 @@ async function loadOverview() {
 
   document.getElementById('ov-risks').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Level</th><th>Reason</th></tr></thead><tbody>
     ${(await api('/api/risks')).slice(0,5).map(r=>`<tr>
-      <td class="mono">${r.sector}</td>
+      <td class="mono">${sectorNameText(r.sector)}</td>
       <td>${riskBadge(r.risk_level)}</td>
-      <td style="color:var(--text2);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.reason}</td>
+      <td style="color:var(--text2);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${machineText(r.reason)}</td>
     </tr>`).join('')}
   </tbody></table>`;
+}
+
+// Equipment is part of Objects; providers supply data to the existing equipment IDs.
+function machineText(value) {
+  const el = document.createElement('span'); el.textContent = value ?? 'Not available'; return el.innerHTML;
+}
+function machineDetails(row) {
+  return Object.entries({Machine:row.machine_name, Source:row.provider === 'john_deere' ? 'John Deere (Sandbox)' : row.provider, Organization:row.organization_name,
+    Make:row.brand, Model:row.model, Type:row.type, Serial:row.serial_number,
+    Latitude:row.latitude, Longitude:row.longitude, 'Position timestamp':row.location_timestamp,
+    'Engine hours':row.engine_hours, 'Operating hours':row.operating_hours,
+    'Machine status':row.machine_status, 'Device status':row.device_status,
+    'Telemetry health':row.telemetry_health, 'Sector geofence':row.geofence_status,
+    'Restricted zones':row.restricted_zone_status, 'Last synchronization':row.last_synchronization_time ? new Date(row.last_synchronization_time*1000).toLocaleString() : null})
+    .map(([key,value]) => `<div>${machineText(key)}: ${machineText(value)}</div>`).join('');
+}
+let objectMachineCache = [];
+async function loadObjectMachines() {
+  const [machines,sectors] = await Promise.all([api('/api/map/machines'),api('/api/sectors')]);
+  objectMachineCache = machines;
+  const box = document.getElementById('objects-machines');
+  if (!machines.length) { box.replaceChildren(); return; }
+  box.innerHTML = '<div class="card"><h3>Machines · External data sources · Sandbox</h3>' + machines.map(row => `
+    <details style="margin-bottom:12px"><summary>🚜 ${machineText(row.machine_name)} · ${machineText(row.provider)} · ${machineText(row.organization_name)}</summary>
+    ${machineDetails(row)}
+    <label>Forest AI sector: <select data-equipment-id="${Number(row.id)}">
+      <option value="">Unassigned</option>
+      ${sectors.filter(s => !s.data_origin || s.data_origin === 'REAL').map(sector => `<option value="${machineText(sector.name).replaceAll('"','&quot;')}" ${sector.name===row.sector?'selected':''}>${machineText(sector.name)}</option>`).join('')}
+    </select></label></details>`).join('') + '</div>';
+  box.querySelectorAll('select').forEach(select => select.onchange = async () => {
+    const status = await api('/api/john-deere/status');
+    const response = await fetch(`/api/john-deere/machines/${Number(select.dataset.equipmentId)}/sector`,
+      {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':status.csrf_token},body:JSON.stringify({sector:select.value})});
+    if (!response.ok) alert((await response.json()).detail || 'Sector mapping failed.');
+    await loadObjectMachines();
+  });
 }
 
 // ── SECTORS ───────────────────────────────────────────────────────────────────
@@ -996,11 +1162,11 @@ async function objDetailTab(tab) {
       <th>Сектор</th><th>Статус</th><th>Площадь</th><th>Boundary</th><th></th>
     </tr></thead><tbody>
       ${rows.map(s=>`<tr>
-        <td><strong style="color:var(--gbright);font-family:var(--mono)">${s.name}</strong></td>
+        <td><strong style="color:var(--gbright);font-family:var(--mono)">${sectorNameText(s.name)}</strong></td>
         <td>${statusBadge(s.status)}</td>
         <td class="mono">${s.area_ha?s.area_ha+' ha':'–'}</td>
         <td>${s.boundary ? `<span class="badge b-green">✓ ${s.boundary.length}pts</span>` : '<span class="badge b-gray">–</span>'}</td>
-        <td><span class="tbl-link" onclick="openSector('${s.name}')">details →</span></td>
+        <td><span class="tbl-link" onclick="openSector(${sectorNameArgument(s.name)})">details →</span></td>
       </tr>`).join('') || '<tr><td colspan="5" class="empty">no sectors yet</td></tr>'}
     </tbody></table>`;
   } else if (tab === 'satellite') {
@@ -1137,8 +1303,10 @@ let currentObjectTab = 'overview';
 
 async function loadObjects() {
   const objects = await api('/api/objects');
+  await loadObjectMachines();
   document.getElementById('objects-grid').innerHTML = objects.map(o => {
     const totalArea = (o.sectors||[]).reduce((sum,s)=>sum+(s.area_ha||0),0);
+    const machineCount = objectMachineCache.filter(row => (o.sectors||[]).some(sector => sector.name === row.sector)).length;
     const annotatedUrl = o.boundary_plan_id!==null ? `/api/boundary-plans/${o.boundary_plan_id}/annotated` : o.plan_scan_url;
     const scan = annotatedUrl
       ? `<img class="object-card-scan" src="${annotatedUrl}" alt="plan with sectors">`
@@ -1147,7 +1315,7 @@ async function loadObjects() {
       ${scan}
       <div class="object-card-body">
         <div class="object-card-title">${o.object_name}</div>
-        <div class="object-card-meta">${(o.sectors||[]).length} sector(s) · ${totalArea.toFixed(2)} ha total</div>
+        <div class="object-card-meta">${(o.sectors||[]).length} sector(s) · ${totalArea.toFixed(2)} ha total${machineCount ? ` · ${machineCount} machine(s)` : ''}</div>
         ${o.plan_uploaded_at?`<div class="object-card-meta">${fmt(o.plan_uploaded_at)}</div>`:''}
       </div>
     </div>`;
@@ -1155,6 +1323,9 @@ async function loadObjects() {
 }
 
 // ── SECTORS ───────────────────────────────────────────────────────────────────
+// Sector names are user text; encode separately for HTML and inline JS arguments.
+function sectorNameText(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function sectorNameArgument(value){return sectorNameText(JSON.stringify(String(value??'')));}
 async function loadSectors() {
   const [rows, objects] = await Promise.all([api('/api/sectors'), api('/api/objects')]);
   let filtered = rows;
@@ -1181,7 +1352,7 @@ async function loadSectors() {
     <th>Сектор</th><th>Подрядчик</th><th>Статус</th><th>Объём</th><th>Risk Score</th><th>Финансовый риск</th><th>GPS</th><th>Фото</th><th>Boundary</th><th></th>
   </tr></thead><tbody>
     ${filtered.map(s=>`<tr>
-      <td><strong style="color:var(--gbright);font-family:var(--mono)">${s.name}</strong></td>
+      <td><strong style="color:var(--gbright);font-family:var(--mono)">${sectorNameText(s.name)}</strong></td>
       <td>${s.contractor||'–'}</td>
       <td>${statusBadge(s.status)}</td>
       <td class="mono">${s.approved_volume||'–'}</td>
@@ -1190,7 +1361,7 @@ async function loadSectors() {
       <td class="mono">${s.gps_count}</td>
       <td class="mono">${s.photo_count}</td>
       <td>${s.boundary ? `<span class="badge b-green">✓ ${s.boundary.length}pts</span>` : '<span class="badge b-gray">–</span>'}</td>
-      <td><span class="tbl-link" onclick="openSector('${s.name}')">details →</span></td>
+      <td><span class="tbl-link" onclick="openSector(${sectorNameArgument(s.name)})">details →</span></td>
     </tr>`).join('')}
   </tbody></table>`;
 }
@@ -1217,6 +1388,7 @@ async function openSector(name, push=true) {
   const data = await api('/api/sectors/'+encodeURIComponent(name));
   currentDetailData = data;
   const s = data.sector;
+  loadLvmSource(s);
   document.getElementById('detail-meta').textContent = [s.contractor, s.status, s.approved_volume].filter(Boolean).join(' · ');
 
   document.getElementById('detail-stats').innerHTML = `
@@ -1234,7 +1406,7 @@ async function openSector(name, push=true) {
   document.getElementById('detail-info-card').innerHTML = `<div class="card">
     <div class="card-head"><span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> Sector info</span></div>
     <div class="info-grid">
-      <div class="info-cell"><div class="info-cell-label">Sector ID</div><div class="info-cell-value" style="font-family:var(--mono);color:var(--gbright)">${s.name}</div></div>
+      <div class="info-cell"><div class="info-cell-label">Sector ID</div><div class="info-cell-value" style="font-family:var(--mono);color:var(--gbright)">${sectorNameText(s.name)}</div></div>
       <div class="info-cell"><div class="info-cell-label">Contractor</div><div class="info-cell-value">${s.contractor||'–'}</div></div>
       <div class="info-cell"><div class="info-cell-label">Status</div><div class="info-cell-value">${statusBadge(s.status)}</div></div>
       <div class="info-cell"><div class="info-cell-label">Approved volume</div><div class="info-cell-value" style="font-family:var(--mono)">${s.approved_volume||'–'}</div></div>
@@ -1246,7 +1418,7 @@ async function openSector(name, push=true) {
       ${s.boundary_plan_id?`<div class="info-cell"><div class="info-cell-label">Source plan</div><div class="info-cell-value"><a class="btn" style="padding:3px 10px" href="/api/boundary-plans/${s.boundary_plan_id}/scan" target="_blank">📄 View full scan</a></div></div>`:''}
     </div>
     ${s.pixel_boundary_json?`<div style="margin-top:14px"><div class="info-cell-label" style="margin-bottom:6px">Sector location on plan</div><img src="/api/sectors/${encodeURIComponent(s.name)}/plan-crop" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border)" alt="sector on plan"></div>`:''}
-    <div style="margin-top:10px"><label class="btn" style="cursor:pointer;padding:4px 10px">📤 Upload sector satellite<input type="file" accept="image/*" style="display:none" onchange="uploadSectorSatellite('${s.name}', event)"></label></div>
+    <div style="margin-top:10px"><label class="btn" style="cursor:pointer;padding:4px 10px">📤 Upload sector satellite<input type="file" accept="image/*" style="display:none" onchange="uploadSectorSatellite(${sectorNameArgument(s.name)}, event)"></label></div>
   </div>`;
 
   document.getElementById('detail-score-card').innerHTML = `<div class="card">
@@ -1316,7 +1488,7 @@ function detailTab(tab) {
         return `<tr${clickable?` style="cursor:pointer" onclick="detailTab('${c.tab}')" title="Click to view evidence →"`:''}>
           <td>${riskBadge(r.risk_level)}</td>
           <td>${c.icon} ${c.label}</td>
-          <td style="color:var(--text2)">${r.reason}</td>
+          <td style="color:var(--text2)">${machineText(r.reason)}</td>
         </tr>`;
       }).join('')||'<tr><td colspan="3" class="empty">no risks</td></tr>'}
     </tbody></table>`;
@@ -1356,7 +1528,7 @@ function detailTab(tab) {
           <input id="emp-phone" placeholder="Phone" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="emp-id" placeholder="ID / Personal code" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="emp-telegram-id" placeholder="Telegram user ID" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
-          <button class="btn" onclick="addEmployee('${s.name}')">+ Add</button>
+          <button class="btn" onclick="addEmployee(${sectorNameArgument(s.name)})">+ Add</button>
         </div>
         <div id="emp-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
       </div>
@@ -1370,7 +1542,7 @@ function detailTab(tab) {
           <td>${e.active?badge('Active','b-green'):badge('Inactive','b-gray')}</td>
           <td>
             <span class="tbl-link" onclick="toggleEditEmployee(${e.id})">✎</span>
-            <span class="tbl-link" style="color:var(--red)" onclick="deleteEmployee(${e.id},'${s.name}')">✕</span>
+            <span class="tbl-link" style="color:var(--red)" onclick="deleteEmployee(${e.id},${sectorNameArgument(s.name)})">✕</span>
           </td>
         </tr>
         <tr id="emp-edit-row-${e.id}" style="display:none">
@@ -1381,7 +1553,7 @@ function detailTab(tab) {
               <input id="emp-edit-phone-${e.id}" value="${e.phone||''}" placeholder="Phone" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
               <input id="emp-edit-id-${e.id}" value="${e.id_number||''}" placeholder="ID / Personal code" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
               <input id="emp-edit-telegram-${e.id}" value="${e.telegram_user_id||''}" placeholder="Telegram user ID" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
-              <button class="btn" onclick="saveEmployeeEdit(${e.id},'${s.name}')">Save</button>
+              <button class="btn" onclick="saveEmployeeEdit(${e.id},${sectorNameArgument(s.name)})">Save</button>
               <button class="btn" style="background:var(--bg2)" onclick="toggleEditEmployee(${e.id})">Cancel</button>
             </div>
             <div id="emp-edit-msg-${e.id}" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:6px"></div>
@@ -1401,7 +1573,7 @@ function detailTab(tab) {
           <input id="veh-capacity" placeholder="Tank L (e.g. 200)" type="number" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="veh-per100" placeholder="L/100km (e.g. 35)" type="number" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
           <input id="veh-telegram-id" placeholder="Driver Telegram ID" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
-          <button class="btn" onclick="addVehicle('${s.name}')">+ Add</button>
+          <button class="btn" onclick="addVehicle(${sectorNameArgument(s.name)})">+ Add</button>
         </div>
         <div id="veh-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
       </div>
@@ -1414,7 +1586,7 @@ function detailTab(tab) {
               ${v.active?badge('Active','b-green'):badge('Inactive','b-gray')}
             </div>
             <span class="tbl-link" onclick="toggleEditVehicle(${v.id})">✎ Edit</span>
-            <span class="tbl-link" style="color:var(--red)" onclick="deleteVehicle(${v.id},'${s.name}')">✕ Remove</span>
+            <span class="tbl-link" style="color:var(--red)" onclick="deleteVehicle(${v.id},${sectorNameArgument(s.name)})">✕ Remove</span>
           </div>
           <div id="veh-view-${v.id}" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
             <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono)">DRIVER</div><div style="font-size:13px">${v.driver||'–'}</div></div>
@@ -1430,7 +1602,7 @@ function detailTab(tab) {
               <input id="veh-edit-driver-${v.id}" value="${v.driver||''}" placeholder="Driver" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
               <input id="veh-edit-capacity-${v.id}" value="${v.fuel_capacity_l||0}" type="number" placeholder="Tank L" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
               <input id="veh-edit-per100-${v.id}" value="${v.fuel_per_100km||0}" type="number" placeholder="L/100km" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
-              <button class="btn" onclick="saveVehicleEdit(${v.id},'${s.name}')">Save</button>
+              <button class="btn" onclick="saveVehicleEdit(${v.id},${sectorNameArgument(s.name)})">Save</button>
               <button class="btn" style="background:var(--bg2)" onclick="toggleEditVehicle(${v.id})">Cancel</button>
             </div>
             <div id="veh-edit-msg-${v.id}" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
@@ -1447,7 +1619,7 @@ function detailTab(tab) {
                 <input id="fuel-added-${v.id}" type="number" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px"></div>
               <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px">NOTE</div>
                 <input id="fuel-note-${v.id}" placeholder="optional note" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--r);font-family:var(--mono);font-size:12px"></div>
-              <button class="btn" onclick="logFuel(${v.id},'${s.name}',${v.fuel_per_100km||0})">Log</button>
+              <button class="btn" onclick="logFuel(${v.id},${sectorNameArgument(s.name)},${v.fuel_per_100km||0})">Log</button>
             </div>
             <div id="fuel-msg-${v.id}" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
           </div>
@@ -1480,7 +1652,7 @@ function detailTab(tab) {
             <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px">General Notes</div>
             <textarea id="forest-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;resize:vertical;min-height:60px" placeholder="Road access, special conditions, audit notes...">${s.notes||''}</textarea>
           </div>
-          <button class="btn" onclick="saveForestNotes('${s.name}')">✓ Save</button>
+          <button class="btn" onclick="saveForestNotes(${sectorNameArgument(s.name)})">✓ Save</button>
           <span id="forest-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:10px"></span>
         </div>
         <div class="card">
@@ -1572,7 +1744,7 @@ function detailTab(tab) {
             <option value="HIGH">HIGH</option>
           </select>
           <input id="snap-note" placeholder="Note" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px">
-          <button class="btn" onclick="addSectorSnapshot('${s.name}')">+ Добавить</button>
+          <button class="btn" onclick="addSectorSnapshot(${sectorNameArgument(s.name)})">+ Добавить</button>
         </div>
         <div id="snap-msg" style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:6px"></div>
       </div>
@@ -1588,7 +1760,7 @@ function detailTab(tab) {
           </div>
           <div style="padding:6px 8px;text-align:right">
             <span class="tbl-link" onclick="openSnapshotRisksEditor(${sn.id})">риски снимка</span>
-            <span class="tbl-link" style="color:var(--red);margin-left:10px" onclick="deleteSectorSnapshot(${sn.id},'${s.name}')">✕ delete</span>
+            <span class="tbl-link" style="color:var(--red);margin-left:10px" onclick="deleteSectorSnapshot(${sn.id},${sectorNameArgument(s.name)})">✕ delete</span>
           </div>
         </div>`).join('')||'<div class="empty">no snapshots yet</div>'}</div>`;
   }
@@ -1976,7 +2148,11 @@ function downloadPDF() {
 
 // ── MAP ───────────────────────────────────────────────────────────────────────
 async function loadMap() {
-  if (mapLoaded) return;
+  if (mapLoaded) {
+    const machineBounds = await renderProviderMachineMap(forestMap);
+    if (machineBounds.length) forestMap.fitBounds(machineBounds, {padding:[40,40],maxZoom:16});
+    return;
+  }
   const container = document.getElementById('map-container');
 
   // Load Leaflet
@@ -1988,12 +2164,18 @@ async function loadMap() {
   document.head.appendChild(script);
   script.onload = async () => {
     const mapData = await api('/api/map');
+    if (forestMap) { forestMap.remove(); providerMachineLayer = null; }
     container.innerHTML = '';
     container.style.height = '540px';
     const map = L.map(container).setView([56.9, 24.1], 8);
+    forestMap = map;
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:'&copy; OpenStreetMap contributors', maxZoom:19
     }).addTo(map);
+
+    // Independent browser-side reference overlays; never gate operational data.
+    try { if (window.ForestLvmWms) window.ForestLvmWms.attach(map); }
+    catch (_) { console.warn('LVM GEO map controls unavailable; operational map continues.'); }
 
     let hasPins = false;
     const bounds = [];
@@ -2015,13 +2197,14 @@ async function loadMap() {
 
         poly.bindPopup(`
           <div style="font-family:monospace;font-size:12px;min-width:180px">
-            <div style="font-weight:bold;font-size:14px;margin-bottom:4px">${s.name}</div>
+            <div style="font-weight:bold;font-size:14px;margin-bottom:4px">${sectorNameText(s.name)}</div>
             <div>${s.contractor||''}</div>
             <div>Status: ${s.status||'–'}</div>
             <div>Volume: ${s.approved_volume||'–'}</div>
             <div>Risk: <b style="color:${riskCol}">${s.risk_level}</b> (${s.risk_score})</div>
             ${s.area_ha?`<div>Area: ${s.area_ha} ha</div>`:''}
-            <div style="margin-top:8px"><a href="#" onclick="openSector('${s.name}');return false" style="color:#7ab83c">Open details →</a></div>
+            ${s.source?`<div>Avots: ${lvmText('span',s.source.source_dataset_title).innerHTML}</div><div>Nogabals: ${lvmText('span',s.source.source_feature_id).innerHTML}</div><div>Klients: ${lvmText('span',s.source.client_name||s.source.client_id||'Pašreizējais konts').innerHTML}</div>`:''}
+            <div style="margin-top:8px"><a href="#" onclick="openSector(${sectorNameArgument(s.name)});return false" style="color:#7ab83c">Open details →</a></div>
           </div>
         `);
 
@@ -2038,14 +2221,18 @@ async function loadMap() {
         });
         L.marker([s.latitude, s.longitude], {icon})
           .addTo(map)
-          .bindPopup(`<b>${s.name}</b><br>${s.contractor||''}<br>Risk: <b style="color:${riskCol}">${s.risk_level}</b> (${s.risk_score})`)
+          .bindPopup(`<b>${sectorNameText(s.name)}</b><br>${s.contractor||''}<br>Risk: <b style="color:${riskCol}">${s.risk_level}</b> (${s.risk_score})`)
           .on('click', () => openSector(s.name));
         bounds.push([s.latitude, s.longitude]);
       }
     });
 
+    const machineBounds = await renderProviderMachineMap(map);
+    bounds.push(...machineBounds);
+    if (machineBounds.length) hasPins = true;
     if (!hasPins) {
-      container.innerHTML = '<div class="empty" style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center">No GPS or boundary data available yet.<br><small style="color:var(--text3);font-family:var(--mono);margin-top:8px">Add sector boundaries or GPS check-ins</small></div>';
+      // Retain the map so later provider syncs can add markers without rebuilding it.
+      L.popup().setLatLng(map.getCenter()).setContent('No GPS or boundary data available yet.').openOn(map);
     } else if (bounds.length > 0) {
       map.fitBounds(bounds, {padding: [40, 40]});
     }
@@ -2053,14 +2240,30 @@ async function loadMap() {
   };
 }
 
+async function renderProviderMachineMap(map) {
+  if (!map) return [];
+  const machines = await api('/api/map/machines');
+  if (providerMachineLayer) map.removeLayer(providerMachineLayer);
+  providerMachineLayer = L.layerGroup().addTo(map);
+  const bounds = [];
+  machines.forEach(row => {
+    if (row.latitude === null || row.longitude === null || !Number.isFinite(row.latitude) || !Number.isFinite(row.longitude)) return;
+    const icon = L.divIcon({className:'',html:'<div style="background:#efc843;border:2px solid #257438;border-radius:4px;font-size:20px;width:28px;height:28px;text-align:center">🚜</div>',iconSize:[28,28],iconAnchor:[14,14]});
+    L.marker([row.latitude,row.longitude],{icon}).addTo(providerMachineLayer).bindPopup(machineDetails(row));
+    bounds.push([row.latitude,row.longitude]);
+  });
+  if (bounds.length) map.closePopup();
+  return bounds;
+}
+
 // ── RISKS ─────────────────────────────────────────────────────────────────────
 async function loadRisks() {
   const rows = await api('/api/risks');
   document.getElementById('risks-table').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Level</th><th>Reason</th></tr></thead><tbody>
     ${rows.map(r=>`<tr style="cursor:pointer" onclick="openRisk(${r.id})">
-      <td><span class="tbl-link" onclick="event.stopPropagation();openSector('${r.sector}')">${r.sector}</span></td>
+      <td><span class="tbl-link" onclick="event.stopPropagation();openSector(${sectorNameArgument(r.sector)})">${sectorNameText(r.sector)}</span></td>
       <td>${riskBadge(r.risk_level)}</td>
-      <td style="color:var(--text2)">${r.reason}${r.occurred_at ? ` <span class="mono" style="font-size:11px;color:var(--text3)">· notika ${riskLocal(r.occurred_at)}</span>` : ''}</td>
+      <td style="color:var(--text2)">${machineText(r.reason)}${r.occurred_at ? ` <span class="mono" style="font-size:11px;color:var(--text3)">· notika ${riskLocal(r.occurred_at)}</span>` : ''}</td>
     </tr>`).join('')||'<tr><td colspan="3" class="empty">no risks</td></tr>'}
   </tbody></table>`;
 }
@@ -2152,11 +2355,11 @@ async function openRisk(id, push=true) {
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
       <div>${riskBadge(r.risk_level)}</div>
       <div style="color:var(--text2)">Status: <b>${r.status||'OPEN'}</b></div>
-      <div style="color:var(--text2)">Sector: <b>${r.sector}</b></div>
+      <div style="color:var(--text2)">Sector: <b>${sectorNameText(r.sector)}</b></div>
       ${r.employee_name?`<div style="color:var(--text2)">Worker: <b>${r.employee_name}</b></div>`:''}
       ${deliveryBadge}
     </div>
-    <div style="margin-bottom:16px">${(r.reason||'').replace(/\(водитель ([^)]+)\)/, '(водитель <b>$1</b>)')}</div>${r.identity_ambiguous ? `
+    <div style="margin-bottom:16px">${machineText(r.reason||'').replace(/\(водитель ([^)]+)\)/, '(водитель <b>$1</b>)')}</div>${r.identity_ambiguous ? `
     <div style="margin:-8px 0 16px;padding:8px 12px;border:1px solid var(--amber);border-radius:var(--r);background:rgba(212,160,23,0.1);color:var(--amber);font-size:13px">
       ⚠ Darbinieka identitāte nav viennozīmīga — ${r.identity_shared_count || '?'} darbinieki izmanto vienu Telegram ID; piesaistīts: <b>${r.employee_name || '–'}</b></div>` : ''}${r.occurred_at ? `
     <div style="margin:-8px 0 16px;font-size:13px;color:var(--text2)">Notika: <b>${riskLocal(r.occurred_at)}</b> · ieraksts izveidots: ${riskLocal(r.created_at)}</div>` : ''}
@@ -2166,11 +2369,11 @@ async function openRisk(id, push=true) {
       <div style="display:flex;gap:8px;margin-bottom:16px">
         ${r.photo_path ? `
           <img src="${API}/api/risks/${r.id}/photo" style="width:150px;border-radius:var(--r);border:1px solid var(--border);cursor:zoom-in"
-               onclick="openLightboxImg('${API}/api/risks/${r.id}/photo', '${r.sector}', 'Risk #${r.id}')" onerror="this.style.display='none'">
+               onclick="openLightboxImg('${API}/api/risks/${r.id}/photo', ${sectorNameArgument(r.sector)}, 'Risk #${r.id}')" onerror="this.style.display='none'">
         ` : ''}
         ${r.photo_path_2 ? `
           <img src="${API}/api/risks/${r.id}/photo2" style="width:150px;border-radius:var(--r);border:1px solid var(--border);cursor:zoom-in"
-               onclick="openLightboxImg('${API}/api/risks/${r.id}/photo2', '${r.sector}', 'Risk #${r.id} (2)')" onerror="this.style.display='none'">
+               onclick="openLightboxImg('${API}/api/risks/${r.id}/photo2', ${sectorNameArgument(r.sector)}, 'Risk #${r.id} (2)')" onerror="this.style.display='none'">
         ` : ''}
       </div>
     ` : ''}
@@ -2554,8 +2757,8 @@ async function openFinancialBreakdown(push=true) {
     <table class="tbl"><thead><tr><th>Sector</th><th>Reason</th><th>Period</th><th>Exposure</th></tr></thead><tbody>
       ${rows.map(r=>`
         <tr class="tbl-row" style="cursor:pointer" onclick="openRisk(${r.id})">
-          <td><span class="tbl-link">${r.sector}</span></td>
-          <td>${truncate(r.reason, 80)}</td>
+          <td><span class="tbl-link">${sectorNameText(r.sector)}</span></td>
+          <td>${machineText(truncate(r.reason, 80))}</td>
           <td style="color:var(--text2);font-size:12px">${r.exposure_period||'–'}</td>
           <td style="font-family:var(--mono);font-size:12px;color:var(--red);font-weight:500">€${r.exposure_low.toLocaleString('de-DE')}–€${r.exposure_high.toLocaleString('de-DE')}</td>
         </tr>
@@ -2626,7 +2829,7 @@ async function loadGPS() {
   document.getElementById('gps-table').innerHTML = `<table class="tbl"><thead><tr><th>Employee</th><th>Sector</th><th>Check-in</th><th>Finish</th><th>Distance m</th><th>Approved</th><th>Comment</th></tr></thead><tbody>
     ${rows.map(r=>`<tr>
       <td>${r.employee}</td>
-      <td><span class="tbl-link" onclick="openSector('${r.sector}')">${r.sector}</span></td>
+      <td><span class="tbl-link" onclick="openSector(${sectorNameArgument(r.sector)})">${sectorNameText(r.sector)}</span></td>
       <td class="mono" style="font-size:11px">${fmt(r.check_in_time)}</td>
       <td class="mono" style="font-size:11px">${fmt(r.finish_time)}</td>
       <td class="mono">${r.distance_m?Math.round(r.distance_m):'–'}</td>
@@ -2641,7 +2844,7 @@ async function loadTrucks() {
   const rows = await api('/api/trucks');
   document.getElementById('trucks-table').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Truck</th><th>Driver</th><th>Volume m³</th><th>Note</th><th>Time</th></tr></thead><tbody>
     ${rows.map(r=>`<tr>
-      <td><span class="tbl-link" onclick="openSector('${r.sector}')">${r.sector}</span></td>
+      <td><span class="tbl-link" onclick="openSector(${sectorNameArgument(r.sector)})">${sectorNameText(r.sector)}</span></td>
       <td class="mono">${r.truck_number}</td><td>${r.driver}</td>
       <td class="mono">${r.reported_volume}</td>
       <td style="color:var(--text2);font-size:12px">${r.note||'–'}</td>
@@ -2655,7 +2858,7 @@ async function loadTimber() {
   const rows = await api('/api/timber');
   document.getElementById('timber-table').innerHTML = `<table class="tbl"><thead><tr><th>Sector</th><th>Planned m³</th><th>Actual m³</th><th>Diff m³</th><th>Status</th><th>Note</th><th>Time</th></tr></thead><tbody>
     ${rows.map(r=>`<tr>
-      <td><span class="tbl-link" onclick="openSector('${r.sector}')">${r.sector}</span></td>
+      <td><span class="tbl-link" onclick="openSector(${sectorNameArgument(r.sector)})">${sectorNameText(r.sector)}</span></td>
       <td class="mono">${r.planned_volume}</td><td class="mono">${r.actual_volume}</td>
       <td class="mono" style="color:${r.difference_volume>0?'var(--amber)':'var(--green)'}">${r.difference_volume}</td>
       <td>${statusBadge(r.status)}</td>
@@ -2777,7 +2980,7 @@ async function loadInspector() {
     const expLabel=s.exposure_label||'€0';
     return `<div class="inspector-card ${cls}">
       <div class="inspector-header">
-        <div><div class="inspector-sector">${s.name}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${s.contractor||'–'} · ${s.status||'–'}</div></div>
+        <div><div class="inspector-sector">${sectorNameText(s.name)}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${s.contractor||'–'} · ${s.status||'–'}</div></div>
         <div class="inspector-score-wrap">
           <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-align:right;margin-bottom:4px">RISK SCORE</div>
           <div class="score-track"><div class="score-track-fill" style="width:${score}%;background:${col}"></div></div></div>
@@ -2795,9 +2998,9 @@ async function loadInspector() {
       <div class="inspector-issues">${issues.map(i=>`<div class="issue-item"><div class="issue-dot" style="background:${i.c}"></div>${i.t}</div>`).join('')}</div>
       <div class="recommendations"><div class="rec-title">Recommendations</div>${recs.map(r=>`<div class="rec-item">${r}</div>`).join('')}</div>
       <div style="margin-top:10px;display:flex;gap:8px">
-        <button class="btn" onclick="openSector('${s.name}')">View sector →</button>
-        <button class="btn" onclick="window.open('/api/report/pdf/${s.name}','_blank')">↓ PDF</button>
-        <button class="btn" onclick="runSectorAnalysis('${s.name}')">🔍 Analyze</button>
+        <button class="btn" onclick="openSector(${sectorNameArgument(s.name)})">View sector →</button>
+        <button class="btn" onclick="window.open('/api/report/pdf/'+encodeURIComponent(${sectorNameArgument(s.name)}),'_blank')">↓ PDF</button>
+        <button class="btn" onclick="runSectorAnalysis(${sectorNameArgument(s.name)})">🔍 Analyze</button>
       </div>
       <div id="insp-analysis-${idSafe}" class="inspector-analysis" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:var(--r);border:1px solid var(--border)">
         <div class="insp-analysis-title" style="font-size:11px;font-family:var(--mono);font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="_toggleInspBox('insp-analysis-${idSafe}')"><span class="insp-chevron">▾</span>🤖 AI Анализ</div>
@@ -3245,17 +3448,17 @@ async function loadSatellite() {
 
   const sel = document.getElementById('sat-sector');
   sel.innerHTML = '<option value="">— выбери сектор —</option>' +
-    satSectors.map(s=>`<option value="${s.name}">${s.name} — ${s.contractor||''}</option>`).join('');
+    satSectors.map(s=>`<option value="${sectorNameText(s.name)}">${sectorNameText(s.name)} — ${s.contractor||''}</option>`).join('');
 
   document.getElementById('sat-sectors-list').innerHTML = `
     <table class="tbl"><thead><tr><th>Сектор</th><th>Подрядчик</th><th>Координаты</th><th>Risk</th><th>Финансовый риск</th><th></th></tr></thead><tbody>
     ${satSectors.map(s=>`<tr>
-      <td><strong style="color:var(--gbright);font-family:var(--mono)">${s.name}</strong></td>
+      <td><strong style="color:var(--gbright);font-family:var(--mono)">${sectorNameText(s.name)}</strong></td>
       <td>${s.contractor||'–'}</td>
       <td class="mono" style="font-size:11px">${s.latitude?s.latitude.toFixed(4)+'°N':''} ${s.longitude?s.longitude.toFixed(4)+'°E':''}</td>
       <td>${riskScoreBar(s.risk_score, s.risk_color)}</td>
       <td style="font-family:var(--mono);font-size:12px;color:${s.exposure_label!=='€0'?'var(--red)':'var(--green)'}">${s.exposure_label}</td>
-      <td><span class="tbl-link" onclick="selectSatSector('${s.name}')">снимок →</span></td>
+      <td><span class="tbl-link" onclick="selectSatSector(${sectorNameArgument(s.name)})">снимок →</span></td>
     </tr>`).join('')}
     </tbody></table>`;
 
@@ -3274,12 +3477,12 @@ async function loadSatellite() {
         if (s.boundary && s.boundary.length >= 3) {
           L.polygon(s.boundary, {color:col, fillColor:col, fillOpacity:0.2, weight:2})
             .addTo(satLeafMap)
-            .bindPopup(`<b>${s.name}</b><br>${s.contractor||''}<br>Risk: ${s.risk_level}`);
+            .bindPopup(`<b>${sectorNameText(s.name)}</b><br>${s.contractor||''}<br>Risk: ${s.risk_level}`);
           s.boundary.forEach(p => bounds.push(p));
         } else if (s.latitude && s.longitude) {
           L.circleMarker([s.latitude, s.longitude], {radius:6, color:col, fillColor:col, fillOpacity:0.8})
             .addTo(satLeafMap)
-            .bindPopup(`<b>${s.name}</b>`);
+            .bindPopup(`<b>${sectorNameText(s.name)}</b>`);
           bounds.push([s.latitude, s.longitude]);
         }
       });
@@ -3400,11 +3603,11 @@ function snapshotRiskSectionsHTML(sn) {
     (sn.note?`<div style="margin-top:2px">${sn.note}</div>`:'') +
     `<div style="margin-top:12px;font-weight:600">Риски на момент снимка</div>` +
     (snapRisks.length
-      ? snapRisks.map(r=>`<div style="margin-top:4px">${riskBadge(r.risk_level)} ${r.reason}</div>`).join('')
+      ? snapRisks.map(r=>`<div style="margin-top:4px">${riskBadge(r.risk_level)} ${machineText(r.reason)}</div>`).join('')
       : `<div style="margin-top:4px;color:var(--text3)">риски для этой даты не отмечены</div>`) +
     `<div style="margin-top:12px;font-weight:600">Риски сейчас (все текущие)</div>` +
     (liveRisks.length
-      ? liveRisks.map(r=>`<div style="margin-top:4px">${riskBadge(r.risk_level)} ${r.reason}</div>`).join('')
+      ? liveRisks.map(r=>`<div style="margin-top:4px">${riskBadge(r.risk_level)} ${machineText(r.reason)}</div>`).join('')
       : `<div style="margin-top:4px;color:var(--text3)">нет рисков</div>`);
 }
 
@@ -3426,7 +3629,7 @@ function openSnapshotRisksEditor(id) {
     ? risks.map(r => `
       <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px">
         <input type="checkbox" value="${r.id}" ${linkedIds.has(r.id)?'checked':''}>
-        ${riskBadge(r.risk_level)} <span style="color:var(--text2)">${r.reason}</span>
+        ${riskBadge(r.risk_level)} <span style="color:var(--text2)">${machineText(r.reason)}</span>
       </label>`).join('')
     : '<div class="empty">no risks for this sector</div>';
   document.getElementById('snapshot-risks-modal').classList.add('open');
@@ -3484,7 +3687,7 @@ function renderDetailMap(sector, boundary) {
         color:'#c94040', fillColor:'#c94040', fillOpacity:0.2, weight:2
       }).addTo(detailMap);
       detailMap.fitBounds(boundary, {padding:[40,40]});
-      poly.bindPopup(`<b>${sector.name}</b><br>${sector.contractor||''}<br>Area: ${sector.area_ha||'?'} ha`).openPopup();
+      poly.bindPopup(`<b>${sectorNameText(sector.name)}</b><br>${sector.contractor||''}<br>Area: ${sector.area_ha||'?'} ha`).openPopup();
     }
 
     // One work session at a time: its check-in point and recorded route.
@@ -3633,7 +3836,7 @@ async function loadDetailSatellite() {
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
     wrap.innerHTML = `<img src="${url}" style="width:100%;height:420px;object-fit:cover;border-radius:var(--r);cursor:zoom-in"
-      onclick="openLightboxImg(this.src,'${currentSector}','${dsSatMode==='ndvi'?'NDVI':'True Color'} · ${dateFrom}–${dateTo}')">`;
+      onclick="openLightboxImg(this.src,${sectorNameArgument(currentSector)},'${dsSatMode==='ndvi'?'NDVI':'True Color'} · ${dateFrom}–${dateTo}')">`;
     if (status) status.textContent = `✓ ${currentSector} · ${dsSatMode==='ndvi'?'NDVI':'True Color'} · ${dateFrom}–${dateTo}`;
   } catch(e) {
     wrap.innerHTML=`<div class="empty" style="color:var(--red)">⚠ ${e.message}</div>`;
@@ -3994,7 +4197,141 @@ function setIntCategoryFilter(cat, el) {
 
 let _intCatalogCache = [];
 
+let deereCsrf = '';
+async function loadJohnDeere() {
+  const card = document.getElementById('john-deere-card');
+  const technical = document.getElementById('john-deere-technical');
+  technical.replaceChildren();
+  const eyebrow = document.createElement('div');
+  eyebrow.className = 'jd-eyebrow'; eyebrow.textContent = 'LIVE TECHNICAL STATUS'; technical.appendChild(eyebrow);
+  const heading = document.createElement('h3');
+  heading.className = 'jd-title'; heading.textContent = 'JOHN DEERE — SANDBOX'; technical.appendChild(heading);
+  const logo = document.getElementById('john-deere-logo');
+  const fallback = document.getElementById('john-deere-logo-fallback');
+  const showLogo = () => { logo.hidden = false; fallback.hidden = true; };
+  const hideLogo = () => { logo.hidden = true; fallback.hidden = false; };
+  logo.onload = showLogo; logo.onerror = hideLogo;
+  if (logo.complete) { if (logo.naturalWidth) showLogo(); else hideLogo(); }
+  let group = technical;
+  let actions = null;
+  const section = title => {
+    group = document.createElement('section'); group.className = 'jd-section'; technical.appendChild(group);
+    const titleEl = document.createElement('h4'); titleEl.className = 'jd-section-title'; titleEl.textContent = title; group.appendChild(titleEl);
+    actions = null;
+  };
+  const line = text => {
+    const el = document.createElement('div');
+    const split = text.indexOf(': ');
+    if (split > 0 && !text.includes('\n')) {
+      el.className = 'jd-row';
+      const key = document.createElement('span'); key.className = 'jd-label'; key.textContent = text.slice(0, split);
+      const value = document.createElement('span'); value.className = 'jd-value'; value.textContent = text.slice(split + 2);
+      const state = value.textContent.toUpperCase();
+      if (['OK','READY','WORKING','CONNECTED','RECEIVING','VALID','REFRESHED','AVAILABLE','INSIDE','LIVE'].includes(state)) value.dataset.tone = 'ready';
+      else if (/WAITING|NOT CHECKED|NOT TESTED|NOT VERIFIED|UNAVAILABLE|NOT AVAILABLE|UNKNOWN|EXPIRED|STALE|NO ORGANIZATIONS/.test(state)) value.dataset.tone = 'waiting';
+      else if (/ERROR|FAILED|AUTH REQUIRED|PERMISSION REQUIRED|RATE LIMITED|OFFLINE/.test(state)) value.dataset.tone = 'error';
+      el.append(key, value);
+    } else { el.className = 'jd-note'; el.textContent = text; }
+    group.appendChild(el);
+  };
+  const button = (text, action) => {
+    if (!actions) { actions = document.createElement('div'); actions.className = 'jd-actions'; group.appendChild(actions); }
+    const el = document.createElement('button'); el.type = 'button'; el.className = 'btn'; el.textContent = text; el.onclick = action; actions.appendChild(el);
+  };
+  section('Authorization & API access');
+  try {
+    const response = await fetch('/api/john-deere/status', {cache:'no-store'});
+    if (!response.ok) throw new Error('Unable to load John Deere status.');
+    const data = await response.json();
+    deereCsrf = data.csrf_token;
+    const outcome = new URLSearchParams(location.search).get('john_deere');
+    if (outcome === 'authorization_failed') line('OAuth: ERROR — permission was not granted. Connect again and Allow Access.');
+    if (outcome === 'token_failed') line('OAuth: ERROR — token exchange failed. Check server configuration and reconnect.');
+    line('OAuth: ' + data.oauth);
+    line('Token: ' + (data.token || 'Not available'));
+    line('API Catalog: ' + (data.api_catalog || 'Not checked'));
+    line('Organizations: ' + (data.organizations || 0) + ' · ' + (data.organizations_status || 'Not checked'));
+    line('Organization Connection: ' + (data.organization_connection || 'Not connected'));
+    for (const org of data.organizations_list || []) line(org.name + ' · ' + org.connection_status);
+    if (data.error) line(data.error);
+    if (data.configured) button(data.oauth === 'OK' ? 'Reconnect John Deere' : 'Connect John Deere', () => deereAction('connect'));
+    if (data.oauth === 'OK') button('Refresh', () => deereAction('refresh'));
+    if (data.can_authorize) button('Authorize Organization', () => { location.href = '/integrations/john-deere/organizations/authorize'; });
+    if (data.can_manage) button('Manage connection', () => { location.href = '/integrations/john-deere/organizations/manage'; });
+    if (data.can_authorize || data.can_manage) line('After selecting organizations and saving in Deere Connections, return here and click Refresh.');
+    const diag = data.phase2a;
+    if (diag) {
+      section('API & machine diagnostics');
+      line('API CONNECTION: ' + diag.api_connection);
+      line('ORGANIZATION DATA: ' + diag.organization_data);
+      line('MACHINE DATA: ' + diag.machine_data);
+      line('Diagnostic OAuth: ' + diag.oauth + ' · Token: ' + diag.token);
+      line('Connected Organizations: ' + (diag.connected_organizations ?? 'Not verified'));
+      line('Equipment: ' + diag.equipment + ' · Status: ' + diag.equipment_status);
+      line('Machines: ' + diag.machines);
+      line('ISO 15143-3 Fleet: ' + diag.fleet.status + (diag.fleet.machines === null ? '' : ' · Machines: ' + diag.fleet.machines));
+      if (diag.fleet.connection_status) line('Fleet connection: ' + diag.fleet.connection_status);
+      if (diag.message) line(diag.message);
+      for (const [stage, error] of Object.entries(diag.errors || {})) line(stage + ': ' + error);
+      if (diag.checked_at) line('Last API test: ' + new Date(diag.checked_at * 1000).toLocaleString());
+      if (Object.keys(diag.machine_api_status || {}).length) section('Machine API readiness');
+      for (const [resource, state] of Object.entries(diag.machine_api_status || {})) line(resource + ': ' + state);
+    }
+    if (data.oauth === 'OK') button('Test John Deere API', async () => {
+      card.querySelectorAll('button').forEach(el => el.disabled = true);
+      line('Testing John Deere Sandbox APIs…');
+      await deereAction('test');
+    });
+    const sync = data.phase2b;
+    if (sync) {
+      section('JOHN DEERE CUSTOMER READINESS');
+      line(sync.implementation + ' · ' + sync.verification);
+      for (const [layer,state] of Object.entries(sync.readiness)) line(layer + ': ' + state);
+      section('Synchronization');
+      for (const [name,count] of Object.entries(sync.counts)) line(name.replaceAll('_',' ') + ': ' + count);
+      for (const [kind,last] of Object.entries(sync.last_sync)) line('Last ' + kind + ' sync: ' + (last || 'Not available'));
+      for (const [kind,title] of Object.entries({organizations:'Sync Organizations',machines:'Sync Machines',telemetry:'Sync Telemetry',all:'Sync All'})) {
+        if (data.oauth === 'OK') button(title, async () => {
+          card.querySelectorAll('button').forEach(el => el.disabled = true);
+          line(title + ' running…');
+          try {
+            const response = await fetch('/api/john-deere/sync/'+kind,{method:'POST',headers:{'X-CSRF-Token':deereCsrf}});
+            const result = await response.json();
+            alert((result.status || result.detail || 'Synchronization finished.') + (result.retry_after ? ' · Retry after ' + result.retry_after + ' seconds' : ''));
+          } catch (err) { alert('Synchronization request failed.'); }
+          await loadJohnDeere();
+        });
+      }
+      if (sync.history.length) section('Recent synchronization');
+      for (const run of sync.history.slice(0,5)) {
+        line(run.sync_type + ': ' + run.status + ' · ' + run.completed_at + ' · errors ' + run.errors_count);
+        for (const error of run.result?.errors || []) line(error.stage + ': ' + error.status);
+      }
+    }
+    line('API diagnostics never create machines or risks. Manual synchronization uses real Deere responses only.');
+  } catch (err) { line(err.message); }
+}
+async function deereAction(action) {
+  // A same-origin POST with a session CSRF token; OAuth tokens never enter JavaScript.
+  if (action === 'connect') {
+    // Native form navigation follows the OAuth redirect without cross-origin fetch.
+    // The server accepts the CSRF token in this form body.
+    const form = document.createElement('form');
+    form.method = 'post'; form.action = '/integrations/john-deere/connect';
+    const input = document.createElement('input'); input.type = 'hidden'; input.name = 'csrf_token'; input.value = deereCsrf;
+    form.appendChild(input); document.body.appendChild(form); form.submit();
+    return;
+  }
+  try {
+    const response = await fetch(action === 'test' ? '/api/john-deere/test' : '/api/john-deere/refresh', {method:'POST', headers:{'X-CSRF-Token':deereCsrf}});
+    if (!response.ok) { const data = await response.json(); alert(data.detail || 'John Deere refresh failed.'); }
+  } catch (err) { alert('John Deere request failed. Try Refresh again.'); }
+  await loadJohnDeere();
+}
+
 async function loadIntegrations() {
+  loadLvmStatus();
+  await loadJohnDeere();
   const data = await api('/api/integrations');
   _intCatalogCache = data.integrations;
   const connected = _intCatalogCache.filter(e=>e.integration && e.integration.connection_status==='CONNECTED').length;
@@ -4012,7 +4349,7 @@ async function loadIntegrations() {
 
 function renderIntegrationCards() {
   const grid = document.getElementById('int-cards-grid');
-  const list = intCategoryFilter ? _intCatalogCache.filter(e=>e.category===intCategoryFilter) : _intCatalogCache;
+  const list = _intCatalogCache.filter(e=>(!window.FOREST_GEODATA_ENABLED || e.provider!=='lvm_geo') && (!intCategoryFilter || e.category===intCategoryFilter));
   if (!list.length) { grid.innerHTML = '<div class="card" style="color:var(--text3)">Нет интеграций в этой категории.</div>'; return; }
   grid.innerHTML = list.map(e => {
     const status = e.display_status;
@@ -4144,7 +4481,7 @@ async function openIntegration(id, push=true) {
 }
 
 // ── AUTO REFRESH every 30s ────────────────────────────────────────────────────
-setInterval(()=>{ if(currentSection&&currentSection!=='detail'){ clearCache(); load(currentSection); } }, 30000);
+setInterval(()=>{ if(currentSection&&currentSection!=='detail'&&currentSection!=='lvm-geodata'&&currentSection!=='forest-map'){ clearCache(); load(currentSection); } }, 30000);
 
 // Resolve a history route from location.hash (inverse of the hashes written by
 // nav/openSector/openObject/openRisk). Unknown or malformed hashes resolve to Overview.
@@ -4201,7 +4538,7 @@ window.addEventListener('popstate', e=>{
 const initRoute = routeFromHash();
 history.replaceState(initRoute, '', location.hash || '#overview');
 openRoute(initRoute);
-document.getElementById('last-update').innerHTML = '<span class="auto-refresh-badge"><span class="pulse"></span> live · v2.1</span>';
+document.getElementById('last-update').innerHTML = '<span class="auto-refresh-badge"><span class="pulse"></span> tiešsaistē · v2.1</span>';
 </script>
 </body>
 </html>
