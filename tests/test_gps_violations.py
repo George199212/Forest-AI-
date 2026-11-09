@@ -247,3 +247,48 @@ def test_session_32_equals_sector_map_tab(monkeypatch):
     assert round(tab['inside_s']) == 660 and round(tab['outside_s']) == 201      # 11 min 0 s / 3 min 21 s
     assert r['summary']['exits'] == 1 and r['summary']['violations'] == 1 and r['summary']['matches_map_tab']
     assert [i['id'] for i in r['segments'][0]['incidents']] == [62]
+
+
+# ── Map-load overview (violations visible without clicks) ────────────────────
+
+def test_overview_latest_session_in_window(world):
+    ids = add_points(world, [(0, -500, 3), (30, -300, 3), (60, -500, 3)])
+    inc = database.add_incident('S-1', 'HIGH', 'x', entity_type='EMPLOYEE', entity_id=7, rule_code='SECTOR_EXIT', occurred_at=ts(T0+timedelta(seconds=30)))
+    with sqlite3.connect(world) as c:c.execute('UPDATE risks SET session_id=70 WHERE id=?', (inc,))
+    r = gv.overview(1, days=30, now=T0+timedelta(days=29))
+    (e,) = r['entities']
+    assert (e['name'], e['session_key'], r['segments'], r['violations']) == ('Worker One', '70', 1, 1)
+    assert e['segments'][0]['exit_point_id'] == ids[1] and [i['id'] for i in e['segments'][0]['incidents']] == [inc]
+    assert 'points' not in e and 'inside_lines' not in e          # inside parts are not sent on load
+    assert gv.overview(1, days=30, now=T0+timedelta(days=31))['entities'] == []   # outside the window
+    assert gv.overview(1, days=60, now=T0+timedelta(days=31))['segments'] == 1    # configurable
+
+
+def test_overview_uses_only_the_latest_session(world):
+    add_points(world, [(0, -500, 3), (30, -300, 3), (60, -500, 3)])
+    with sqlite3.connect(world) as c:
+        c.execute("INSERT INTO work_sessions(id,user_id,employee,sector,check_in_time,employee_id) VALUES(71,'700','Worker One','S-1',?,7)", (ts(T0+timedelta(hours=2)),))
+    add_points(world, [(7200, -500, 3), (7230, -480, 3)], session=71)
+    (e,) = gv.overview(1, days=30, now=T0+timedelta(days=1))['entities']
+    assert e['session_key'] == '71' and e['segments'] == [] and e['summary']['exits'] == 0
+
+
+def test_overview_skips_vehicles_without_real_origin(world):
+    lat, lon = wgs(X0-300, Y0)
+    with sqlite3.connect(world) as c:
+        c.execute("INSERT INTO sector_vehicles(id,sector,plate) VALUES(5,'S-1','AB-1')")
+        c.execute("INSERT INTO vehicle_gps_pings(vehicle_id,sector,latitude,longitude,recorded_at) VALUES(5,'S-1',?,?,?)", (lat, lon, ts(T0)))
+    assert gv.overview(1, days=30, now=T0+timedelta(days=1))['entities'] == []   # origin UNKNOWN: never shown as a violation
+
+
+def test_overview_endpoint(world, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from services.geodata import forest_map
+    add_points(world, [(0, -500, 3), (30, -300, 3), (60, -500, 3)])
+    monkeypatch.setattr(gv, 'datetime', type('D', (), {'now':staticmethod(lambda tz=None:T0+timedelta(days=1))}))
+    app = FastAPI();app.include_router(forest_map.router(lambda:'tester'))
+    client = TestClient(app)
+    r = client.get('/api/geodata/forest-map/gps/violations/overview?days=30')
+    assert r.status_code == 200 and r.headers['cache-control'].startswith('private, no-store') and r.json()['segments'] == 1
+    assert client.get('/api/geodata/forest-map/gps/violations/overview?days=0').status_code == 422

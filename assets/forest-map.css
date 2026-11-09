@@ -47,3 +47,12 @@
 .fm-summary dl{display:grid;grid-template-columns:minmax(0,9.5rem) minmax(0,1fr);gap:3px 10px;margin:.4rem 0;font-size:12px}
 .fm-summary dd{overflow-wrap:anywhere}
 .fm-summary a,.fm-summary a:visited{color:inherit}.fm-summary .fm-risk-link{color:#7fb8ff}
+/* "Pārkāpumi" list: visible on load, top of the sidebar */
+.fm-violations-panel{border-left:3px solid #e5484d}
+.fm-violations-info{font-size:12px;margin:.3rem 0;opacity:.85}
+.fm-violations-list{margin:.3rem 0;padding-left:1.1rem;font-size:12px;max-height:16rem;overflow:auto}
+.fm-violation-row{margin:.35rem 0}
+.fm-violation-head{font-weight:700}.fm-violation-bad .fm-violation-head{color:#ff6b6f}.fm-violation-unknown .fm-violation-head{color:#f0b429}
+.fm-violation-meta,.fm-violation-incident{opacity:.9}
+.fm-violation-incident .fm-risk-link{color:#7fb8ff}
+.fm-lowzoom .fm-flag,.fm-lowzoom .fm-flag-dot{display:none}

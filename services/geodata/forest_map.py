@@ -310,6 +310,9 @@ def router(auth):
     @r.get('/gps/violations')
     def get_gps_violations(kind:str=KIND,id:str=Query(min_length=1,max_length=120),session:str=Query(pattern=r'^(\d{1,9}|\d{4}-\d{2}-\d{2})$'),actor=Depends(auth)):
         return guarded(gv.violations,context(actor)['organization_id'],kind,entity(kind,id),session)
+    @r.get('/gps/violations/overview')
+    def get_gps_violations_overview(days:int=Query(None,ge=1,le=365),actor=Depends(auth)):
+        return guarded(gv.overview,context(actor)['organization_id'],days)
     @r.get('/gps/session/{session_id}')
     def get_gps_session(session_id:int,actor=Depends(auth)):
         return guarded(gv.session_violations,context(actor)['organization_id'],session_id)

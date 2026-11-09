@@ -385,3 +385,50 @@ def create_incident(organization_id, session_id, exit_point_id, actor):
         for source, kind, summary, table, ref, observed in evidence:
             database.add_risk_evidence(incident, source, 'REAL', kind, summary, table, ref, observed)
         return {'result':result, 'incident_id':incident}
+
+
+# ── Map-load overview: outside segments of every REAL entity's latest session ───────────────
+
+def overview_days():
+    return max(1, min(365, gps._env_int('FOREST_GPS_VIOLATIONS_DAYS', 30)))
+
+
+def _slim(r, name):
+    """Overview payload: segments + what the segment popup needs; no full point list / inside lines."""
+    out = {k:r[k] for k in ('kind', 'id', 'session_key', 'session', 'assigned_sector', 'sector_polygon', 'origin',
+                            'max_accuracy_m', 'gap_seconds', 'summary', 'segments', 'incidents_unmatched', 'can_create_incidents', 'last')}
+    out['name'] = name
+    return out
+
+
+def overview(organization_id, days=None, now=None):
+    """Latest session (worker) / latest local day (vehicle, REAL pings only) whose last stored point lies
+    within the last `days` days, for every entity with REAL data. Read-only; computes nothing new beyond
+    violations()."""
+    days = days or overview_days()
+    now = now or datetime.now(timezone.utc)
+    since = now-timedelta(days=days)
+    entities = []
+    with closing(gps._app()) as c:
+        latest = {}
+        for r in c.execute('SELECT w.id,w.employee_id,w.employee,MAX(p.recorded_at) AS last FROM work_sessions w '
+                           'JOIN session_track_points p ON p.session_id=w.id WHERE w.employee_id IS NOT NULL GROUP BY w.id'):
+            t = gps._parse(r['last'])
+            if t is None or t < since or t > now+timedelta(minutes=5):continue
+            if r['employee_id'] not in latest or t > latest[r['employee_id']][0]:latest[r['employee_id']] = (t, r['id'], r['employee'])
+        names = {r[0]:r[1] for r in c.execute('SELECT id,full_name FROM sector_employees')}
+        vehicles = []
+        for kind, column in (('vehicle', 'vehicle_id'), ('equipment', 'equipment_id')):
+            for (ident,) in c.execute(f'SELECT DISTINCT {column} FROM vehicle_gps_pings WHERE {column} IS NOT NULL'):
+                real = [t for p in gps._points(c, kind, ident, None, None) if p['origin'] == 'REAL' and (t := gps._parse(p['recorded_at'])) and since <= t <= now]
+                if real:vehicles.append((kind, ident, max(real).astimezone(session_track.LOCAL_TZ).date().isoformat()))
+        plates = {r[0]:r[1] for r in c.execute('SELECT id,plate FROM sector_vehicles')}
+        codes = {r[0]:r[1] for r in c.execute('SELECT id,equipment_code FROM sector_equipment')}
+    for employee, (t, sid, name) in sorted(latest.items(), key=lambda kv:kv[1][0], reverse=True):
+        entities.append(_slim(violations(organization_id, 'worker', employee, str(sid)), names.get(employee) or name or f'#{employee}'))
+    for kind, ident, day in vehicles:
+        r = violations(organization_id, kind, ident, day)
+        if r['origin'] and 'REAL' in r['origin'].split(','):
+            entities.append(_slim(r, (plates if kind == 'vehicle' else codes).get(ident) or f'#{ident}'))
+    return {'generated_at':gps._iso(now), 'days':days, 'since':gps._iso(since), 'entities':entities,
+            'segments':sum(len(e['segments']) for e in entities), 'violations':sum(e['summary']['violations'] for e in entities)}
