@@ -67,10 +67,11 @@ def coverage(version, z, x, y):
     features=[]
     for key,count in zip(keys,totals):
         px,py=divmod(int(key),2**cell_z)
-        g=box(*tile_bounds(cell_z,px,py)).intersection(clip)
-        if not g.is_empty and g.area:
-            features.append({'type':'Feature','geometry':mapping(g),'properties':{'compartment_count':int(count),'display_only':True}})
-    return {'type':'FeatureCollection','features':features,'mode':'generalized_presence','display_only':True,'dataset_version':version,'notice':'Occupied overview cells indicate forest presence, not exact coverage or registrable boundaries.'}
+        cell=box(*tile_bounds(cell_z,px,py))
+        if cell.intersects(clip):
+            center=cell.centroid
+            features.append({'type':'Feature','geometry':mapping(center),'properties':{'compartment_count':int(count),'display_only':True,'meaning':'bbox_center_presence_sample'}})
+    return {'type':'FeatureCollection','features':features,'mode':'generalized_presence','display_only':True,'dataset_version':version,'notice':'Punkti rāda indeksētu nogabalu aptuveno klātbūtni pēc avota robežtaisnstūra centra; tie nav meža laukumi vai precīzas robežas.'}
 
 
 def _encode(payload):
@@ -151,13 +152,28 @@ def feature(fid,actor):
         if sizes[0]>2_000_000 or (sizes[1] or 0)>MAX_INPUT_BYTES:raise HTTPException(413,'Source geometry is too complex for direct inspection; use cadastral review')
         row=c.execute('SELECT * FROM compartments WHERE external_id=?',(fid,)).fetchone()
         f=data._feature(c,row,app=app);p=f['properties']
-        association=nw.source_association(row,row['kadastrs'])
-        validation=nw.parcel_validation(row['kadastrs'],nw.original(row),source_crs=row['source_crs'])
-        if row['repair']:validation.update(registration_allowed=False,status='display_review_required' if row['geometry_valid'] else 'geometry_invalid')
+        validation,association=nw.compartment_validation(row,row['kadastrs'])
         eligible=bool(p['importable'] and row['geometry_valid'] and not row['repair'] and validation['registration_allowed'] and association['status']=='verified_source_attribute')
-        p.update(cadastral_association=association,cadastral_validation=validation,geometry_valid=bool(row['geometry_valid']),importable=eligible,display_only=False)
+        # Inspection shows the unchanged source geometry transformed only for map coordinates.
+        # The display tiles remain simplified separately and are never registration input.
+        f['geometry']=nw.original_wgs84(row)
+        p.update(cadastral_association=association,cadastral_validation=validation,geometry_valid=bool(row['geometry_valid']),source_crs=row['source_crs'],source_geometry_crs='EPSG:4326',source_region=row['source_region'],source_date=row['source_date'],source_layer=row['source_layer'],source_record=row['source_row'],source_reference=nw.source_reference(row),geometry_role='transformed_original_source',importable=eligible,display_only=False)
         if not eligible and not p['sector']:p['import_status']='REVIEW REQUIRED'
         return {'feature':f,'dataset_version':m['version'],'geometry_role':'full_source_display','registration_geometry':'reread_from_immutable_native_source_by_existing_import_workflow'}
+
+
+def municipality_catalogue(name,limit=100,offset=0,actor=None):
+    """Paginated national catalogue navigation by exact VMD municipality value."""
+    context(actor)
+    name=name.strip()
+    if not 1<=len(name)<=254 or not 1<=limit<=100 or not 0<=offset<=50000:
+        raise HTTPException(422,'Norādiet pašvaldību, lapas izmēru (1–100) un derīgu nobīdi.')
+    m=nw.release()
+    with closing(nw.db(m['forest_db'])) as c:
+        total=c.execute('SELECT count(*) FROM compartments WHERE adm1=?',(name,)).fetchone()[0]
+        rows=c.execute('SELECT external_id,kadastrs,kvart,nog,nog_plat,area_m2,source_region FROM compartments WHERE adm1=? ORDER BY id LIMIT ? OFFSET ?', (name,limit,offset)).fetchall()
+    return {'municipality':name,'dataset_version':m['version'],'total':total,'offset':offset,'limit':limit,'has_more':offset+len(rows)<total,
+        'results':[{'source_id':r['external_id'],'kadastrs':r['kadastrs'],'kvart':r['kvart'],'nog':r['nog'],'area_ha':r['nog_plat'] if r['nog_plat'] and r['nog_plat']>0 else r['area_m2']/10000,'source_region':r['source_region']} for r in rows]}
 
 
 def identify(lat,lon,zoom,actor):
@@ -191,7 +207,8 @@ def sectors(actor):
                 g=Polygon([(p[1],p[0]) for p in json.loads(row['boundary_json'])])
                 if g.is_valid and not g.is_empty:
                     w,s,e,n=g.bounds
-                    if 20<=w<=e<=29 and 55<=s<=n<=59:geometry=mapping(g);status='valid_boundary'
+                    if 20<=w<=e<=29 and 55<=s<=n<=59:
+                        geometry=mapping(g);status='valid_boundary';warning='Valid stored polygon; membership in Latvia borders is not independently verified.'
                     else:status='outside_map_extent';warning='Stored boundary is outside the Latvia map extent.';outside+=1
                 else:status='invalid_boundary';warning=shapely.is_valid_reason(g);invalid+=1
         except (ValueError,TypeError,IndexError,shapely.errors.GEOSException):status='invalid_boundary';warning='Invalid stored sector boundary';invalid+=1
@@ -202,7 +219,7 @@ def sectors(actor):
                 if status!='outside_map_extent':outside+=1
                 continue
             geometry={'type':'Point','coordinates':[lon,lat]};markers+=1
-            warning=(warning+' · ' if warning else '')+'Stored sector center; no validated polygon is shown.'
+            warning=(warning+' · ' if warning else '')+'Stored sector center; no validated polygon is shown and country-border membership is not verified.'
         features.append({'type':'Feature','geometry':geometry,'properties':{'id':row['id'],'name':row['name'],'area_ha':row['area_ha'],'geometry_status':status,'warning':warning}})
     return {'type':'FeatureCollection','features':features,'summary':{'total':len(rows),'mapped':len(features),'unmapped':len(rows)-len(features),'invalid_boundaries':invalid,'center_markers':markers,'outside_map_extent':outside}}
 
@@ -225,6 +242,9 @@ def router(auth):
         return Response(raw,media_type='application/geo+json',headers={'Cache-Control':'private, max-age=120','Vary':'Authorization','X-Forest-Cache':'HIT' if hit else 'MISS'})
     @r.get('/feature')
     def get_feature(id:str=Query(min_length=1,max_length=200),actor=Depends(auth)):return private(call(feature,id,actor))
+    @r.get('/catalogue')
+    def get_catalogue(municipality:str=Query(min_length=1,max_length=254),limit:int=Query(100,ge=1,le=100),offset:int=Query(0,ge=0,le=50000),actor=Depends(auth)):
+        return private(call(municipality_catalogue,municipality,limit,offset,actor))
     @r.get('/identify')
     def get_identify(lat:float,lon:float,zoom:int=Query(ge=4,le=19),actor=Depends(auth)):return private(call(identify,lat,lon,zoom,actor))
     @r.get('/sectors')
