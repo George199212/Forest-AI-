@@ -1,0 +1,573 @@
+{
+ "console": [
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  },
+  {
+   "type": "error",
+   "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  }
+ ],
+ "failed": [
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/16/37339/19994?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/16/37339/19995?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/16/37339/19993?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4667/2498?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4666/2499?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4667/2499?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4668/2499?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4667/2500?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/582/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/582/311?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/585/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/314?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/585/314?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/7/71/39?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/7/74/39?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/7/72/40?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/7/73/40?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/16/37340/19994?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/16/37340/19995?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/16/37338/19996?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4666/2497?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4667/2497?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4665/2498?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4668/2499?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4667/2500?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4668/2500?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4669/2500?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4669/2499?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/585/311?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/582/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/314?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/585/314?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/586/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/586/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/583/314?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "error": "net::ERR_ABORTED"
+  }
+ ],
+ "http_errors": [
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4666/2498?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4667/2500?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4668/2499?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/583/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/583/311?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/583/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/311?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/585/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/4/9/4?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/4/8/4?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/4/8/5?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/4/9/5?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4667/2500?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4668/2499?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/13/4668/2500?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/583/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/583/311?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/311?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/583/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/582/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/582/311?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/585/312?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/585/311?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/582/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/585/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/586/313?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  },
+  {
+   "url": "http://127.0.0.1:8011/api/geodata/forest-map/tiles/forest/10/584/314?v=15b2ef2b3e6b4bba295c309fa237ac49bd06772b36440c10d38d8a0b47eeb13a",
+   "status": 503
+  }
+ ],
+ "steps": {
+  "html_lang": "en",
+  "dashboard_nav_text": [
+   "◈ Overview",
+   "🗂 Objects",
+   "⬡ Sectors",
+   "◎ Map",
+   "△ Risks",
+   "⊕ GPS Sessions",
+   "▷ Truck Reports",
+   "≡ Timber",
+   "□ Photos",
+   "◆ AI Inspector",
+   "🛰 Satellite",
+   "🌲 LVM GEO",
+   "🔌 Integrations",
+   "🌳 Forest Map"
+  ],
+  "default_lang_text": [
+   "Available",
+   "Selected",
+   "Existing sectors",
+   "Boundary / geometry review",
+   "Find a forest",
+   "EN",
+   "LV",
+   "Local national catalogue",
+   "3,063,409",
+   "11-digit cadastral identifier",
+   "Find land unit",
+   "Coordinates (latitude, longitude)",
+   "Go to coordinates",
+   "All Latvia",
+   "Map layers",
+   "Satellite",
+   "Standard map",
+   "VMD forest compartments",
+   "VZD cadastral parcels · zoom 14+",
+   "Your Forest AI sectors (13/21)",
+   "Basemap imagery uses external providers; forest polygons use local data.",
+   "Compartment details",
+   "Zoom in and click a forest compartment.",
+   "Selection",
+   "No compartments selected.",
+   "Clear selection",
+   "Sector name",
+   "Responsible first name",
+   "Responsible last name",
+   "Organization: Default Organization",
+   "Import as Sector",
+   "Import uses complete original source records. Repaired, unsupported or boundary-discrepant polygons are not registered.",
+   "Forest catalogue ready · 3,063,409",
+   "+",
+   "−",
+   "50 km",
+   "Leaflet",
+   "|",
+   "Tiles © Esri",
+   "Generalized forest presence cells · zoom in for boundaries. Cells are not exact forest coverage.",
+   "placeholder:56.9496, 24.1052",
+   "aria:Language / Valoda",
+   "aria:Map layers",
+   "aria:Forest Map",
+   "aria:Zoom in",
+   "aria:Zoom out"
+  ],
+  "zoom7": {
+   "zoom": null,
+   "modes": {
+    "generalized_presence": 12
+   },
+   "badge": "Generalized forest presence cells · zoom in for boundaries. Cells are not exact forest coverage.",
+   "sectors_label": "Your Forest AI sectors (13/21)",
+   "record_count": "3,063,409",
+   "status": "Forest catalogue ready · 3,063,409"
+  },
+  "zoom11_57.25, 25.10": {
+   "modes": {},
+   "badge": "Generalized forest presence cells · zoom in for boundaries. Cells are not exact forest coverage.",
+   "status": "Some tiles failed. Pan, zoom or refresh to retry."
+  },
+  "zoom13_57.25, 25.10": {
+   "modes": {
+    "generalized_presence": 12
+   },
+   "badge": "Generalized forest presence cells · zoom in for boundaries. Cells are not exact forest coverage.",
+   "status": "Some tiles failed. Pan, zoom or refresh to retry."
+  },
+  "zoom15_57.25, 25.10": {
+   "modes": {
+    "generalized_presence": 5,
+    "simplified": 11
+   },
+   "badge": "Generalized forest presence cells · zoom in for boundaries. Cells are not exact forest coverage.",
+   "status": "Some tiles failed. Pan, zoom or refresh to retry."
+  },
+  "zoom16_56.9496, 24.1052": {
+   "modes": {
+    "simplified": 12
+   },
+   "badge": "Viewport boundaries · display geometry only. Click to inspect original records.",
+   "status": "Some tiles failed. Pan, zoom or refresh to retry."
+  },
+  "inspect": {
+   "panel": "Compartment details\n11-digit cadastral identifier\n42460030027\nVMD ID\nVMD:nodala2251:108690563\nMunicipality\nCēsu novads\nParish\nDrabešu pagasts\nForest area\n2.65 ha\nSource geometry\nValid\nImport eligibility\nReady for preview\nSelect compartment\nAdd to selection\n\nFull source geometry is checked again before registration.",
+   "status": "Viewport boundaries · display geometry only. Click to inspect original records.",
+   "select_disabled": false,
+   "add_disabled": false
+  },
+  "selection": {
+   "count": "Selected: 1 · 2.65 ha",
+   "import_disabled": false
+  },
+  "cadastral_search": {
+   "status": "Exact compartments: 10 · 7.99 ha",
+   "panel": "Exact compartments · 10\n\nAtrasti VMD nogabali. Zaļas robežas — pārbaudīti nogabali; zila robeža — VZD zemes vienība.\n\nK1 · N1 · 0.45 haK1 · N3 · 0.55 haK1 · N4 · 0.25 haK1 · N5 · 0.14 haK1 · N6 · 0.18 haK1 · N8 · 0.24 haK1 · N9 · 0.16 haK1 · N10 · 5.19 haK1 · N12 · 0.45 haK1 · N7 · 0.38 ha"
+  },
+  "bad_coordinates": "Enter latitude, longitude in Latvia (55–59, 20–29).",
+  "all_latvia": {
+   "modes": {
+    "generalized_presence": 12
+   },
+   "badge": "Generalized forest presence cells · zoom in for boundaries. Cells are not exact forest coverage."
+  },
+  "lv_text": [
+   "Pieejams",
+   "Atlasīts",
+   "Esošie sektori",
+   "Robežu / ģeometrijas pārbaude",
+   "Atrast mežu",
+   "EN",
+   "LV",
+   "Vietējā valsts datu kopa",
+   "3 063 409",
+   "11 ciparu kadastra apzīmējums",
+   "Atrast zemes vienību",
+   "Koordinātas (platums, garums)",
+   "Doties uz koordinātām",
+   "Visa Latvija",
+   "Kartes slāņi",
+   "Satelīts",
+   "Standarta karte",
+   "VMD meža nogabali",
+   "VZD zemes vienības · mērogs 14+",
+   "Jūsu Forest AI sektori (13/21)",
+   "Pamatkartes attēli izmanto ārējus avotus; meža robežas ir vietējās.",
+   "Nogabala dati",
+   "Pietuviniet un noklikšķiniet uz nogabala.",
+   "Atlase",
+   "Atlasīti: 1 · 2.65 ha",
+   "42460030027 · K531 N35",
+   "×",
+   "Notīrīt atlasi",
+   "Sektora nosaukums",
+   "Atbildīgās personas vārds",
+   "Atbildīgās personas uzvārds",
+   "Organizācija: Default Organization",
+   "Importēt kā sektoru",
+   "Imports izmanto pilnus sākotnējos avota ierakstus. Laboti, neatbalstīti vai robežām neatbilstoši nogabali netiek reģistrēti.",
+   "Meža datu kopa gatava · 3,063,409",
+   "+",
+   "−",
+   "50 km",
+   "Leaflet",
+   "|",
+   "Tiles © Esri",
+   "Vispārinātas meža klātbūtnes šūnas · pietuviniet robežām. Šūnas nav precīzs meža pārklājums.",
+   "placeholder:56.9496, 24.1052",
+   "aria:Language / Valoda",
+   "aria:Kartes slāņi",
+   "aria:Noņemt",
+   "aria:Meža karte",
+   "aria:Zoom in",
+   "aria:Zoom out"
+  ],
+  "back_to_en_title": "Forest Map"
+ }
+}

@@ -1,0 +1,72 @@
+[
+ {
+  "z": 14,
+  "tile": "9300/5015",
+  "sample": "densest",
+  "compartments_bbox": 343,
+  "read_s": 0.09,
+  "a_geojson_bytes": 118108,
+  "a_geojson_gzip": 26645,
+  "a_s": 0.05,
+  "b_mvt_gzip_bytes": 6980,
+  "b_s": 0.13,
+  "c_png_bytes": 9360,
+  "c_s": 0.1
+ },
+ {
+  "z": 14,
+  "tile": "9242/5008",
+  "sample": "median",
+  "compartments_bbox": 101,
+  "read_s": 0.06,
+  "a_geojson_bytes": 49247,
+  "a_geojson_gzip": 11878,
+  "a_s": 0.02,
+  "b_mvt_gzip_bytes": 3376,
+  "b_s": 0.04,
+  "c_png_bytes": 6109,
+  "c_s": 0.04
+ },
+ {
+  "z": 14,
+  "tile": "9328/4964",
+  "sample": "random",
+  "compartments_bbox": 30,
+  "read_s": 0.03,
+  "a_geojson_bytes": 12060,
+  "a_geojson_gzip": 2741,
+  "a_s": 0.01,
+  "b_mvt_gzip_bytes": 936,
+  "b_s": 0.01,
+  "c_png_bytes": 2426,
+  "c_s": 0.02
+ },
+ {
+  "z": 14,
+  "tile": "9241/4987",
+  "sample": "random",
+  "compartments_bbox": 11,
+  "read_s": 0.01,
+  "a_geojson_bytes": 3765,
+  "a_geojson_gzip": 744,
+  "a_s": 0.0,
+  "b_mvt_gzip_bytes": 335,
+  "b_s": 0.01,
+  "c_png_bytes": 821,
+  "c_s": 0.01
+ },
+ {
+  "z": 14,
+  "tile": "9384/4965",
+  "sample": "random",
+  "compartments_bbox": 167,
+  "read_s": 0.07,
+  "a_geojson_bytes": 70638,
+  "a_geojson_gzip": 13838,
+  "a_s": 0.03,
+  "b_mvt_gzip_bytes": 4844,
+  "b_s": 0.06,
+  "c_png_bytes": 6653,
+  "c_s": 0.04
+ }
+]

@@ -1,0 +1,26 @@
+z14 9300/5015 bbox_hits=343 mode=simplified features=342 bytes=159787 0.29s
+z14 9156/5093 bbox_hits=334 mode=simplified features=334 bytes=203972 0.25s
+z14 9303/4990 bbox_hits=314 mode=simplified features=314 bytes=160494 0.16s
+z14 9433/5023 bbox_hits=307 mode=simplified features=306 bytes=166401 0.19s
+z14 9439/5080 bbox_hits=304 mode=simplified features=303 bytes=191069 0.22s
+z14 9386/5087 bbox_hits=301 mode=simplified features=300 bytes=168571 0.26s
+z14 9429/5029 bbox_hits=300 mode=simplified features=299 bytes=175179 0.19s
+z14 9430/5029 bbox_hits=297 mode=simplified features=295 bytes=172359 0.17s
+z14 9303/4987 bbox_hits=297 mode=simplified features=297 bytes=144084 0.17s
+z14 9430/5079 bbox_hits=295 mode=simplified features=293 bytes=169751 0.16s
+z14 9451/5082 bbox_hits=294 mode=simplified features=293 bytes=207858 0.18s
+z14 9392/4995 bbox_hits=292 mode=simplified features=287 bytes=156087 0.14s
+z14 9360/5013 bbox_hits=290 mode=simplified features=289 bytes=170704 0.17s
+z14 9183/5065 bbox_hits=289 mode=simplified features=288 bytes=207294 0.18s
+z14 9416/5077 bbox_hits=288 mode=simplified features=283 bytes=187179 0.21s
+z14 9429/5030 bbox_hits=286 mode=simplified features=284 bytes=157190 0.15s
+z14 9433/5084 bbox_hits=284 mode=simplified features=284 bytes=181679 0.17s
+z14 9432/5076 bbox_hits=284 mode=simplified features=284 bytes=168112 0.17s
+z14 9356/5016 bbox_hits=284 mode=simplified features=283 bytes=180161 0.15s
+z14 9154/5032 bbox_hits=284 mode=simplified features=284 bytes=165019 0.14s
+z14 9383/4968 bbox_hits=283 mode=simplified features=281 bytes=154387 0.13s
+z14 9191/4969 bbox_hits=282 mode=simplified features=281 bytes=148493 0.17s
+z14 9368/4996 bbox_hits=281 mode=simplified features=280 bytes=165981 0.14s
+z14 9354/5017 bbox_hits=281 mode=simplified features=278 bytes=183243 0.15s
+z14 9308/5018 bbox_hits=281 mode=simplified features=280 bytes=145743 0.16s
+SUMMARY 25 densest z14 tiles: modes {'simplified': 25} max bytes 207858 max latency 0.29s

@@ -1,0 +1,5 @@
+VMD:nodala2653:73199797 kadastrs 80330040581 | inside its VZD parcel: 100.000% | outside area m2: 0.0
+VMD:nodala2852:149971413 kadastrs 38740020029 | inside its VZD parcel: 100.000% | outside area m2: -0.0 
+VMD:nodala2054:115477287 kadastrs 88500290008 | inside its VZD parcel: 100.000% | outside area m2: 0.0 
+VMD:nodala2452:50854883 kadastrs 44720060054 | inside its VZD parcel: 100.000% | outside area m2: 0.0 
+VMD:nodala2253:50162060 kadastrs 70540080007 | inside its VZD parcel: 99.987% | outside area m2: 0.4

@@ -1,0 +1,52 @@
+{
+ "11": {
+  "occupied_tiles": 654,
+  "fallback_tiles_count_rule": 611,
+  "fallback_pct": 93.43,
+  "compartments_centred_in_fallback_tiles": 3056494,
+  "pct_of_catalogue": 99.77,
+  "bbox_hits_p50": 601,
+  "bbox_hits_max_capped601": 601,
+  "seconds": 6.2
+ },
+ "12": {
+  "occupied_tiles": 2428,
+  "fallback_tiles_count_rule": 2076,
+  "fallback_pct": 85.5,
+  "compartments_centred_in_fallback_tiles": 2968390,
+  "pct_of_catalogue": 96.9,
+  "bbox_hits_p50": 601,
+  "bbox_hits_max_capped601": 601,
+  "seconds": 3.9
+ },
+ "13": {
+  "occupied_tiles": 9312,
+  "fallback_tiles_count_rule": 857,
+  "fallback_pct": 9.2,
+  "compartments_centred_in_fallback_tiles": 520839,
+  "pct_of_catalogue": 17.0,
+  "bbox_hits_p50": 380,
+  "bbox_hits_max_capped601": 601,
+  "seconds": 4.8
+ },
+ "14": {
+  "occupied_tiles": 35621,
+  "fallback_tiles_count_rule": 0,
+  "fallback_pct": 0.0,
+  "compartments_centred_in_fallback_tiles": 0,
+  "pct_of_catalogue": 0.0,
+  "bbox_hits_p50": 109,
+  "bbox_hits_max_capped601": 343,
+  "seconds": 2.9
+ },
+ "15": {
+  "occupied_tiles": 1,
+  "fallback_tiles_count_rule": 0,
+  "fallback_pct": 0.0,
+  "compartments_centred_in_fallback_tiles": 0,
+  "pct_of_catalogue": 0.0,
+  "bbox_hits_p50": 0,
+  "bbox_hits_max_capped601": 0,
+  "seconds": 0.0
+ }
+}

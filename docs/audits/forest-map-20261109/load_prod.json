@@ -1,0 +1,139 @@
+{
+ "pan_z10": {
+  "tiles": 108,
+  "wall_s": 6.2,
+  "bytes": 5264813,
+  "status": {
+   "200": 108
+  },
+  "p50_s": 0.209,
+  "p95_s": 0.349,
+  "max_s": 0.417,
+  "modes": {
+   "generalized_presence": 104,
+   "detail": 4
+  },
+  "features": 17678,
+  "server_cpu_s": 7.1,
+  "server_rss_mb_peak": 133,
+  "server_rss_mb_start": 127
+ },
+ "pan_z13": {
+  "tiles": 696,
+  "wall_s": 97.5,
+  "bytes": 80755934,
+  "status": {
+   "200": 696
+  },
+  "p50_s": 0.413,
+  "p95_s": 0.89,
+  "max_s": 1.401,
+  "modes": {
+   "simplified": 646,
+   "generalized_presence": 50
+  },
+  "features": 182515,
+  "server_cpu_s": 114.4,
+  "server_rss_mb_peak": 155,
+  "server_rss_mb_start": 133
+ },
+ "five_users_z13": [
+  {
+   "tiles": 24,
+   "wall_s": 1.6,
+   "bytes": 246019,
+   "status": {
+    "200": 3,
+    "503": 21
+   },
+   "p50_s": 0.629,
+   "p95_s": 0.629,
+   "max_s": 1.147,
+   "modes": {
+    "simplified": 2,
+    "generalized_presence": 1,
+    "null": 21
+   },
+   "features": 568,
+   "server_cpu_s": 1.6,
+   "server_rss_mb_peak": 161,
+   "server_rss_mb_start": 155
+  },
+  {
+   "tiles": 24,
+   "wall_s": 1.6,
+   "bytes": 247686,
+   "status": {
+    "200": 2,
+    "503": 22
+   },
+   "p50_s": 0.765,
+   "p95_s": 0.616,
+   "max_s": 0.915,
+   "modes": {
+    "simplified": 2,
+    "null": 22
+   },
+   "features": 575,
+   "server_cpu_s": 1.6,
+   "server_rss_mb_peak": 161,
+   "server_rss_mb_start": 155
+  },
+  {
+   "tiles": 24,
+   "wall_s": 0.8,
+   "bytes": 0,
+   "status": {
+    "503": 24
+   },
+   "p50_s": null,
+   "p95_s": null,
+   "max_s": null,
+   "modes": {
+    "null": 24
+   },
+   "features": 0,
+   "server_cpu_s": 0.8,
+   "server_rss_mb_peak": 158,
+   "server_rss_mb_start": 155
+  },
+  {
+   "tiles": 24,
+   "wall_s": 0.8,
+   "bytes": 0,
+   "status": {
+    "503": 24
+   },
+   "p50_s": null,
+   "p95_s": null,
+   "max_s": null,
+   "modes": {
+    "null": 24
+   },
+   "features": 0,
+   "server_cpu_s": 0.8,
+   "server_rss_mb_peak": 158,
+   "server_rss_mb_start": 155
+  },
+  {
+   "tiles": 24,
+   "wall_s": 1.4,
+   "bytes": 111423,
+   "status": {
+    "200": 1,
+    "503": 23
+   },
+   "p50_s": 0.717,
+   "p95_s": 0.717,
+   "max_s": 0.717,
+   "modes": {
+    "null": 23,
+    "simplified": 1
+   },
+   "features": 250,
+   "server_cpu_s": 1.5,
+   "server_rss_mb_peak": 161,
+   "server_rss_mb_start": 155
+  }
+ ]
+}

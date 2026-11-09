@@ -1,0 +1,22 @@
+id | name | status | shown | reason
+1 | A-004 | no_boundary | False | no center coordinates | REAL
+2 | A-005 | valid_boundary | True |  | REAL
+3 | A-006 | valid_boundary | True |  | REAL
+4 | A-007 — Сигулдский лес: | valid_boundary | True |  | REAL
+5 | A-008 | valid_boundary | True |  | REAL
+9 | S-004 | valid_boundary | True |  | REAL
+12 | S-001 — Mūrnieku Jāņa 0.21ha | valid_boundary | True |  | REAL
+13 | S-002 — Mūrnieku Jāņa 0.21ha | invalid_boundary | center marker | Ring Self-intersection[26.444731 56.258547] | REAL
+14 | S-003 — Mūrnieku Jāņa 0.21ha | valid_boundary | True |  | REAL
+15 | S-001 — Plieksana zeme | invalid_boundary | False | Self-intersection[32.7404859153543 58.9037702854331]; center 58.9042,32.7412 outside 55-59N/20-29E | REAL
+16 | S-002 — Plieksana zeme | invalid_boundary | False | Self-intersection[32.7406995620215 58.9038697269015]; center 58.9039,32.7407 outside 55-59N/20-29E | REAL
+17 | S-003 — Plieksana zeme | outside_map_extent | False | center 58.9038,32.7411 outside 55-59N/20-29E | REAL
+18 | S-004 | no_boundary | False | no center coordinates | REAL
+19 | Sectors 124 | no_boundary | False | no center coordinates | REAL
+20 | Ы-13223 | no_boundary | False | no center coordinates | REAL
+21 | S- 123 | no_boundary | False | no center coordinates | REAL
+26 | BIK-001 | valid_boundary | True |  | REAL
+30 | VMD 40940020002 - 1-6 | valid_boundary | True |  | REAL
+31 | VMD 40940020002 - K1 - N1 [nodala2651:49703938] | valid_boundary | True |  | REAL
+32 | VMD 40940020002 - K1 - N9 [nodala2651:49703946] | valid_boundary | True |  | REAL
+33 | VMD 40940020002 - K1 - N5 [nodala2651:49703942] | valid_boundary | True |  | REAL

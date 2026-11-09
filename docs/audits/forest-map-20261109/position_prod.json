@@ -1,0 +1,262 @@
+[
+ {
+  "external_id": "VMD:nodala2653:73199797",
+  "region": "Centra",
+  "source_crs": "EPSG:10306",
+  "vertices": 20,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   57.20625,
+   24.37655
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2852:149971413",
+  "region": "Austrumu",
+  "source_crs": "EPSG:10306",
+  "vertices": 9,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   57.05457,
+   27.03448
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2054:115477287",
+  "region": "Kurzemes",
+  "source_crs": "EPSG:10306",
+  "vertices": 19,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   57.40521,
+   22.2019
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2452:50854883",
+  "region": "Dienvidu",
+  "source_crs": "EPSG:10306",
+  "vertices": 7,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   55.76933,
+   26.37713
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2253:50162060",
+  "region": "Vidzemes",
+  "source_crs": "EPSG:10306",
+  "vertices": 40,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.88585,
+   25.64568
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2651:51127121",
+  "region": "Centra",
+  "source_crs": "EPSG:10306",
+  "vertices": 12,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.40767,
+   24.47502
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2051:164194760",
+  "region": "Kurzemes",
+  "source_crs": "EPSG:10306",
+  "vertices": 13,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.30988,
+   21.40107
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2454:49724103",
+  "region": "Dienvidu",
+  "source_crs": "EPSG:10306",
+  "vertices": 10,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   55.94608,
+   27.65908
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2653:60132558",
+  "region": "Centra",
+  "source_crs": "EPSG:10306",
+  "vertices": 5,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.9779,
+   25.12859
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2851:86927271",
+  "region": "Austrumu",
+  "source_crs": "EPSG:10306",
+  "vertices": 23,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   57.52973,
+   26.85872
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2053:111619270",
+  "region": "Kurzemes",
+  "source_crs": "EPSG:10306",
+  "vertices": 10,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.42387,
+   22.38769
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2854:124834760",
+  "region": "Austrumu",
+  "source_crs": "EPSG:10306",
+  "vertices": 37,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.67889,
+   27.56971
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2654:49828544",
+  "region": "Centra",
+  "source_crs": "EPSG:10306",
+  "vertices": 31,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.90739,
+   24.81218
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2054:134079779",
+  "region": "Kurzemes",
+  "source_crs": "EPSG:10306",
+  "vertices": 12,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   57.37501,
+   22.35377
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2654:97441374",
+  "region": "Centra",
+  "source_crs": "EPSG:10306",
+  "vertices": 7,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.93978,
+   25.36873
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2455:50277991",
+  "region": "Dienvidu",
+  "source_crs": "EPSG:10306",
+  "vertices": 5,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.23405,
+   26.69595
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2652:68203104",
+  "region": "Centra",
+  "source_crs": "EPSG:10306",
+  "vertices": 8,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.59244,
+   23.82361
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2453:51801259",
+  "region": "Dienvidu",
+  "source_crs": "EPSG:10306",
+  "vertices": 13,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.20395,
+   25.41096
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2253:161608791",
+  "region": "Vidzemes",
+  "source_crs": "EPSG:10306",
+  "vertices": 8,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   56.79686,
+   26.50959
+  ]
+ },
+ {
+  "external_id": "VMD:nodala2452:137511523",
+  "region": "Dienvidu",
+  "source_crs": "EPSG:10306",
+  "vertices": 16,
+  "stored_vs_pyproj_hausdorff_deg": 1e-09,
+  "stored_vs_pyproj_m_approx": 0.0,
+  "api_vs_pyproj_max_m": 0.0,
+  "centroid": [
+   55.90225,
+   26.09099
+  ]
+ }
+]
