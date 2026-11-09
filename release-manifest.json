@@ -1,0 +1,364 @@
+{
+  "release": "forest-api-meza-karte-20261107T084300Z",
+  "baseline_api_sha256": "dfbf12feae50688094f5584bf6750fe739357d57cfc84d7c064e4fdee1c634cb",
+  "release_api_sha256": "552c46ae547b5453e4d277724bec0038c47e07001656aaa9ad5e34ea6e51aead",
+  "runtime_files": [
+    "api.py",
+    "index.html",
+    "assets/forest-map.js",
+    "assets/forest-map.css",
+    "services/geodata/forest_map.py",
+    "lvm_3_sectors.geojson"
+  ],
+  "baseline_runtime_code_reused": [
+    "database.py",
+    "services/**",
+    "assets/** except Forest Map assets; existing map and workflow assets retained",
+    "lvm_3_sectors.geojson (unchanged local VMD test dataset, required by existing route)"
+  ],
+  "data": "symlink to /root/forest_ai/data; service DB and geodata release remain shared existing files",
+  "database_migrations": false,
+  "new_python_dependencies": [],
+  "complete_source_inventory": [
+    {
+      "path": "api.py",
+      "bytes": 128140,
+      "sha256": "552c46ae547b5453e4d277724bec0038c47e07001656aaa9ad5e34ea6e51aead"
+    },
+    {
+      "path": "assets/DejaVu-FONT-LICENSE.txt",
+      "bytes": 3859,
+      "sha256": "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9"
+    },
+    {
+      "path": "assets/DejaVuSans-Bold.ttf",
+      "bytes": 708920,
+      "sha256": "5c1247acef7f2b8522a31742c76d6adcb5569bacc0be7ceaa4dc39dd252ce895"
+    },
+    {
+      "path": "assets/DejaVuSans.ttf",
+      "bytes": 759720,
+      "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280"
+    },
+    {
+      "path": "assets/favicon.png",
+      "bytes": 7998,
+      "sha256": "6c34314300e37c5732ba1b946a9ad220ab3d6a1e78fd1db037a557cd84a6a39a"
+    },
+    {
+      "path": "assets/forest-map.css",
+      "bytes": 3274,
+      "sha256": "35388526859d61928b9ef382b085c18807df167e460ccfcccbb83daf321b3af2"
+    },
+    {
+      "path": "assets/forest-map.js",
+      "bytes": 25347,
+      "sha256": "146298f3f4c0161ce1d4d202126b7eeefc3fb267c8ecc9c0d1bb7bb6a813b247"
+    },
+    {
+      "path": "assets/i18n-lv.js",
+      "bytes": 38928,
+      "sha256": "130b9ed072028d2dd86895930aa92df2d731808f37466ff33ab61d017ed8ee5f"
+    },
+    {
+      "path": "assets/john-deere-logo.png",
+      "bytes": 9354,
+      "sha256": "7f4159d0cf61dc193c8e1e918fc2a5a21362629652b512d4bac24e217f367b96"
+    },
+    {
+      "path": "assets/logo.jpg",
+      "bytes": 124131,
+      "sha256": "bbfa1bfb738753d017204e264869140c48ef6b54f9c974411fedc58cb1cdf45e"
+    },
+    {
+      "path": "assets/logo.png",
+      "bytes": 203136,
+      "sha256": "e069be303307f83f18ee552811df5f754126eed73d50496d5149a6191b9484b2"
+    },
+    {
+      "path": "assets/lvm-geodata.js",
+      "bytes": 20490,
+      "sha256": "526878d69fc2957968be60ce6feb7076520c86de231a1a4eedd05b913b39c798"
+    },
+    {
+      "path": "assets/lvm-wms-map.js",
+      "bytes": 5491,
+      "sha256": "6518a74a020322afcaf3a856f189a8a1aea52785a90c7fb0fd220b583c3569b3"
+    },
+    {
+      "path": "assets/vmd-local.js",
+      "bytes": 12896,
+      "sha256": "1dc5f326ecd48a13da5a8a2e796ee34001e442eebaec6cd48f40ef5b4ec7734b"
+    },
+    {
+      "path": "assets/vmd-production.js",
+      "bytes": 23055,
+      "sha256": "494fefb9351ae723d32934ac88aa6aca3b23da66468b53baca0624269a1941ee"
+    },
+    {
+      "path": "assets/vmd-workflow.css",
+      "bytes": 8642,
+      "sha256": "9b69c18ec6384b5da8c60388762d8c104e2e59a19a01fed4f04e7023d9fcc489"
+    },
+    {
+      "path": "database.py",
+      "bytes": 84631,
+      "sha256": "22f191917869f76b53aba3be106975cfdf0a7e3059707098717d516735e8e2dd"
+    },
+    {
+      "path": "index.html",
+      "bytes": 292981,
+      "sha256": "4480cb6dafa60eed174401ab950d47b4b1874b52156d19f648a59b43a2ebb11d"
+    },
+    {
+      "path": "lvm_3_sectors.geojson",
+      "bytes": 4557,
+      "sha256": "97067e4f56a6b72a8e042594d4ddb4f970b9f24673e943568bec760ea364625c"
+    },
+    {
+      "path": "services/ai_resolution.py",
+      "bytes": 7600,
+      "sha256": "716cebc7d691db042467e958ff9caa9f41762fbbe7ae4ac106a9c79499b346c7"
+    },
+    {
+      "path": "services/demo_scenarios.py",
+      "bytes": 53751,
+      "sha256": "1ff0ad3091b374c63c8ec2173c765a6806a1b0e5a9e5adc5fb9d6c387f669a7d"
+    },
+    {
+      "path": "services/geo.py",
+      "bytes": 2955,
+      "sha256": "9fa00523ff42e1b3d8c7c3db92009308ef7e68cdec22501d29d085907d0b65a7"
+    },
+    {
+      "path": "services/geodata/__init__.py",
+      "bytes": 83,
+      "sha256": "3ee20485af703bc43f155dfe7dbb83e702542652379f24f55051c2b475d4a764"
+    },
+    {
+      "path": "services/geodata/base.py",
+      "bytes": 596,
+      "sha256": "7fe969d97c3c30ca85be2c0e11bb30590dc593086665d9cfa1315cc3c4c5ee9c"
+    },
+    {
+      "path": "services/geodata/cadastral_authority.py",
+      "bytes": 4496,
+      "sha256": "7df3c520db2a5d7299e4dba625727b9260f0faa99bedb70100a8d8c9c89e9787"
+    },
+    {
+      "path": "services/geodata/forest_map.py",
+      "bytes": 14071,
+      "sha256": "8690dd9b056611b49192dbff0f82e0362de2126287d91179effb6e2e8ffc9f4e"
+    },
+    {
+      "path": "services/geodata/forestry_io.py",
+      "bytes": 9276,
+      "sha256": "9c1dcefbd1ee3cd2a854ad958aed27249d13980509040899302d9516c5cc0080"
+    },
+    {
+      "path": "services/geodata/lvm_geo.py",
+      "bytes": 17710,
+      "sha256": "ca251f381077a807fd3bd65c8f726ef669d34a8b98fbf8075c68272cdff7c2d5"
+    },
+    {
+      "path": "services/geodata/nationwide.py",
+      "bytes": 18235,
+      "sha256": "bb7188e793e66d3de36d527a0bb055fc364ca4c2d9218f21a78a59a65e83f140"
+    },
+    {
+      "path": "services/geodata/registration_identity.py",
+      "bytes": 1753,
+      "sha256": "d768b0dbfc721e7dd85ad390cf82a13a406db79d10c6f3f08ef7c631df98b00b"
+    },
+    {
+      "path": "services/geodata/routes.py",
+      "bytes": 3893,
+      "sha256": "4be3c443bec3024bfa6c5128457bb207bf3fcc261bcd791400d54c5f0954a4ff"
+    },
+    {
+      "path": "services/geodata/store.py",
+      "bytes": 14653,
+      "sha256": "1905ee7bc085ed2c7b459b579c258dbeb40a2961f40e8146120295684d675d1a"
+    },
+    {
+      "path": "services/geodata/vmd_dataset.py",
+      "bytes": 33287,
+      "sha256": "750ac148a90aac3145201039dcd9979168c8fad46795e6e81d88308f8f3f52cb"
+    },
+    {
+      "path": "services/geodata/vmd_local.py",
+      "bytes": 9171,
+      "sha256": "c4ee053f7c45d1529703eb5546cbaf4834c4abb2ed5bca2dd71021fe35d97fdf"
+    },
+    {
+      "path": "services/geodata/vmd_production.py",
+      "bytes": 6583,
+      "sha256": "3a1368729f64b108de21309cc511b27cddf8d0ffc1762f92e195be313031db85"
+    },
+    {
+      "path": "services/geodata/vmd_test.py",
+      "bytes": 3893,
+      "sha256": "a6c05946c671316b61b9a5157fa4dc49b21ff5a1e79f1a403319d8ba9426ed35"
+    },
+    {
+      "path": "services/integrations/__init__.py",
+      "bytes": 530,
+      "sha256": "4f7edb8992b98a567e7c4a7b094bb8505c91c3d096385dec9f9b3bf3bc5b5bbf"
+    },
+    {
+      "path": "services/integrations/base.py",
+      "bytes": 10971,
+      "sha256": "4aee91590d55d18614d2a0bac9883e38c0d20b29f846ce1ba6fc72f3d66d24f4"
+    },
+    {
+      "path": "services/integrations/categories.py",
+      "bytes": 6996,
+      "sha256": "8f7894ef103b599e2dd4c560defba5362057a80509e83018ab15d72860e186f7"
+    },
+    {
+      "path": "services/integrations/crypto.py",
+      "bytes": 2214,
+      "sha256": "310998c4a81300b340cef036e47c6c6683a0362816fa12d01ad15743b36619d0"
+    },
+    {
+      "path": "services/integrations/demo/__init__.py",
+      "bytes": 294,
+      "sha256": "25d602616b4776a4a1caf5aed982f181db21d6ed92b0b9eb2fc292d93a903895"
+    },
+    {
+      "path": "services/integrations/demo/fleet_gps_demo.py",
+      "bytes": 4864,
+      "sha256": "96f5ab2bb591fc5748e818c3cda8760f71f82ee2e8f8534f9a665bc22af20e73"
+    },
+    {
+      "path": "services/integrations/demo/sentinel_demo.py",
+      "bytes": 3876,
+      "sha256": "42cd115827e88c0487c4814a853c90497cb37ed6cef9c317acf7b098c0a0e4ba"
+    },
+    {
+      "path": "services/integrations/demo/weighbridge_demo.py",
+      "bytes": 4478,
+      "sha256": "2b5dac43f77e1fc8412366c7dd993682174a2ce3e51671f9f285665e3f4276ac"
+    },
+    {
+      "path": "services/integrations/john_deere.py",
+      "bytes": 16531,
+      "sha256": "7dbd83f9c583a4be5835c9e4f6792531b5814b9b4e9e322848c53a92b1929d52"
+    },
+    {
+      "path": "services/integrations/john_deere_diagnostics.py",
+      "bytes": 8429,
+      "sha256": "2591331773433300cbe40dbf6a2c4e5477066e82b0352bec68a2bedfa8c8d947"
+    },
+    {
+      "path": "services/integrations/john_deere_iso.py",
+      "bytes": 3986,
+      "sha256": "e2763a6a221e2ca1b313f0db9748fde1d29ad8dd7dac6eba7073dc1ee950fb3f"
+    },
+    {
+      "path": "services/integrations/john_deere_machines.py",
+      "bytes": 9266,
+      "sha256": "31367fbfbdd19f66db88f8f2be8ebe0c863afde9a7aaf0a5f9b6c666cc08b743"
+    },
+    {
+      "path": "services/integrations/john_deere_routes.py",
+      "bytes": 7990,
+      "sha256": "4188cd2c4628a1e2358a9d9053e337a406114dc24f7b36bbd01dfb3e7e3b1c44"
+    },
+    {
+      "path": "services/integrations/john_deere_sync.py",
+      "bytes": 30529,
+      "sha256": "3eb8bd8289770271d551afddf0accc38bfd19a14bc1ca89928ec4923d7bc611c"
+    },
+    {
+      "path": "services/integrations/manager.py",
+      "bytes": 10754,
+      "sha256": "0e10e91dde5a0e65893f4fea4f1cc6dafbf6bac28111ad6972a4a865bb2dc378"
+    },
+    {
+      "path": "services/integrations/registry.py",
+      "bytes": 9249,
+      "sha256": "79b394a4b3b54cb7594e20008fdf1e43645dc9fd68c1f856c5a2dae8b2e1ac62"
+    },
+    {
+      "path": "services/integrations/risk_rules.py",
+      "bytes": 9956,
+      "sha256": "ef445636883cd9d9752864539e782031a63891bf89c7d1cd46a780b06d5ebd2c"
+    },
+    {
+      "path": "services/photo_compare.py",
+      "bytes": 60458,
+      "sha256": "eceafbe815659ac87ac1cf3f1e6bc8e44fccc76518c08459ca20aae5a8871f08"
+    },
+    {
+      "path": "services/risk_ai_worker.py",
+      "bytes": 23036,
+      "sha256": "c61ac6bea5d6334827303b0e3206fe64ea2fe6a3d4cb60a73fb8f2d0c6eb2ac4"
+    },
+    {
+      "path": "services/risk_conclusion.py",
+      "bytes": 32071,
+      "sha256": "55f31b88be252ef53b7b4dc707f5fc9c6b4469834a73350447c4802db3e100be"
+    },
+    {
+      "path": "services/robez_ocr_vision.py",
+      "bytes": 33372,
+      "sha256": "a01cb7d73fa1e0c31801422b498b6144b033f9c133dff4d8ba672facf21fe81b"
+    },
+    {
+      "path": "services/satellite_intelligence/__init__.py",
+      "bytes": 1379,
+      "sha256": "634e4d894f7fb77e34959cdcc3e4e8c1765d93d9ff208551b1314efc41bfb179"
+    },
+    {
+      "path": "services/satellite_intelligence/decision_engine.py",
+      "bytes": 15543,
+      "sha256": "d15512a4aaf4e49f1742ee4bb3f20e172332710e74eb96f5715537e6db59c720"
+    },
+    {
+      "path": "services/satellite_intelligence/events.py",
+      "bytes": 13979,
+      "sha256": "4c3b561da830e81396cdde6d525843f4ee3e295b4d22ce377ab71d545626a74d"
+    },
+    {
+      "path": "services/satellite_intelligence/inspector_bridge.py",
+      "bytes": 7060,
+      "sha256": "575613874483b8e2de927376de87f40e8637d2c6003d74212eb5961d251b98d1"
+    },
+    {
+      "path": "services/satellite_intelligence/models.py",
+      "bytes": 3052,
+      "sha256": "a290197d0f76f1f1f3521b0f71911a36b6f22006d9b2d6d4180496a3e5dd7eb3"
+    },
+    {
+      "path": "services/satellite_intelligence/providers/__init__.py",
+      "bytes": 610,
+      "sha256": "fb01b3ac8efc3f8bc186394ed78ce425cb602f2aaaa12563c8eb9c924f78bd37"
+    },
+    {
+      "path": "services/satellite_intelligence/providers/base.py",
+      "bytes": 1730,
+      "sha256": "789f9812136dc6b433c64902350353d70cbb30f2b15e8130b384a14c74945c92"
+    },
+    {
+      "path": "services/satellite_intelligence/providers/commercial.py",
+      "bytes": 3067,
+      "sha256": "9b15a297681508fa5e760d68b5cdb847605d965a933c20825de8f32ddf08eb67"
+    },
+    {
+      "path": "services/satellite_intelligence/providers/sentinel.py",
+      "bytes": 8217,
+      "sha256": "ccfdaeac24d98a6ef6c99af36606210b4a1561472ee6c2ba33e4bc0070525788"
+    },
+    {
+      "path": "services/satellite_intelligence/risk_score.py",
+      "bytes": 10169,
+      "sha256": "4d97b79b0d2499cbfd0cf5b67e4a2f5e313d62a7e020279c2d44b912b7a375cd"
+    },
+    {
+      "path": "services/session_track.py",
+      "bytes": 16922,
+      "sha256": "c48336978bd8fa19f001d862050b19783fd2c2c7ae70fcc2cf352b94afc0ae8a"
+    }
+  ]
+}
