@@ -43,6 +43,8 @@ def init_db():
 
     # Safe migrations — add new columns/tables if they don't exist
     _migrate()
+    from services.geodata.store import init_schema as _init_geodata_schema
+    _init_geodata_schema(DB_NAME)
 
 
 def _add_column_if_missing(cur, table, column, definition):
@@ -74,6 +76,11 @@ def _migrate():
         ("sectors", "satellite_file_path", "TEXT"),
         # REAL | SIMULATED (a sector that exists only for a demo; demo adapters may only touch these).
         ("sectors", "data_origin", "TEXT DEFAULT 'REAL'"),
+        ("sectors", "organization_id", "INTEGER DEFAULT 1"),
+        ("sectors", "created_by_user_id", "TEXT"),
+        ("sectors", "created_by_account", "TEXT"),
+        ("sectors", "responsible_first_name", "TEXT"),
+        ("sectors", "responsible_last_name", "TEXT"),
     ]
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -193,6 +200,20 @@ def _migrate():
     )
     """)
     _add_column_if_missing(cur, "sector_equipment", "is_demo", "INTEGER DEFAULT 0")
+    # Deere readiness extends the existing sector-assigned equipment model.
+    # No machines, sectors, telemetry points, or risks are seeded by this migration.
+    for column, definition in {
+        "provider": "TEXT", "external_account_id": "TEXT", "external_organization_id": "TEXT",
+        "external_machine_id": "TEXT", "machine_name": "TEXT", "serial_number": "TEXT",
+        "latitude": "REAL", "longitude": "REAL", "location_timestamp": "TEXT",
+        "engine_hours": "REAL", "operating_hours": "REAL", "machine_status": "TEXT",
+        "last_alert": "TEXT", "last_synchronization_time": "REAL",
+    }.items():
+        _add_column_if_missing(cur, "sector_equipment", column, definition)
+    cur.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_equipment_deere_identity
+        ON sector_equipment(provider, external_account_id, external_organization_id, external_machine_id)
+        WHERE provider='john_deere' AND external_machine_id IS NOT NULL""")
+
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS vehicle_fuel_logs (
@@ -618,6 +639,79 @@ def _migrate():
         created_at TEXT
     )
     """)
+
+    # John Deere Phase 1: additive, isolated from operational and demo data.
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS john_deere_oauth (
+        provider TEXT NOT NULL DEFAULT 'john_deere',
+        account_id TEXT PRIMARY KEY,
+        encrypted_tokens TEXT NOT NULL,
+        expires_at REAL NOT NULL,
+        connected_at REAL NOT NULL,
+        updated_at REAL NOT NULL,
+        status TEXT NOT NULL,
+        diagnostics_json TEXT NOT NULL DEFAULT '{}'
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS john_deere_sessions (
+        session_hash TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        csrf_token TEXT NOT NULL,
+        oauth_state TEXT,
+        state_expires_at REAL,
+        expires_at REAL NOT NULL
+    )
+    """)
+
+    # Phase 2B: provider references and equipment telemetry in existing domain tables.
+    for column, definition in {
+        "telemetry_timestamp": "TEXT", "telemetry_health": "TEXT",
+        "geofence_status": "TEXT", "restricted_zone_status": "TEXT",
+        "device_status": "TEXT", "provider_links_json": "TEXT",
+        "engine_hours_timestamp": "TEXT", "operating_hours_timestamp": "TEXT", "device_status_timestamp": "TEXT",
+    }.items():
+        _add_column_if_missing(cur, "sector_equipment", column, definition)
+    # Phase 2A had no automatic creation; global provider identity must now be unique.
+    # If pre-existing bindings conflict, index creation fails safely for review.
+    cur.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_equipment_provider_identity
+        ON sector_equipment(provider, external_machine_id)
+        WHERE provider IS NOT NULL AND external_machine_id IS NOT NULL""")
+    for column, definition in {"provider": "TEXT", "source": "TEXT", "source_timestamp": "TEXT",
+                               "provider_record_key": "TEXT"}.items():
+        _add_column_if_missing(cur, "vehicle_gps_pings", column, definition)
+    cur.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_gps_provider_record
+        ON vehicle_gps_pings(provider, equipment_id, provider_record_key)
+        WHERE provider_record_key IS NOT NULL""")
+    for column, definition in {"provider": "TEXT", "sync_type": "TEXT", "completed_at": "TEXT",
+            "organizations_processed": "INTEGER DEFAULT 0", "machines_processed": "INTEGER DEFAULT 0",
+            "telemetry_records_processed": "INTEGER DEFAULT 0", "errors_count": "INTEGER DEFAULT 0",
+            "result_json": "TEXT"}.items():
+        _add_column_if_missing(cur, "integration_sync_runs", column, definition)
+    cur.execute("""CREATE TABLE IF NOT EXISTS integration_organizations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        external_organization_id TEXT NOT NULL,
+        organization_name TEXT,
+        external_account_id TEXT NOT NULL,
+        connection_status TEXT,
+        last_sync_at TEXT,
+        UNIQUE(provider, external_organization_id)
+    )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS integration_provider_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        event_key TEXT NOT NULL,
+        external_event_id TEXT,
+        equipment_id INTEGER NOT NULL,
+        risk_id INTEGER,
+        event_timestamp TEXT,
+        severity TEXT,
+        description TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        last_sync_at TEXT,
+        UNIQUE(provider, equipment_id, event_key)
+    )""")
 
     _create_photo_compare_tables(cur)
     _create_risk_conclusion_table(cur)

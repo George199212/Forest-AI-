@@ -74,6 +74,7 @@ CHILD_RULES = [
 
 # Emptied completely, even rows tagged with a kept sector (reported as a warning).
 WIPE_TABLES = [
+    "geodata_previews",
     "integration_credentials",
     "integration_logs",
     "integration_sync_runs",
