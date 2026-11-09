@@ -3,7 +3,7 @@ Forest AI — Full Commercial API
 Run: uvicorn api:app --host 0.0.0.0 --port 8000
 """
 
-import sqlite3, os, io, math, json, secrets, requests
+import sqlite3, os, io, math, json, secrets, requests, hashlib, re
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List
@@ -65,6 +65,54 @@ def verify_credentials(credentials: HTTPBasicCredentials = Depends(_basic_auth))
 
 
 app = FastAPI(title="Forest AI API", dependencies=[Depends(verify_credentials)])
+
+# Uses the same HTTP Basic authentication as every dashboard route.
+from services.integrations.john_deere_routes import router as deere_router, CallbackPrivacyMiddleware
+app.add_middleware(CallbackPrivacyMiddleware)
+app.include_router(deere_router(verify_credentials))
+
+# External geodata is isolated from operational GPS/risk execution.
+from services.geodata.routes import router as geodata_router
+app.include_router(geodata_router(verify_credentials))
+from services.geodata.vmd_production import router as vmd_production_router
+app.include_router(vmd_production_router(verify_credentials))
+from services.geodata.forest_map import router as forest_map_router
+app.include_router(forest_map_router(verify_credentials))
+
+@app.get("/api/geodata/vmd/test-sectors")
+def vmd_test_compartments():
+    """Return the configured local GeoJSON under dashboard authentication."""
+    from services.geodata.vmd_test import read_test_compartments, VmdTestDataError
+    try:
+        data = read_test_compartments()
+    except VmdTestDataError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    from services.geodata.vmd_local import dataset_version
+    return Response(content=json.dumps(data, ensure_ascii=False, allow_nan=False),
+                    media_type="application/geo+json",
+                    headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                             "ETag": '"'+dataset_version(data)+'"'})
+
+
+
+from services.geodata.vmd_local import LocalImportRequest, require_json_mutation
+
+
+@app.get("/api/geodata/vmd/local-status")
+def vmd_local_status():
+    from services.geodata.vmd_local import local_status
+    from services.geodata.vmd_test import VmdTestDataError
+    try:
+        return local_status()
+    except VmdTestDataError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@app.post("/api/geodata/vmd/import", dependencies=[Depends(require_json_mutation)])
+def vmd_local_import(body: LocalImportRequest, actor: str = Depends(verify_credentials)):
+    raise HTTPException(409, 'Kadastra dati nav pārbaudīti; izmantojiet pārbaudīto VMD katalogu un reģistrācijas priekšskatījumu')
+
+
 
 
 @app.on_event("startup")
@@ -523,12 +571,32 @@ def inspector_report_issue(body: ReportIssueIn):
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 
+# Captured at process startup so diagnostics identify the code actually loaded.
+_BACKEND_REVISION = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
+
+def frontend_deployment():
+    files = [Path('index.html'), Path('assets/lvm-geodata.js'), Path('assets/vmd-production.js'), Path('assets/vmd-workflow.css'), Path('assets/forest-map.js'), Path('assets/forest-map.css')]
+    hashes = {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files if path.is_file()}
+    digest = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:12]
+    return {'version': 'geo-' + digest, 'backend_revision': _BACKEND_REVISION,
+            'frontend_revision': digest, 'assets': hashes}
+
+@app.get('/api/deployment')
+def deployment_info():
+    return frontend_deployment()
+
+
 @app.get("/", response_class=HTMLResponse)
 def serve_index():
     p = Path("index.html")
     if not p.exists():
         return HTMLResponse("<h1>Forest AI</h1>")
     html = p.read_text(encoding="utf-8")
+    # Activate the UI only when this backend version (and its routes) is running.
+    html = html.replace('<script src="/assets/lvm-geodata.js?v=20261106"></script>',
+                        '<script>window.FOREST_GEODATA_ENABLED=true;</script>\n<script src="/assets/lvm-geodata.js?v=20261106"></script>', 1)
+    html = html.replace('<script src="/assets/forest-map.js?v=20261107"></script>',
+                        '<script>window.FOREST_MAP_ENABLED=true;</script>\n<script src="/assets/forest-map.js?v=20261107"></script>', 1)
     # Per-instance UI language (client accounts, see docs/CLIENT_INSTANCES.md).
     # Unset = the page is served unchanged. "lv" loads assets/i18n-lv.js, a
     # display-only translation layer; data and API responses are not changed.
@@ -536,7 +604,20 @@ def serve_index():
     if ui_lang and ui_lang.isalpha() and Path(f"assets/i18n-{ui_lang}.js").exists():
         html = html.replace('<html lang="en">', f'<html lang="{ui_lang}">', 1)
         html = html.replace("</head>", f'<script src="/assets/i18n-{ui_lang}.js"></script>\n</head>', 1)
-    return HTMLResponse(html)
+    deployment = frontend_deployment()
+    html = html.replace('</head>', '<meta name="forest-deployment" content="'+deployment['version']+'">\n</head>', 1)
+    html = re.sub(r'(<(?:p|span) id="geodata-build"[^>]*>)', lambda match: match.group(1)+'Versija: '+deployment['version'], html, count=1)
+    # Fingerprint local scripts by content, including scripts retained by cached tabs.
+    def fingerprint(match):
+        filename = match.group(1)
+        asset = Path('assets') / filename
+        if not asset.is_file(): return match.group(0)
+        version = hashlib.sha256(asset.read_bytes()).hexdigest()[:12]
+        return ('href' if match.group(0).startswith('href') else 'src')+'="/assets/' + filename + '?v=' + version + '"'
+    html = re.sub(r'src="/assets/([^"?]+\.js)(?:\?[^"<>]*)?"', fingerprint, html)
+    html = re.sub(r'href="/assets/([^"?]+\.css)(?:\?[^"<>]*)?"', fingerprint, html)
+    return HTMLResponse(html, headers={'Cache-Control':'no-store, max-age=0',
+                                      'Vary':'Authorization', 'X-Forest-Deployment':deployment['version']})
 
 @app.get("/photos/file/{filename}")
 def serve_photo_file(filename: str):
@@ -549,7 +630,8 @@ def serve_photo_file(filename: str):
 def serve_asset(filename: str):
     path = Path("assets") / filename
     if path.exists():
-        return FileResponse(str(path))
+        headers = {'Cache-Control':'private, no-cache, must-revalidate'} if path.suffix in {'.js','.css'} else None
+        return FileResponse(str(path), headers=headers)
     return Response(status_code=404)
 
 
@@ -1929,9 +2011,24 @@ def photo_cmp_review_change(change_id: int, body: PhotoCmpReviewIn, username: st
 
 # ── Map data ──────────────────────────────────────────────────────────────────
 
+@app.get("/api/map/machines")
+def get_map_machines():
+    from services.integrations.john_deere_sync import public_machines
+    return public_machines()
+
+
 @app.get("/api/map")
 def get_map_data():
     sectors = db("SELECT * FROM sectors")
+    sources = {}
+    for source in db("SELECT sector_id,provider,source_feature_id,source_dataset_title,source_properties FROM geodata_sources"):
+        metadata = json.loads(source.pop('source_properties'))
+        source['client_id'] = metadata.get('organization_id',metadata.get('client_id'))
+        source['organization_id'] = metadata.get('organization_id')
+        source['responsible_first_name'] = metadata.get('responsible_first_name')
+        source['responsible_last_name'] = metadata.get('responsible_last_name')
+        source['client_name'] = metadata.get('organization_name',metadata.get('client_name'))
+        sources[source['sector_id']] = source
     result = []
     for s in sectors:
         rs = calc_risk_score(s["name"])
@@ -1949,6 +2046,8 @@ def get_map_data():
             except Exception:
                 pass
         result.append({
+            "id":          s["id"],
+            "source":      sources.get(s["id"]),
             "name":        s["name"],
             "contractor":  s.get("contractor", ""),
             "status":      s.get("status", ""),
@@ -1987,6 +2086,14 @@ def generate_pdf(sector_name: str):
     if "error" in data:
         return Response(content='{"error":"Sector not found"}', media_type="application/json", status_code=404)
 
+    from urllib.parse import quote
+    from xml.sax.saxutils import escape
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    for font_name, filename in [('ForestSans', 'DejaVuSans.ttf'), ('ForestSans-Bold', 'DejaVuSans-Bold.ttf')]:
+        if font_name not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(font_name, str(Path(__file__).resolve().parent / 'assets' / filename)))
+    pdfmetrics.registerFontFamily('ForestSans', normal='ForestSans', bold='ForestSans-Bold', italic='ForestSans', boldItalic='ForestSans-Bold')
     sector = data["sector"]
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
@@ -1998,17 +2105,17 @@ def generate_pdf(sector_name: str):
     AMBER  = colors.HexColor("#d4a017")
 
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("title", fontSize=22, textColor=DARK, spaceAfter=4, fontName="Helvetica-Bold")
-    h2_style    = ParagraphStyle("h2", fontSize=14, textColor=GREEN, spaceAfter=6, spaceBefore=16, fontName="Helvetica-Bold")
-    body_style  = ParagraphStyle("body", fontSize=10, textColor=DARK, spaceAfter=4, fontName="Helvetica")
-    small_style = ParagraphStyle("small", fontSize=9, textColor=colors.gray, fontName="Helvetica")
+    title_style = ParagraphStyle("title", fontSize=22, textColor=DARK, spaceAfter=4, fontName="ForestSans-Bold")
+    h2_style    = ParagraphStyle("h2", fontSize=14, textColor=GREEN, spaceAfter=6, spaceBefore=16, fontName="ForestSans-Bold")
+    body_style  = ParagraphStyle("body", fontSize=10, textColor=DARK, spaceAfter=4, fontName="ForestSans")
+    small_style = ParagraphStyle("small", fontSize=9, textColor=colors.gray, fontName="ForestSans")
 
     story = []
 
     # Header
-    story.append(Paragraph("Forest AI", ParagraphStyle("logo", fontSize=11, textColor=GREEN, fontName="Helvetica-Bold")))
+    story.append(Paragraph("Forest AI", ParagraphStyle("logo", fontSize=11, textColor=GREEN, fontName="ForestSans-Bold")))
     story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph(f"Sector Report — {sector_name}", title_style))
+    story.append(Paragraph(f"Sector Report — {escape(sector_name)}", title_style))
     story.append(Paragraph(f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", small_style))
     story.append(HRFlowable(width="100%", thickness=1, color=GREEN, spaceAfter=12))
 
@@ -2023,7 +2130,7 @@ def generate_pdf(sector_name: str):
     t = Table(info_data, colWidths=[3.5*cm, 5*cm, 3.5*cm, 5*cm])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0,0), (0,-1), LGRAY), ("BACKGROUND", (2,0), (2,-1), LGRAY),
-        ("FONTNAME", (0,0), (-1,-1), "Helvetica"), ("FONTSIZE", (0,0), (-1,-1), 9),
+        ("FONTNAME", (0,0), (-1,-1), "ForestSans"), ("FONTSIZE", (0,0), (-1,-1), 9),
         ("GRID", (0,0), (-1,-1), 0.5, colors.lightgrey),
         ("ROWBACKGROUNDS", (0,0), (-1,-1), [colors.white, colors.HexColor("#fafaf8")]),
         ("PADDING", (0,0), (-1,-1), 6),
@@ -2040,7 +2147,7 @@ def generate_pdf(sector_name: str):
         tbl.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,0), GREEN),
             ("TEXTCOLOR", (0,0), (-1,0), colors.white),
-            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTNAME", (0,0), (-1,0), "ForestSans-Bold"),
             ("FONTSIZE", (0,0), (-1,-1), 8),
             ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, LGRAY]),
             ("GRID", (0,0), (-1,-1), 0.3, colors.lightgrey),
@@ -2061,7 +2168,7 @@ def generate_pdf(sector_name: str):
         t = Table(d, colWidths=[5*cm, 5*cm, 3*cm, 4*cm])
         t.setStyle(TableStyle([
             ("BACKGROUND",(0,0),(-1,0),GREEN),("TEXTCOLOR",(0,0),(-1,0),colors.white),
-            ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,-1),8),
+            ("FONTNAME",(0,0),(-1,0),"ForestSans-Bold"),("FONTSIZE",(0,0),(-1,-1),8),
             ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,LGRAY]),
             ("GRID",(0,0),(-1,-1),0.3,colors.lightgrey),("PADDING",(0,0),(-1,-1),5),
         ]))
@@ -2076,7 +2183,7 @@ def generate_pdf(sector_name: str):
         t = Table(d, colWidths=[3*cm, 14*cm])
         t.setStyle(TableStyle([
             ("BACKGROUND",(0,0),(-1,0),GREEN),("TEXTCOLOR",(0,0),(-1,0),colors.white),
-            ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,-1),8),
+            ("FONTNAME",(0,0),(-1,0),"ForestSans-Bold"),("FONTSIZE",(0,0),(-1,-1),8),
             ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,LGRAY]),
             ("GRID",(0,0),(-1,-1),0.3,colors.lightgrey),("PADDING",(0,0),(-1,-1),5),
             ("WORDWRAP",(1,1),(-1,-1),True),
@@ -2095,7 +2202,7 @@ def generate_pdf(sector_name: str):
         t = Table(d, colWidths=[3*cm,3*cm,3*cm,3.5*cm,4.5*cm])
         t.setStyle(TableStyle([
             ("BACKGROUND",(0,0),(-1,0),GREEN),("TEXTCOLOR",(0,0),(-1,0),colors.white),
-            ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,-1),8),
+            ("FONTNAME",(0,0),(-1,0),"ForestSans-Bold"),("FONTSIZE",(0,0),(-1,-1),8),
             ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,LGRAY]),
             ("GRID",(0,0),(-1,-1),0.3,colors.lightgrey),("PADDING",(0,0),(-1,-1),5),
         ]))
@@ -2113,7 +2220,7 @@ def generate_pdf(sector_name: str):
         t = Table(d, colWidths=[4*cm,4*cm,3*cm,6*cm])
         t.setStyle(TableStyle([
             ("BACKGROUND",(0,0),(-1,0),GREEN),("TEXTCOLOR",(0,0),(-1,0),colors.white),
-            ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,-1),8),
+            ("FONTNAME",(0,0),(-1,0),"ForestSans-Bold"),("FONTSIZE",(0,0),(-1,-1),8),
             ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,LGRAY]),
             ("GRID",(0,0),(-1,-1),0.3,colors.lightgrey),("PADDING",(0,0),(-1,-1),5),
         ]))
@@ -2145,10 +2252,11 @@ def generate_pdf(sector_name: str):
 
     doc.build(story)
     buf.seek(0)
+    filename = f"forest_ai_{sector_name}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
     return StreamingResponse(
         buf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=forest_ai_{sector_name}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"}
+        headers={"Content-Disposition": "attachment; filename=forest_ai_report.pdf; filename*=UTF-8''" + quote(filename, safe='')}
     )
 
 
