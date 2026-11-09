@@ -1,0 +1,13 @@
+{
+  "_comment": "Example only. The real file lives outside git (FOREST_TELEGRAM_TENANTS_FILE, default data/telegram/tenants.json). Admin ids come from FOREST_TELEGRAM_ADMIN_IDS; invite codes from FOREST_TENANT_INVITE_<KEY>. Never put real Telegram ids or invite codes here.",
+  "default_admin_tenant": "example",
+  "tenants": {
+    "example": {
+      "name": "Example Client",
+      "tenant": "example-client",
+      "sector": "EX-001",
+      "project": "<instance directory>",
+      "database": "<instance directory>/data/forest_ai.db"
+    }
+  }
+}
