@@ -1,13 +1,17 @@
 # Deploy releases (`releases/`): how :8000 is deployed today
 
-State as of 2026-11-09 11:44 UTC (activation of the Forest Map GPS release). Mirrors of the live
-systemd files are in `deploy/systemd/` (the `70-` drop-in below is not mirrored there yet).
+State as of 2026-11-09 16:28 UTC (activation of the Forest Map violations release). Mirrors of the
+live systemd files are in `deploy/systemd/` (the `70-`/`90-` drop-ins below are not mirrored there yet).
+
+**Rule (AGENTS.md / CLAUDE.md):** agents may create NEW folders in `/root/forest_ai/releases/`, never
+modify or delete existing ones. Production never runs from a worktree path. Activation (drop-in
+change + restart) only after an explicit human OK in the chat.
 
 ## Which code runs on each port
 
 | port | unit | code location | git |
 |---|---|---|---|
-| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-forest-map-gps-20261109T1129Z` (via drop-in `70-forest-map-gps-release.conf`) | tag `prod-2026-11-09-forest-map-gps` (= master `2e901c7`), dashboard version `geo-9c94d506a565`, backend `552c46ae547b`. **Not all live files are in git**: see "Live files not in git" below |
+| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-forest-map-violations-20261109T1623Z` (via drop-in `90-forest-map-violations-release.conf`) | tag `prod-2026-11-09-forest-map-violations` (master), dashboard version `geo-3b9cdfaac106`, backend `552c46ae547b`. **Not all live files are in git**: see "Live files not in git" below |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
 | 8003 | `forest-review-api` | `/root/forest_ai_review` (copy of `84cb00b`) | 84cb00b |
@@ -15,14 +19,19 @@ systemd files are in `deploy/systemd/` (the `70-` drop-in below is not mirrored 
 
 The root of `/root/forest_ai` is **not** what :8000 serves.
 
-### Live files not in git (as of 2026-11-09)
+### Live files not in git (as of 2026-11-09, still true for the violations release)
 
-The active release was built by copying the then-live meza-karte folder and replacing only the
-five Forest Map/GPS files. The meza-karte folder had been edited in place earlier that day:
+The violations release was built from the remove-map-sidebar release, which was built from the GPS
+release, which was built by copying the then-live meza-karte folder and replacing only the
+five Forest Map/GPS files. Compared with master at the tag, exactly these 4 runtime files differ:
+`assets/lvm-geodata.js`, `assets/vmd-production.js`, `assets/vmd-workflow.css`, `index.html`. The meza-karte folder had been edited in place earlier that day:
 - `assets/lvm-geodata.js`, `assets/vmd-production.js`, `assets/vmd-workflow.css` and `index.html`
   are the versions from `feature/boundary-plan@fd3d2c6` (LVM GEO), which is not merged into master.
 - `index.html` additionally has a manual edit (10:19 UTC) hiding the Photos, AI, AI Inspector and
   Satellite navigation items. It is in no branch.
+- The sidebar change (Map item removed) and the Forest Map deep-link route **are** in master
+  (`feature/remove-map-sidebar`, `feature/forest-map-violations`); in the live `index.html` they
+  sit on top of the two items above.
 
 The exact inventory (path, size, SHA-256) is `release-manifest.json` in the release folder. Until
 these are committed, a release built from git alone would revert them.
@@ -35,8 +44,21 @@ these are committed, a release built from git alone would revert them.
   forest-api-meza-karte-20261107T084300Z         ROLLBACK TARGET for :8000 (previous active release)
   forest-api-forest-map-audit-20261107T1645Z     candidate, never activated (superseded)
   forest-api-forest-map-finish-20261109T1023Z    prepared, never activated (contained in the GPS release)
-  forest-api-forest-map-gps-20261109T1129Z       ACTIVE on :8000 since 2026-11-09 11:44 UTC (geo-9c94d506a565)
+  forest-api-forest-map-gps-20261109T1129Z       was active 2026-11-09 11:44–14:31 UTC (geo-9c94d506a565)
+  forest-api-remove-map-sidebar-20261109T1431Z   ROLLBACK TARGET for :8000: permanent copy (diff -r = 0) of
+                                                 /root/wt/remove-map-sidebar/releases/forest-api-remove-map-sidebar-20261109,
+                                                 which was active 14:31–16:28 UTC from that worktree path (geo-091ed8e852f9)
+  forest-api-forest-map-violations-20261109T1623Z ACTIVE on :8000 since 2026-11-09 16:28 UTC (geo-3b9cdfaac106)
 ```
+
+### History of :8000
+
+| from (UTC) | release | geo- | how |
+|---|---|---|---|
+| 2026-11-07 08:52 | `forest-api-meza-karte-20261107T084300Z` | c5801dc23be5 (later edited in place) | `50-` drop-in |
+| 2026-11-09 11:44 | `forest-api-forest-map-gps-20261109T1129Z` | 9c94d506a565 | `70-` drop-in |
+| 2026-11-09 14:31 | worktree `/root/wt/remove-map-sidebar/releases/forest-api-remove-map-sidebar-20261109` | 091ed8e852f9 | `80-` drop-in (from a worktree; not documented at the time) |
+| 2026-11-09 16:28 | `forest-api-forest-map-violations-20261109T1623Z` | 3b9cdfaac106 | `90-` drop-in; `80-` removed |
 
 - **Name:** `forest-api-<feature-slug>-<UTC timestamp YYYYMMDDTHHMM[SS]Z>`. The timestamp is
   when the release was cut. The audit candidate's folder name includes `1645Z`.
@@ -137,6 +159,27 @@ sorted-key JSON of `{path: sha256}`. The paths are `index.html`,
    so compartment alerts are off.
 4. Ran `systemctl daemon-reload && systemctl restart forest-api`. Only `forest-api` was restarted.
 
+## Activation record: forest-map-violations (2026-11-09 16:28 UTC)
+
+1. Rollback copy `forest-api-remove-map-sidebar-20261109T1431Z` made from the live worktree folder
+   (`cp -a`, `diff -r --no-dereference` = 0, served version `geo-091ed8e852f9` = live).
+2. Release copied from the worktree build (`diff -r` = 0); `pre-activation-check.sh <rollback copy>`
+   printed OK (70 release files match the manifest, 69 baseline files unchanged).
+3. Backups: DB `/root/backups/forest_ai_before_violations_20261109T162758Z.db` (`sqlite3 .backup`, `integrity_check` = ok, 1.3 MB);
+   unit files `/root/backups/forest-api.service.d-20261109T162811Z/` and `/root/backups/forest-api.service-20261109T162811Z`.
+4. Removed `80-remove-map-sidebar-release.conf` (worktree path), added
+   `90-forest-map-violations-release.conf`:
+   ```ini
+   [Service]
+   WorkingDirectory=/root/forest_ai/releases/forest-api-forest-map-violations-20261109T1623Z
+   ```
+   `50-` and `70-` stay in place and are overridden. `FOREST_GPS_COMPARTMENT_ALERTS` is not set (off).
+5. `systemctl daemon-reload && systemctl restart forest-api`. Only `forest-api` restarted; forest-bot and
+   :8002/:8003/:8004 kept their PIDs.
+6. Verified: `/api/deployment` = `geo-3b9cdfaac106`; `#forest-map` shows the session #32 red segment, exit/
+   re-entry flags and the "Pārkāpumi" list with incident #62 without clicks; sidebar change present;
+   `#lvm-geodata`, Risks, sector Map tab (11 min 00 s / 3 min 21 s) unchanged; no tracebacks.
+
 ## Rollback
 
 Roll back code only. Do **not** restore the DB backup over live user writes unless a
@@ -148,7 +191,16 @@ remain in place.
   It checks `releases/forest-api-baseline-.../api.py` has SHA-256 `dfbf12fe…`, installs
   `rollback-release.conf` over `50-meza-karte-release.conf`, runs `daemon-reload`, restarts
   `forest-api` and checks it is active.
-- **forest-map-gps → meza-karte (current rollback target):**
+- **forest-map-violations → remove-map-sidebar (current rollback target):**
+  ```sh
+  printf '[Service]\nWorkingDirectory=/root/forest_ai/releases/forest-api-remove-map-sidebar-20261109T1431Z\n' \
+    > /etc/systemd/system/forest-api.service.d/90-forest-map-violations-release.conf
+  systemctl daemon-reload && systemctl restart forest-api
+  readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd   # → …/forest-api-remove-map-sidebar-20261109T1431Z
+  ```
+  Confirm `/api/deployment` reports `geo-091ed8e852f9`. No data to restore (no migrations). Incidents
+  created with the "Izveidot incidentu" button remain as ordinary incidents.
+- **forest-map-gps → meza-karte (older):**
   ```sh
   rm -f /etc/systemd/system/forest-api.service.d/70-forest-map-gps-release.conf /etc/systemd/system/forest-api.service.d/71-forest-gps-alerts.conf
   systemctl daemon-reload && systemctl restart forest-api
