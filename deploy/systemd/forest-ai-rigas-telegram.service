@@ -1,0 +1,28 @@
+[Unit]
+Description=Forest AI rigas Telegram tenant worker (no polling)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/forest_ai_rm
+EnvironmentFile=/root/forest_ai_rm/.env
+EnvironmentFile=/root/forest_ai_rm/.telegram.env
+Environment=FOREST_TENANT_KEY=rigas
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=TMPDIR=/root/forest_ai_rm/data/tmp
+Environment=XDG_CACHE_HOME=/root/forest_ai_rm/data/cache
+ExecStart=/usr/bin/python3 /root/forest_ai_telegram/worker.py
+Restart=always
+RestartSec=5
+UMask=0077
+ProtectSystem=strict
+ReadWritePaths=/root/forest_ai_rm /run/forest-ai-telegram-locks
+InaccessiblePaths=/root/forest_ai /root/forest_ai_ingka /root/forest_ai_review
+PrivateTmp=true
+NoNewPrivileges=true
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

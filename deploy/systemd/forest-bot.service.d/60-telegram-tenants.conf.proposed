@@ -1,0 +1,17 @@
+# PROPOSED — NOT INSTALLED. Cutover step 1 in docs/TELEGRAM_TENANTS.md.
+# systemd ignores this file name; to activate, a human copies it to
+# /etc/systemd/system/forest-bot.service.d/60-telegram-tenants.conf
+#
+# Turns on the versioned router (telegram_tenant_router.py + telegram_tenants/) in the
+# main poller. All paths point at the CURRENT live files, so the first cutover changes
+# the code location only, not the data location.
+[Service]
+Environment=FOREST_TENANT_ROUTING=1
+Environment=FOREST_TELEGRAM_TENANTS_FILE=/root/forest_ai_telegram/config.json
+Environment=FOREST_TELEGRAM_ROUTING_DB=/root/forest_ai_telegram/routing.db
+Environment=FOREST_TELEGRAM_LOCK_DIR=/run/forest-ai-telegram-locks
+# Invite codes (FOREST_TENANT_INVITE_<KEY>=...) are not committed. Create this file
+# (mode 0600) before activation, holding the invite currently hard-coded in the live
+# router. FOREST_TELEGRAM_ADMIN_IDS may also go there; if unset, "admin_ids" from
+# config.json is used, exactly as today.
+EnvironmentFile=/root/forest_ai_telegram/tenants.env
