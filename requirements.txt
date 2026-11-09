@@ -16,3 +16,16 @@ cryptography==50.0.1
 
 # Dev/test only
 pytest>=9.1.1
+
+# Existing FastAPI file/form routes and TestClient runtime dependencies
+python-multipart==0.0.32
+httpx==0.28.1
+
+# External geodata polygon validation (installed on production at inspection)
+shapely==2.1.2
+
+# Territory uploads in LKS-92 / Latvia TM with explicit x,y axis order
+pyproj==3.7.2
+
+# Native geodata normalization used by the indexed VMD loaders
+numpy==2.5.2

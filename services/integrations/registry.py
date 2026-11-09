@@ -79,7 +79,8 @@ def _catalog() -> list[ProviderEntry]:
                        status_claim="demo"),
 
         # ── GIS / maps ────────────────────────────────────────────────────
-        ProviderEntry("lvm_geo", "gis", "LVM GEO", "LVM", status_claim="planned"),
+        ProviderEntry("lvm_geo", "gis", "LVM GEO", "LVM", status_claim="available",
+                       notes="Dedicated geodata browser: /#lvm-geodata. Live WMS/WFS status is verified there; no automatic sector sync."),
         ProviderEntry("gis_generic", "gis", "Corporate GIS system", "generic", status_claim="planned"),
         ProviderEntry("geo_file_import", "gis", "GeoJSON / KML / GPX / Shapefile import", "generic",
                        status_claim="planned", notes="Stage 2."),
