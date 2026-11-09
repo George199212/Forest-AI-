@@ -7,3 +7,20 @@
 .forest-map-popup .forest-map-next{color:#4d5c50}
 .forest-map-hover{font-size:12px}
 #fm-sector-list ul{margin:.3rem 0 0;padding-left:1.1rem;font-size:12px}
+/* GPS layer: colour = origin; SIMULATED dashed so it never looks like real data; stale faded */
+.fm-gps{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.fm-gps svg{width:15px;height:15px;fill:#fff}
+.fm-gps.fm-o-REAL{background:#2f80ed}.fm-gps.fm-o-SIMULATED{background:#b14fd8;border-style:dashed}.fm-gps.fm-o-SANDBOX{background:#f2994a}.fm-gps.fm-o-UNKNOWN{background:#9aa4ad}
+.fm-gps.fm-stale{opacity:.45;filter:grayscale(.6)}
+.fm-gps[data-class="INSIDE_UNREGISTERED_COMPARTMENT"]{outline:3px solid #e5484d;outline-offset:1px}
+.fm-o-label{display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:12px}
+.fm-o-label::before{content:"";width:10px;height:10px;border-radius:50%;display:inline-block}
+.fm-o-label.fm-o-REAL::before{background:#2f80ed}.fm-o-label.fm-o-SIMULATED::before{background:#b14fd8}.fm-o-label.fm-o-SANDBOX::before{background:#f2994a}.fm-o-label.fm-o-UNKNOWN::before{background:#9aa4ad}
+.fm-gps-row{display:flex;flex-wrap:wrap;gap:6px 12px;margin:.3rem 0;font-size:12px}
+.fm-gps-row label{display:inline-flex;align-items:center;gap:5px;margin:0;width:auto}
+.fm-gps-row input[type=checkbox]{width:auto;margin:0}
+.fm-gps-stale{width:4.5rem}
+.fm-gps-window{display:flex;flex-wrap:wrap;gap:6px;margin:.4rem 0}
+.fm-track-end{display:flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#111;color:#fff;font:700 11px/1 sans-serif;border:2px solid #fff}
+.fm-track-photo{font-size:16px;color:#fff;text-shadow:0 0 3px #000}
+#fm-gps-track ul{margin:.3rem 0;padding-left:1.1rem;font-size:12px}

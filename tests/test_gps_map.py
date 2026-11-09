@@ -216,3 +216,16 @@ def test_gps_endpoints(world, monkeypatch):
     assert client.get('/api/geodata/forest-map/gps/track', params={'kind':'nope', 'id':'7', 'start':'2026-11-09T00:00:00Z', 'end':'2026-11-09T12:00:00Z'}).status_code == 422
     t = client.get('/api/geodata/forest-map/gps/track', params={'kind':'worker', 'id':'7', 'start':'2026-11-09T00:00:00Z', 'end':'2026-11-09T12:00:00Z'})
     assert t.status_code == 200 and len(t.json()['points']) == 2
+
+
+def test_integration_mirror_ping_is_shown_once_with_integration_origin(world):
+    lat, lon = wgs(X0+2000, Y0)
+    with sqlite3.connect(world) as c:
+        c.execute("INSERT INTO integrations(id,organization_id,category,provider,integration_type,display_name,is_demo) VALUES(3,1,'fleet','fleet_gps_demo','api','Fleet demo',1)")
+        c.execute("INSERT INTO integration_records(integration_id,organization_id,source_provider,entity_type,external_id,sector,source_timestamp,received_at,raw_payload_json,normalized_payload_json,validation_status,deduplication_key) VALUES(3,1,'fleet_gps_demo','GPSPosition','D-1:t','S-1','2026-11-09T11:55:00Z',?,'{}',?,'VALID','D-1:t')",
+                  (ts(NOW), json.dumps({'vehicle_id':'D-1', 'sector':'S-1', 'latitude':lat, 'longitude':lon, 'source_timestamp':'2026-11-09T11:55:00Z'})))
+        c.execute("INSERT INTO vehicle_gps_pings(vehicle_id,sector,latitude,longitude,inside_boundary,recorded_at,entity_type) VALUES('D-1','S-1',?,?,0,?,'VEHICLE')", (lat, lon, ts(NOW)))
+    entities = gps.positions(1, now=NOW)['entities']
+    assert [(e['name'], e['origin']) for e in entities] == [('D-1', 'SIMULATED')]
+    t = gps.track(1, 'vehicle', 'D-1', NOW-timedelta(hours=1), NOW+timedelta(minutes=1))
+    assert t['origins'] == ['SIMULATED']

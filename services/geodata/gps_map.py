@@ -133,6 +133,23 @@ def _ping_origin(row):
     return 'UNKNOWN'   # bot pings are stored without provider/source; provenance cannot be proven
 
 
+def _integration_mirrors(c):
+    """Fleet integrations also copy each GPSPosition into vehicle_gps_pings without provenance
+    (categories.FleetIntegrationAdapter). A ping with the same vehicle id and identical coordinates
+    as a stored integration record is that record: it takes the integration's origin."""
+    out = {}
+    for r in c.execute("SELECT r.normalized_payload_json,i.is_demo FROM integration_records r JOIN integrations i ON i.id=r.integration_id WHERE r.entity_type='GPSPosition'"):
+        try:p = json.loads(r['normalized_payload_json'])
+        except (TypeError, ValueError):continue
+        if p.get('latitude') is not None and p.get('longitude') is not None:
+            out[(str(p.get('vehicle_id')), float(p['latitude']), float(p['longitude']))] = 'SIMULATED' if r['is_demo'] else 'REAL'
+    return out
+
+
+def _mirror_origin(mirrors, row):
+    return mirrors.get((str(row['vehicle_id']), float(row['latitude']), float(row['longitude']))) if row['latitude'] is not None else None
+
+
 def _machine_kind(vehicle_type):
     text = (vehicle_type or '').lower()
     return 'machine' if any(k in text for k in ('harvest', 'forward', 'excavat', 'ekskav', 'harvest', 'forvard')) else 'vehicle'
@@ -161,9 +178,12 @@ def positions(organization_id, stale_minutes=STALE_MINUTES, now=None):
                                    r['latitude'], r['longitude'], r['updated_at'], acc[0] if acc else None, 'REAL',
                                    {'live_until':_iso(_parse(r['expires_at']))}, classify, now, stale_minutes))
             # Vehicles / equipment pings: newest per entity; origin from stored provenance only.
+            # Pings that mirror an integration record are shown once, as that record (below).
+            mirrors = _integration_mirrors(c)
             for r in c.execute('''SELECT p.*,v.plate,v.vehicle_type,q.equipment_code,q.type AS equipment_type FROM vehicle_gps_pings p
                     LEFT JOIN sector_vehicles v ON v.id=p.vehicle_id LEFT JOIN sector_equipment q ON q.id=p.equipment_id
                     WHERE p.id IN (SELECT max(id) FROM vehicle_gps_pings GROUP BY COALESCE(equipment_id,-1),COALESCE(vehicle_id,-1),COALESCE(entity_type,''))'''):
+                if _mirror_origin(mirrors, r):continue
                 equipment = r['equipment_id'] is not None
                 kind = 'machine' if equipment else _machine_kind(r['vehicle_type'])
                 name = r['equipment_code'] if equipment else (r['plate'] or ('#'+str(r['vehicle_id'])))
@@ -196,8 +216,9 @@ def _points(c, kind, ident, start, end):
         return [dict(r, origin='REAL', ref_table='session_track_points') for r in rows]
     if kind in ('vehicle', 'equipment'):
         column = 'equipment_id' if kind == 'equipment' else 'vehicle_id'
-        rows = c.execute(f'SELECT id,latitude,longitude,recorded_at,provider FROM vehicle_gps_pings WHERE {column}=? ORDER BY recorded_at,id', (ident,)).fetchall()
-        return [dict(r, horizontal_accuracy=None, session_id=None, origin=_ping_origin(r), ref_table='vehicle_gps_pings') for r in rows]
+        rows = c.execute(f'SELECT id,vehicle_id,latitude,longitude,recorded_at,provider FROM vehicle_gps_pings WHERE {column}=? ORDER BY recorded_at,id', (ident,)).fetchall()
+        mirrors = _integration_mirrors(c)
+        return [dict(r, horizontal_accuracy=None, session_id=None, origin=_mirror_origin(mirrors, r) or _ping_origin(r), ref_table='vehicle_gps_pings') for r in rows]
     if kind == 'simulated':
         out = []
         for r in c.execute("SELECT id,normalized_payload_json FROM integration_records WHERE source_provider='fleet_gps_demo' AND entity_type='GPSPosition' ORDER BY id"):
