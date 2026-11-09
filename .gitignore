@@ -28,3 +28,17 @@ LEAFLET_CHECK.txt
 LEAFLET_*.txt
 Screenshot*.png
 kling_*.png
+
+# Editors may create credential-bearing environment swap files
+..env.sw?
+.env.sw?
+
+# Deploy snapshots: production code is in git (tag prod-*); see docs/DEPLOY_RELEASES.md
+releases/
+
+# Manual page backups
+index.html.backup-*
+
+# Verification evidence stays on the VPS; only its README is versioned
+docs/evidence/*
+!docs/evidence/README.md
