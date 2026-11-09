@@ -16,7 +16,7 @@ below protect production and each other's work.
   ```
 - Never edit these paths, not even "temporarily":
   - `/root/forest_ai` (the root checkout)
-  - `/root/forest_ai/releases/*`
+  - existing folders in `/root/forest_ai/releases/` (see "Release folders" below)
   - `/root/forest_ai/data/*`
   - `/root/forest_ai_rm`
   - `/root/forest_ai_ingka`
@@ -26,6 +26,13 @@ below protect production and each other's work.
 - Never restart, stop or reload services. Deployment is a separate step that a human
   approves; see `docs/DEPLOY_RELEASES.md`. Port 8000 is served from a `releases/` folder,
   not from the repo root.
+
+### Release folders
+
+- Agents MAY create NEW release folders in `/root/forest_ai/releases/`. Never modify or delete
+  existing ones.
+- Production must never run from a worktree path (`/root/wt/...`) or any other temporary path.
+- Activation (drop-in change + restart) ONLY after explicit human OK in the chat.
 
 ## 2. Data and secrets
 
