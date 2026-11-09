@@ -1,0 +1,131 @@
+{
+ "console": [],
+ "failed": [],
+ "http_errors": [],
+ "checks": {
+  "country_view_density_cells": {
+   "ok": true,
+   "detail": {
+    "generalized_presence": 12
+   }
+  },
+  "country_hint_lv": {
+   "ok": true,
+   "detail": "Ierakstu blīvums ~1,3 km šūnās (nav meža platība). Nogabalu robežas redzamas no mēroga 13."
+  },
+  "z13_no_fallback_dense_gauja": {
+   "ok": true,
+   "detail": {
+    "simplified": 16
+   }
+  },
+  "z13_no_fallback_densest_z13": {
+   "ok": true,
+   "detail": {
+    "simplified": 16
+   }
+  },
+  "z13_no_fallback_riga": {
+   "ok": true,
+   "detail": {
+    "simplified": 16
+   }
+  },
+  "no_tile_errors": {
+   "ok": true,
+   "detail": {
+    "tiles": 60,
+    "maxBytes": 365679,
+    "maxFeatures": 734,
+    "aborted": 0,
+    "errors": 0,
+    "drawMs": 580.9000043869019,
+    "queued": 0,
+    "running": 0
+   }
+  },
+  "hover_tooltip": {
+   "ok": true,
+   "detail": "42460030027 · K531 N35 · 2.65 ha"
+  },
+  "popup_fields_lv": {
+   "ok": true,
+   "detail": "Meža nogabals | Kadastra apzīmējums | 42460030027 | Kvartāls | 531 | Nogabals | 35 | Platība | 2.65 ha | Datu avots | VMD · nodala2251 | Avota ID | VMD:nodala2251:108690563 | Kadastra saistība | VMD avota atribūts pārbaudīts | Ģeometrija | Derīga | Reģistrācijas iespēja | Gatavs priekšskatījumam | A"
+  },
+  "popup_select_add_enabled": {
+   "ok": true,
+   "detail": [
+    [
+     "Atlasīt nogabalu",
+     false
+    ],
+    [
+     "Pievienot atlasei",
+     false
+    ]
+   ]
+  },
+  "added_to_selection": {
+   "ok": true,
+   "detail": "Atlasīti: 1 · 2.65 ha"
+  },
+  "review_reason_review": {
+   "ok": true,
+   "detail": [
+    "Ko darīt: pirms reģistrācijas salīdziniet ar VZD zemes vienību (kadastra meklēšana).",
+    "",
+    "Atlasīt nogabalu",
+    "Pievienot atlasei"
+   ]
+  },
+  "review_reason_invalid": {
+   "ok": true,
+   "detail": [
+    "Ko darīt: izvēlieties citu nogabalu vai ziņojiet par ierakstu VMD.",
+    "",
+    "Atlasīt nogabalu",
+    "Pievienot atlasei"
+   ]
+  },
+  "sector_reasons_listed": {
+   "ok": true,
+   "detail": "Kartē nav attēloti · 8 | A-004 — nav robežas | S-001 — Plieksana zeme — nederīga robeža (pašķrustojas) | S-002 — Plieksana zeme — nederīga robeža (pašķrustojas) | S-003 — Plieksana zeme — ārpus Latvijas, pārbaudiet koordinātas | S-004 — nav robežas | Sectors 124 — nav robežas | Ы-13223 — nav robežas | S- 123 — nav robežas | S-004 — ārpus Latvijas teritorijas, pārbaudiet koordinātas"
+  },
+  "sector_label": {
+   "ok": true,
+   "detail": "Jūsu Forest AI sektori (39/47)"
+  },
+  "registration_result_dialog": {
+   "ok": true,
+   "detail": "Reģistrācijas rezultāts | Izveidotie sektori · 1 | DEMO Meža karte 101939 | Atvērt Sektori | Aizvērt"
+  },
+  "result_link_opens_sectors": {
+   "ok": true,
+   "detail": "#sectors"
+  },
+  "lv_no_english_ui": {
+   "ok": true,
+   "detail": []
+  },
+  "en_no_latvian_ui": {
+   "ok": true,
+   "detail": []
+  },
+  "lvm_geodata_no_console_errors": {
+   "ok": true,
+   "detail": []
+  },
+  "no_console_errors": {
+   "ok": true,
+   "detail": []
+  },
+  "no_failed_non_tile_requests": {
+   "ok": true,
+   "detail": []
+  },
+  "no_http_errors": {
+   "ok": true,
+   "detail": []
+  }
+ }
+}

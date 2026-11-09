@@ -1,0 +1,54 @@
+{
+ "initial_country_view": {
+  "tile_requests": 12,
+  "status": {
+   "200": 12
+  },
+  "transfer_bytes": 136509,
+  "body_bytes": 132909,
+  "gzip": 0,
+  "latency_p50_ms": 203,
+  "latency_max_ms": 657,
+  "idle_s": 1.81,
+  "longtask_ms": 296
+ },
+ "zoom13_view": {
+  "tile_requests": 16,
+  "status": {
+   "200": 16
+  },
+  "transfer_bytes": 3119761,
+  "body_bytes": 3114961,
+  "gzip": 0,
+  "latency_p50_ms": 2551,
+  "latency_max_ms": 5018,
+  "idle_s": 14.66,
+  "longtask_ms": 630
+ },
+ "zoom13_five_pans": {
+  "tile_requests": 28,
+  "status": {
+   "200": 28
+  },
+  "transfer_bytes": 4388175,
+  "body_bytes": 4379775,
+  "gzip": 0,
+  "latency_p50_ms": 1502,
+  "latency_max_ms": 3457,
+  "idle_s": 11.85,
+  "longtask_ms": 710
+ },
+ "zoom12_view": {
+  "tile_requests": 16,
+  "status": {
+   "200": 16
+  },
+  "transfer_bytes": 214156,
+  "body_bytes": 209356,
+  "gzip": 0,
+  "latency_p50_ms": 654,
+  "latency_max_ms": 1424,
+  "idle_s": 3.91,
+  "longtask_ms": 0
+ }
+}

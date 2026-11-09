@@ -1,0 +1,31 @@
+distinct tiles 448 status Counter({200: 448})
+zoom | tiles | detail | presence(fallback) | other | completeness% min | median | tiles 100% | max index_exact in a 100% tile | bytes p50/max | latency s p50/max
+   7 |     6 |      0 |                  6 |     0 |               0.0 |    0.0 |    0/6    |        0 | 41715/133483 | 0.00/0.09
+   8 |    16 |      0 |                 16 |     0 |               0.0 |    0.0 |    0/16   |        0 | 23207/37805 | 0.01/0.01
+   9 |    33 |      0 |                 33 |     0 |               0.0 |    0.0 |    0/33   |        0 | 7968/9513 | 0.01/0.02
+  10 |    45 |      0 |                 45 |     0 |               0.0 |    0.0 |    0/45   |        0 | 2319/2549 | 0.01/0.01
+  11 |    48 |      0 |                 48 |     0 |               0.0 |    0.0 |    0/48   |        0 | 779/889 | 0.01/0.01
+  12 |    50 |      0 |                 50 |     0 |               0.0 |    0.0 |    0/50   |        0 | 483/507 | 0.00/0.01
+  13 |    50 |     50 |                  0 |     0 |             100.0 |  100.0 |   46/50   |      802 | 93859/411509 | 0.09/0.45
+  14 |    50 |     50 |                  0 |     0 |             100.0 |  100.0 |   36/50   |      209 | 16785/151069 | 0.02/0.23
+  15 |    50 |     50 |                  0 |     0 |             100.0 |  100.0 |   27/50   |       58 | 2190/38287 | 0.01/0.10
+  16 |    50 |     50 |                  0 |     0 |             100.0 |  100.0 |   21/50   |       29 | 167/16541 | 0.01/0.03
+  17 |    50 |     50 |                  0 |     0 |             100.0 |  100.0 |   18/50   |       10 | 163/5998 | 0.01/0.03
+
+category x zoom: fraction of sampled tiles that render individual compartments (detail mode)
+zoom | border | coastal | dense | riga | sparse | water
+  10 | 0/6 | 0/9 | 0/13 | 0/4 | 0/16 | 0/2
+  11 | 0/6 | 0/9 | 0/13 | 0/4 | 0/16 | 0/2
+  12 | 0/6 | 0/9 | 0/13 | 0/4 | 0/16 | 0/2
+  13 | 6/6 | 9/9 | 13/13 | 4/4 | 16/16 | 2/2
+  14 | 6/6 | 9/9 | 13/13 | 4/4 | 16/16 | 2/2
+  15 | 6/6 | 9/9 | 13/13 | 4/4 | 16/16 | 2/2
+  16 | 6/6 | 9/9 | 13/13 | 4/4 | 16/16 | 2/2
+  17 | 6/6 | 9/9 | 13/13 | 4/4 | 16/16 | 2/2
+
+detail tiles with completeness<100:
+
+bbox hits of fallback tiles at z11-16 (why fallback):
+ z11: 48 tiles, index_bbox_hits min/median/max = 0/3438/9285
+ z12: 50 tiles, index_bbox_hits min/median/max = 0/751/2436
+detail tiles: index_bbox_hits max 804  features max 802
