@@ -12,10 +12,10 @@ from pathlib import Path
 import numpy as np
 import shapely
 from shapely.geometry import box, mapping, Point
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 
-from . import gps_map as gps, nationwide as nw, vmd_dataset as data
+from . import gps_map as gps, gps_violations as gv, nationwide as nw, vmd_dataset as data
 from .registration_identity import context
 
 # Compartment boundaries are drawn from DETAIL_MIN_ZOOM (median compartment about 8 px);
@@ -294,5 +294,28 @@ def router(auth):
             except ValueError as exc:raise HTTPException(422,'Invalid entity id') from exc
         try:return private(call(gps.track,context(actor)['organization_id'],kind,ident,begin,finish))
         except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+    def entity(kind,id):
+        if kind=='simulated':return id
+        try:return int(id)
+        except ValueError as exc:raise HTTPException(422,'Invalid entity id') from exc
+    def guarded(fn,*args):
+        try:return private(call(fn,*args))
+        except LookupError as exc:raise HTTPException(404,str(exc)) from exc
+        except PermissionError as exc:raise HTTPException(409,str(exc)) from exc
+        except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+    KIND=Query(pattern='^(worker|vehicle|equipment|simulated)$')
+    @r.get('/gps/sessions')
+    def get_gps_sessions(kind:str=KIND,id:str=Query(min_length=1,max_length=120)):
+        return guarded(gv.sessions,kind,entity(kind,id))
+    @r.get('/gps/violations')
+    def get_gps_violations(kind:str=KIND,id:str=Query(min_length=1,max_length=120),session:str=Query(pattern=r'^(\d{1,9}|\d{4}-\d{2}-\d{2})$'),actor=Depends(auth)):
+        return guarded(gv.violations,context(actor)['organization_id'],kind,entity(kind,id),session)
+    @r.get('/gps/session/{session_id}')
+    def get_gps_session(session_id:int,actor=Depends(auth)):
+        return guarded(gv.session_violations,context(actor)['organization_id'],session_id)
+    @r.post('/gps/violations/incident')
+    def post_gps_incident(session_id:int=Body(ge=1),exit_point_id:int=Body(ge=1),actor=Depends(auth)):
+        # Human action only: the authenticated dashboard account is recorded as the actor.
+        return guarded(gv.create_incident,context(actor)['organization_id'],session_id,exit_point_id,actor)
     gps.start_alert_loop()
     return r

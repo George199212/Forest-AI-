@@ -123,6 +123,17 @@ class Classifier:
         return {'class':INSIDE_COMPARTMENT, 'compartment':{'id':row['external_id'], 'catalogue_id':row['id'], 'kadastrs':row['kadastrs'], 'kvart':row['kvart'], 'nog':row['nog']}}
 
 
+def assigned_status(polygon, lat, lon, accuracy_m):
+    """Position vs the entity's OWN assigned sector: INSIDE / OUTSIDE / UNKNOWN (accuracy radius crosses
+    the boundary or is worse than MAX_ACCURACY_M), or None when that sector has no valid polygon."""
+    if polygon is None or lat is None or lon is None:return None
+    if accuracy_m is not None and accuracy_m > MAX_ACCURACY_M:return UNKNOWN
+    x, y = _TO_NATIVE(lon, lat)
+    area = Point(x, y).buffer(accuracy_m) if accuracy_m else Point(x, y)
+    if polygon.covers(area):return 'INSIDE'
+    return UNKNOWN if polygon.intersects(area) else 'OUTSIDE'
+
+
 def _sandbox_origin():
     return 'REAL' if os.environ.get('JOHN_DEERE_ENV', 'sandbox').strip().lower() == 'production' else 'SANDBOX'
 
@@ -207,6 +218,8 @@ def positions(organization_id, stale_minutes=STALE_MINUTES, now=None):
                 out.append(_entity('vehicle', {'kind':'simulated', 'id':vehicle}, vehicle, p.get('sector'), p.get('latitude'), p.get('longitude'),
                                    p.get('source_timestamp'), None, 'SIMULATED', {'provider':'fleet_gps_demo'}, classify, now, stale_minutes))
     finally:classify.close()
+    polygons = dict(classify.sectors)
+    for e in out:e['assigned_status'] = assigned_status(polygons.get(e['assigned_sector']), e['lat'], e['lon'], e['accuracy_m'])
     return {'generated_at':_iso(now), 'stale_minutes':stale_minutes, 'max_accuracy_m':MAX_ACCURACY_M, 'entities':out}
 
 
