@@ -4493,6 +4493,7 @@ function routeFromHash() {
   }
   if ((m = h.match(/^object-(\d+)$/))) return {type:'object', id: parseInt(m[1], 10)};
   if ((m = h.match(/^risk\/(\d+)$/))) return {type:'risk', id: parseInt(m[1], 10)};
+  if ((m = h.match(/^forest-map\/session-(\d+)$/))) return {type:'nav', id:'forest-map', session: parseInt(m[1], 10)};
   if (h === 'financial-breakdown') return {type:'financial-breakdown'};
   if (h === 'integration-detail') return {type:'nav', id:'integrations'};
   if (h !== 'risk-detail' && Object.prototype.hasOwnProperty.call(loaders, h)) return {type:'nav', id: h};
@@ -4519,7 +4520,10 @@ function openRoute(route) {
     }).catch(() => fallback('risks'));
   } else if (route.type==='financial-breakdown') {
     openFinancialBreakdown(false).catch(() => fallback('overview'));
-  } else nav(route.id, false);
+  } else {
+    nav(route.id, false);
+    if (route.session) window.ForestMap?.openSession(route.session).catch(() => {});
+  }
 }
 
 window.addEventListener('popstate', e=>{
