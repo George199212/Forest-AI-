@@ -10,3 +10,5 @@
 #lvm-feature-rows tr[data-active=true] td:first-child{box-shadow:inset 3px 0 0 var(--gbright),inset 0 1px 0 var(--gbright),inset 0 -1px 0 var(--gbright)}
 .vmd-popup-action{margin-top:8px;font-size:11px!important;padding:6px 10px!important;width:100%;justify-content:center}
 .vmd-popup-action:disabled{opacity:.55;cursor:not-allowed}
+.vmd-master{display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.vmd-master input{margin:0}

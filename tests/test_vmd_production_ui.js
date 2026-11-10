@@ -144,3 +144,28 @@ test('national results fit the cadastral polygon and keep spatial candidates out
 test('explicit source error clears stale selection and offers a retry',async()=>{
  const e=setup();e.national();await e.api.attach(e.map);e.document.getElementById('vmd-kadastrs').value='40940020002';await e.api.find();e.api.selectAll();e.nationalState('SOURCE_ERROR');await e.api.find();assert.match(e.nodes.get('vmd-selected-summary').textContent,/Atlasīti: 0/);assert.equal(e.nodes.get('lvm-import').disabled,true);assert.equal(e.nodes.get('vmd-retry').hidden,false);assert.match(e.nodes.get('lvm-preview-state').textContent,/Datu avota kļūda/);
 });
+
+const masterBox=e=>e.nodes.get('lvm-feature-head').children[0].children[0].children[0].children[0];
+test('master checkbox: tri-state over importable rows of the current page; boundary-review row never touched',async()=>{
+ const saved=features[2].properties.cadastral_validation;features[2].properties.cadastral_validation={status:'boundary_review_required',registration_allowed:false,overlap_percent:99.9999,outside_area_m2:0.007};
+ try{const e=setup();await e.api.attach(e.map);e.document.getElementById('vmd-kadastrs').value='40940020002';await e.api.find();const m=masterBox(e),ids=features.map(f=>f.id);
+  assert.equal(m.type,'checkbox');assert.equal(m.checked,false);assert.equal(m.indeterminate,false);
+  rowInput(e,0).checked=true;rowInput(e,0).onchange();assert.equal(m.checked,false);assert.equal(m.indeterminate,true,'partial selection');
+  m.checked=true;m.onchange();assert.deepEqual(sel(e).sort(),[ids[0],ids[1]].sort());assert.equal(m.checked,true);assert.equal(m.indeterminate,false);
+  assert(!sel(e).includes(ids[2]),'boundary-review row stays unselected');assert.match(e.nodes.get('vmd-selected-summary').textContent,/Atlasīti: 2 nogabali/);
+  m.checked=false;m.onchange();assert.deepEqual(sel(e),[]);assert.equal(m.checked,false);assert.equal(m.indeterminate,false);
+  m.checked=true;m.onchange();e.api.clearSelection();assert.equal(m.checked,false);assert.equal(m.indeterminate,false);}
+ finally{features[2].properties.cadastral_validation=saved;}
+});
+test('master checkbox scope is the current page; recalculated on page change, new search and clear',async()=>{
+ const e=setup(false,true);await e.api.attach(e.map);e.document.getElementById('vmd-kadastrs').value='40940020002';await e.api.find();
+ masterBox(e).checked=true;masterBox(e).onchange();assert.equal(sel(e).length,1);assert.equal(masterBox(e).checked,true);
+ await e.api.page(1);assert.equal(masterBox(e).checked,false,'page 2 has nothing selected');assert.equal(masterBox(e).indeterminate,false);
+ masterBox(e).checked=true;masterBox(e).onchange();assert.equal(sel(e).length,2);
+ masterBox(e).checked=false;masterBox(e).onchange();assert.equal(sel(e).length,1,'unchecking the master only clears this page');
+ e.api.clearSelection();assert.equal(sel(e).length,0,'Noņemt atlasi clears all pages');
+ masterBox(e).checked=true;masterBox(e).onchange();e.document.getElementById('vmd-kadastrs').value='99999999999';await e.api.find();assert.equal(masterBox(e).checked,false);assert.equal(masterBox(e).disabled,true);
+});
+test('master checkbox keeps the 100-compartment limit and its message (source guard; the fixture has only 3 rows)',()=>{
+ assert.match(script,/if\(s\.selected\.size\+features\.length>100\)\{message\('Vienā reizē var reģistrēt līdz 100 nogabaliem\.'\);syncRows\(\);return buttons\(\);\}/);
+});
