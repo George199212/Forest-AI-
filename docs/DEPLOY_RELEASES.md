@@ -1,7 +1,7 @@
 # Deploy releases (`releases/`): how :8000 is deployed today
 
-State as of 2026-11-10 09:16 UTC (activation of the LVM GEO + LV UI release). Mirrors of the
-live systemd files are in `deploy/systemd/` (the `70-`/`90-`/`95-` drop-ins below are not mirrored there yet).
+State as of 2026-11-10 10:32 UTC (activation of the Forest Map Karte contrast release). Mirrors of the
+live systemd files are in `deploy/systemd/` (the `70-`/`90-`/`95-`/`96-` drop-ins below are not mirrored there yet).
 
 **Rule (AGENTS.md / CLAUDE.md):** agents may create NEW folders in `/root/forest_ai/releases/`, never
 modify or delete existing ones. Production never runs from a worktree path. Activation (drop-in
@@ -11,7 +11,7 @@ change + restart) only after an explicit human OK in the chat.
 
 | port | unit | code location | git |
 |---|---|---|---|
-| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-lvm-geo-lv-ui-20261110T0858Z` (via drop-in `95-lvm-geo-lv-ui-release.conf`; `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `release/2026-11-10-lvm-geo-lv-ui` @ `beb09d0` (runtime), dashboard version `geo-1ae5a85bfd23`, backend `552c46ae547b`. **Live-only content kept**: the manual nav edit and the `fd3d2c6` `assets/lvm-geodata.js` (see the activation record below) |
+| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-forest-map-contrast-20261110T0949Z` (via drop-in `96-forest-map-contrast-release.conf`; `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `feature/forest-map-basemap-contrast` @ `ae638d8` (runtime), dashboard version `geo-d0015b1f82a0`, backend `552c46ae547b`. **Live-only content kept**: the manual nav edit and the `fd3d2c6` `assets/lvm-geodata.js` (see the activation record below) |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
 | 8003 | `forest-review-api` | `/root/forest_ai_review` (copy of `84cb00b`) | 84cb00b |
@@ -52,8 +52,8 @@ these are committed, a release built from git alone would revert them.
   forest-api-lvm-geo-finish-20261110T0825Z       PREPARED, NOT ACTIVE, SUPERSEDED — do not activate (feature/lvm-geo-finish
                                                  e74b624 only; geo-ac8f6bf9b054). Kept because existing folders are never
                                                  modified or deleted.
-  forest-api-lvm-geo-lv-ui-20261110T0858Z        ACTIVE on :8000 since 2026-11-10 09:16 UTC
-  forest-api-forest-map-contrast-20261110T0949Z  PREPARED, NOT ACTIVE — candidate (feature/forest-map-basemap-contrast; geo-d0015b1f82a0)
+  forest-api-lvm-geo-lv-ui-20261110T0858Z        ROLLBACK TARGET for :8000: was active 2026-11-10 09:16 – 10:32 UTC (geo-1ae5a85bfd23)
+  forest-api-forest-map-contrast-20261110T0949Z  ACTIVE on :8000 since 2026-11-10 10:32 UTC (feature/forest-map-basemap-contrast; geo-d0015b1f82a0)
                                                  (release/2026-11-10-lvm-geo-lv-ui beb09d0; geo-1ae5a85bfd23)
 ```
 
@@ -64,6 +64,7 @@ these are committed, a release built from git alone would revert them.
 | 2026-11-07 08:52 | `forest-api-meza-karte-20261107T084300Z` | c5801dc23be5 (later edited in place) | `50-` drop-in |
 | 2026-11-09 11:44 | `forest-api-forest-map-gps-20261109T1129Z` | 9c94d506a565 | `70-` drop-in |
 | 2026-11-09 14:31 | worktree `/root/wt/remove-map-sidebar/releases/forest-api-remove-map-sidebar-20261109` | 091ed8e852f9 | `80-` drop-in (from a worktree; not documented at the time) |
+| 2026-11-10 10:32 | `forest-api-forest-map-contrast-20261110T0949Z` | d0015b1f82a0 | `96-` drop-in (overrides `95-` WorkingDirectory; `90-` Environment kept) |
 | 2026-11-10 09:16 | `forest-api-lvm-geo-lv-ui-20261110T0858Z` | 1ae5a85bfd23 | `95-` drop-in (overrides `90-` WorkingDirectory; `90-` Environment kept) |
 | 2026-11-09 16:28 | `forest-api-forest-map-violations-20261109T1623Z` | 3b9cdfaac106 | `90-` drop-in; `80-` removed |
 
@@ -79,10 +80,26 @@ these are committed, a release built from git alone would revert them.
 - **The geodata manifest** comes from the drop-in `geodata.conf`
   (`FOREST_GEODATA_MANIFEST=/root/forest_ai/data/geodata/nationwide/active.json`).
 
-## Prepared release: forest-api-forest-map-contrast-20261110T0949Z (2026-11-10, NOT active)
+## Activation record: forest-map-contrast (2026-11-10 10:32 UTC)
 
-**Status:** prepared, not active. :8000 serves `forest-api-lvm-geo-lv-ui-20261110T0858Z` (`geo-1ae5a85bfd23`).
-Activation needs an explicit human OK.
+**Status:** ACTIVE on :8000 since 2026-11-10 10:32:03 UTC (`geo-d0015b1f82a0`), activated after an explicit human OK
+(tested by the owner on the loopback test server first). Rollback target: `forest-api-lvm-geo-lv-ui-20261110T0858Z`
+(`geo-1ae5a85bfd23`).
+
+1. Before: active folder `forest-api-lvm-geo-lv-ui-20261110T0858Z`, PID 2905224. `pre-activation-check.sh` OK.
+2. Backups: DB `/root/backups/forest_ai_before_forest_map_contrast_20261110T103150Z.db` (`integrity_check` = ok);
+   unit files `/root/backups/forest-api.service.d-20261110T103150Z/` and `/root/backups/forest-api.service-20261110T103150Z`.
+3. Installed only `96-forest-map-contrast-release.conf`. It sets only `WorkingDirectory` (no `ExecStart`; the single
+   `ExecStart=` reset + `ExecStart` come from `50-`). After `daemon-reload`, before the restart, the effective unit
+   had exactly 1 `ExecStart` (`uvicorn api:app --host 0.0.0.0 --port 8000`), `WorkingDirectory` = the new folder,
+   `FOREST_GPS_VIOLATIONS_DAYS=90` and `FOREST_GEODATA_MANIFEST` kept.
+4. `systemctl restart forest-api` only: new PID 2915987. :8002 (2411749), :8003 (2535074), :8004 (2538345),
+   forest-bot (2538882), ingka/rigas Telegram workers (2696056 / 2690389) kept their PIDs.
+5. Verified on :8000 (headless Chromium, read-only): `/api/deployment` = `geo-d0015b1f82a0`; Karte shows the
+   compartments in dark green (map area identical to the tested branch, 0 differing pixels); Satelīts identical to
+   the pre-activation live screenshot (0 differing pixels); 0 tile requests per basemap switch; violations panel present;
+   LVM GEO 62420110056 → 25 rows with master checkbox and action bar; Latvian sidebar; 0 JS errors; no tracebacks.
+
 
 - **Source:** `feature/forest-map-basemap-contrast` (code `ae638d8`, docs `66572fa`) from `origin/master` `9140473`.
 - **Built as:** copy of the ACTIVE folder `forest-api-lvm-geo-lv-ui-20261110T0858Z`; only `assets/forest-map.js` replaced.
@@ -94,7 +111,7 @@ Activation needs an explicit human OK.
 - **Drop-in:** `96-forest-map-contrast-release.conf` (inside the folder) only sets `WorkingDirectory`; it overrides `95-`,
   which stays in place. `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`.
 
-Activate:
+Commands used to activate (2026-11-10 10:32 UTC):
 ```sh
 REL=/root/forest_ai/releases/forest-api-forest-map-contrast-20261110T0949Z
 $REL/pre-activation-check.sh                                   # must print OK
@@ -302,7 +319,14 @@ remain in place.
   It checks `releases/forest-api-baseline-.../api.py` has SHA-256 `dfbf12fe…`, installs
   `rollback-release.conf` over `50-meza-karte-release.conf`, runs `daemon-reload`, restarts
   `forest-api` and checks it is active.
-- **lvm-geo-lv-ui → forest-map-violations (current rollback target):**
+- **forest-map-contrast → lvm-geo-lv-ui (current rollback target):**
+  ```sh
+  rm -f /etc/systemd/system/forest-api.service.d/96-forest-map-contrast-release.conf
+  systemctl daemon-reload && systemctl restart forest-api
+  readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd   # → …/forest-api-lvm-geo-lv-ui-20261110T0858Z
+  ```
+  Confirm `/api/deployment` reports `geo-1ae5a85bfd23`. No data to restore (frontend only).
+- **lvm-geo-lv-ui → forest-map-violations (older):**
   ```sh
   rm -f /etc/systemd/system/forest-api.service.d/95-lvm-geo-lv-ui-release.conf
   systemctl daemon-reload && systemctl restart forest-api

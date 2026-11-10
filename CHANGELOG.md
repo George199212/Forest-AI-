@@ -2,7 +2,7 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
-## 2026-11-10 — `feature/forest-map-basemap-contrast` (not deployed)
+## 2026-11-10 — `feature/forest-map-basemap-contrast` (deployed 2026-11-10 10:32 UTC, release `forest-api-forest-map-contrast-20261110T0949Z`)
 
 ### Forest Map
 - Basemap "Karte" (OSM): VMD compartments, review-required compartments, VZD parcels and the generalized
