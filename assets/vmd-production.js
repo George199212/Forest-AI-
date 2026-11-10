@@ -14,14 +14,25 @@ async function request(path,body,signal){
   const data=await r.json();if(!r.ok)throw Error(typeof data.detail==='string'?data.detail:'Ģeodatu pieprasījums neizdevās.');return data;
  }finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
 }
+/* Why "Reģistrēt sektorus" is disabled — shown inline next to the button. */
+function blockers(current){const r=[];
+ if(!s.identity)r.push('Reģistrācijas konteksts nav pieejams (organizācijas konts) — izmantojiet “Mēģināt vēlreiz”.');
+ if(s.cadastre&&!current)r.push('Meklēšana ir mainīta — atkārtojiet “Atrast nogabalus”.');
+ if(!s.selected.size)r.push('Atlasiet vismaz vienu nogabalu.');
+ if(!dom('vmd-sector-name').value.trim())r.push('Ievadiet sektora nosaukumu.');
+ if(!dom('vmd-responsible-first-name').value.trim()||!dom('vmd-responsible-last-name').value.trim())r.push('Ievadiet atbildīgās personas vārdu un uzvārdu.');
+ return r;}
+/* Missing area is never shown as 0. */
+function haText(values){if(!values.length)return '0.00 ha';return values.some(v=>v===null||v===undefined||v===''||!Number.isFinite(Number(v)))?'platība nav zināma':values.reduce((a,v)=>a+Number(v),0).toFixed(2)+' ha';}
 function buttons(){
- const current=dom('vmd-kadastrs').value.trim()===s.cadastre&&!s.lastFailed;dom('vmd-find').disabled=s.busy||!s.metadata;dom('lvm-import').disabled=s.busy||!s.selected.size||!s.identity||!current;
+ const current=dom('vmd-kadastrs').value.trim()===s.cadastre&&!s.lastFailed,reasons=blockers(current),register=dom('lvm-import');dom('vmd-find').disabled=s.busy||!s.metadata;
+ register.disabled=s.busy||!!s.review||reasons.length>0;register.textContent=s.busy?'Notiek pārbaude…':'Reģistrēt sektorus ('+s.selected.size+')';
+ dom('vmd-submit-reason').textContent=s.busy||s.review?'':reasons.join(' · ');
  dom('vmd-cancel-search').hidden=!s.controller;dom('vmd-prev').disabled=s.busy||!s.summary?.offset;dom('vmd-next').disabled=s.busy||!s.summary?.has_more;
- let area=0;s.selected.forEach(f=>area+=Number(f.properties.area_ha)||0);
- dom('vmd-selected-summary').textContent='Atlasīti: '+s.selected.size+' nogabali · '+area.toFixed(2)+' ha';
+ dom('vmd-selected-summary').textContent='Atlasīti: '+plural(s.selected.size,'nogabals','nogabali')+' · '+haText(Array.from(s.selected.values()).map(f=>f.properties.area_ha));
  dom('vmd-page-label').textContent=s.summary?'Lapa '+(Math.floor(s.summary.offset/s.summary.limit)+1)+' no '+Math.max(1,Math.ceil(s.summary.found/s.summary.limit)):'—';
  dom('vmd-empty').hidden=!!s.entries.size;dom('vmd-empty').textContent=s.summary?'Šim kadastra apzīmējumam nogabali nav atrasti.':'Ievadiet 11 ciparu kadastra apzīmējumu un atrodiet nogabalus.';
- dom('vmd-go-1').disabled=s.busy;dom('vmd-go-2').disabled=s.busy||!s.entries.size;dom('vmd-go-3').disabled=s.busy||!s.selected.size||!s.identity||!current;dom('vmd-back').hidden=s.step!==2;
+ dom('vmd-go-1').disabled=s.busy;dom('vmd-go-2').disabled=s.busy||!s.entries.size;dom('vmd-go-3').disabled=s.busy||!!s.review||reasons.length>0;dom('vmd-back').hidden=s.step!==2;
  syncMaster();progress(s.step);dom('vmd-step-help').textContent=s.step===1?'1. Ievadiet precīzu kadastra apzīmējumu. Iepriekšējie rezultāti un atlase saglabājas.':s.step===2?'2. Pārbaudiet avota identifikatorus, platību un robežas; atlasiet reģistrējamos nogabalus.':'3. Pārbaudiet nosaukumu, atbildīgo personu un reģistrācijas kopsavilkumu.';
 }
 function associationLabel(p){if(p.cadastral_validation?.status==='display_review_required')return 'Attēlojuma ģeometrijai nepieciešama pārbaude';if(p.cadastral_validation?.status==='geometry_invalid')return 'Avota ģeometrija nav derīga';if(p.cadastral_validation?.status==='source_conflict')return 'Avota identitātes konflikts';if(p.cadastral_validation?.status==='boundary_review_required')return 'Robežu neatbilstība · '+p.cadastral_validation.overlap_percent.toFixed(4)+'% sakritība';if(p.cadastral_validation?.status==='verified')return 'VMD + VZD pārbaudīts';if(!p.cadastral_validation?.registration_allowed)return 'Kadastra dati nav pārbaudīti · '+(p.cadastral_association?.status==='verified_source_attribute'?'VMD atribūts sakrīt':'VMD atribūts nav pārbaudīts');return p.cadastral_association?.status==='verified_source_attribute'?'Pārbaudīts VMD atribūts':p.cadastral_association?.classification==='derived'?'Atvasināta saistība':'Saistība nav pārbaudīta';}
@@ -31,7 +42,10 @@ function featureStyle(feature){return {...style,...(feature.properties?.cadastra
 function headers(){const head=dom('lvm-feature-head');head.replaceChildren();const tr=el('tr',undefined,head);const label=el('label',undefined,el('th',undefined,tr));label.className='vmd-master';const master=el('input',undefined,label);master.type='checkbox';master.id='vmd-master';master.setAttribute('aria-label','Atlasīt visus reģistrējamos nogabalus šajā lapā');master.onchange=()=>{if(master.checked)selectAll();else clearPage();};el('span','Atlasīt',label);s.master=master;syncMaster();['Avota kadastra apzīmējums','Kvartāls','Nogabals','VMD nogabala ID','Platība (ha)','Kadastra saistība','Datu avots','Stāvoklis'].forEach(label=>el('th',label,tr));}
 /* Selection changes ONLY through explicit controls: row checkbox, popup button, master checkbox,
    "Noņemt atlasi". Clicking a polygon or a row only inspects it (highlight + popup / show on map). */
-function statusText(p){return lvmStatus(p.import_status)+(p.sector?' → '+p.sector.name:'');}
+// Registration outcome labels (this page only; the backend status ALREADY IMPORTED means the source is already a sector).
+const OUTCOME={REGISTERED:'Reģistrēts',ALREADY_REGISTERED:'Jau reģistrēts','ALREADY IMPORTED':'Jau reģistrēts'};
+function plural(n,one,many){return n%10===1&&n%100!==11?n+' '+one:n+' '+many;}
+function statusText(p){return (OUTCOME[p.import_status]||lvmStatus(p.import_status))+(p.sector?' → '+p.sector.name:'');}
 function rows(){
  const body=dom('lvm-feature-rows');body.replaceChildren();s.rowNodes=new Map();
  s.entries.forEach((entry,id)=>{const p=entry.feature.properties,tr=el('tr',undefined,body);tr.setAttribute('data-feature-id',id);tr.tabIndex=0;
@@ -51,7 +65,7 @@ function syncRows(){
 function syncPopup(id){
  const entry=s.entries.get(id);if(!entry?.action)return;const p=entry.feature.properties,on=s.selected.has(id);
  entry.action.textContent=on?'Noņemt no atlases':'Atlasīt';entry.action.disabled=s.busy||(!on&&!p.importable);
- entry.reason.textContent=p.importable?'':'Nav reģistrējams: '+(p.sector?statusText(p):associationLabel(p)+' · '+lvmStatus(p.import_status));entry.reason.hidden=!!p.importable;
+ entry.reason.textContent=p.importable?'':'Nav reģistrējams: '+(p.sector?statusText(p):associationLabel(p)+' · '+(OUTCOME[p.import_status]||lvmStatus(p.import_status)));entry.reason.hidden=!!p.importable;
 }
 function highlight(id,scrollTable){
  s.activeId=id;s.rowNodes?.forEach((n,key)=>n.tr.setAttribute('data-active',String(key===id)));
@@ -121,25 +135,32 @@ function syncMaster(){const master=s.master;if(!master)return;const list=pageSel
 function clearPage(){if(s.busy)return;pageSelectable().forEach(f=>s.selected.delete(f.id));paint();syncRows();buttons();}
 function selectAll(){if(s.busy)return;const features=Array.from(s.entries.values()).map(e=>e.feature).filter(f=>f.properties.importable&&!s.selected.has(f.id));if(s.selected.size+features.length>100){message('Vienā reizē var reģistrēt līdz 100 nogabaliem.');syncRows();return buttons();}features.forEach(f=>s.selected.set(f.id,f));paint();syncRows();buttons();}
 function clearSelection(){if(s.busy)return;s.selected.clear();paint();syncRows();selectionOverlay();buttons();}
+function report(result){
+ const box=dom('lvm-preview-state'),done=result.results.filter(r=>r.status==='imported'),failed=result.results.filter(r=>r.status==='failed');box.replaceChildren();
+ const head=result.imported?(result.imported%10===1&&result.imported%100!==11?'Reģistrēts ':'Reģistrēti ')+plural(result.imported,'sektors','sektori')+' · '+haText(done.map(r=>r.area_ha)):'Neviens sektors netika reģistrēts.';
+ el('strong',head,box);el('span',' Jau reģistrēti: '+result.already_exists+' · Neizdevās: '+result.failed+'.',box);
+ failed.forEach(r=>el('div',r.external_id+': '+lvmError(r.reason),box));
+ if(result.imported||result.already_exists){const link=el('a',' Atvērt sadaļu “Sektori”',box);link.href='#sectors';link.onclick=event=>{event.preventDefault?.();if(typeof nav==='function')nav('sectors');};}
+}
 function intent(){return {...(s.metadata?.regions_covered===5?{cadastral_designation:s.cadastre}:{}),feature_ids:Array.from(s.selected.keys()),dataset_version:s.version,sector_name:dom('vmd-sector-name').value.trim(),responsible_first_name:dom('vmd-responsible-first-name').value.trim(),responsible_last_name:dom('vmd-responsible-last-name').value.trim()};}
 async function executeImport(dryRun,body){
  if(s.busy||!body.feature_ids.length)return;s.busy=true;syncRows();buttons();
  try{
   const result=await request('import-selected',{...body,dry_run:dryRun,confirmed:!dryRun});
-  if(!dryRun){s.imported=result.imported;s.step=result.imported?3:2;result.results.forEach(r=>{if(['imported','already_exists'].includes(r.status)){const feature=s.entries.get(r.external_id)?.feature||s.selected.get(r.external_id);if(feature){feature.properties.importable=false;feature.properties.import_status='ALREADY IMPORTED';feature.properties.sector={id:r.id,name:r.name};}s.selected.delete(r.external_id);}});if(typeof clearCache==='function')clearCache();if(typeof mapLoaded!=='undefined')mapLoaded=false;}
+  if(!dryRun){s.imported=result.imported;s.step=result.imported?3:2;result.results.forEach(r=>{if(['imported','already_exists'].includes(r.status)){const feature=s.entries.get(r.external_id)?.feature||s.selected.get(r.external_id);if(feature){feature.properties.importable=false;feature.properties.import_status=r.status==='imported'?'REGISTERED':'ALREADY_REGISTERED';feature.properties.sector={id:r.id,name:r.name};}s.selected.delete(r.external_id);}});if(typeof clearCache==='function')clearCache();if(typeof mapLoaded!=='undefined')mapLoaded=false;report(result);return result;}
   message((dryRun?'Pārbaude: gatavi '+result.would_import:'Reģistrēti: '+result.imported)+' · jau pastāv: '+result.already_exists+' · neizdevās: '+result.failed);return result;
  }catch(error){message(lvmError(error.message));}finally{s.busy=false;paint();selectionOverlay();syncRows();buttons();}
 }
 async function importSelected(dryRun=false){
  if(!s.selected.size||s.busy||!s.identity||s.review)return;if(dom('vmd-kadastrs').value.trim()!==s.cadastre||s.lastFailed){message('Atkārtojiet precīzu meklēšanu pirms reģistrācijas.');return;}const body=intent();if(!body.sector_name){message('Norādiet sektora nosaukumu.');dom('vmd-sector-name').focus();return;}if(!body.responsible_first_name||!body.responsible_last_name){message('Norādiet atbildīgās personas vārdu un uzvārdu.');return;}const result=await executeImport(true,body);if(!result||dryRun)return result;
  const dialog=el('dialog');dialog.className='vmd-dialog';dialog.setAttribute('aria-label','Nogabalu reģistrācijas priekšskatījums');progress(3);
- s.review=dialog;s.step=3;buttons();el('h3','Sektoru reģistrācijas priekšskatījums',dialog);el('p','Sektora nosaukums: '+result.sector_name,dialog);el('p','Organizācija: '+result.registration_identity.organization_name,dialog);el('p','Atbildīgā persona: '+result.responsible_person.first_name+' '+result.responsible_person.last_name,dialog);el('p','Avots: VMD Meža valsts reģistrs · '+body.dataset_version,dialog);
+ s.review=dialog;s.step=3;buttons();el('h3','Sektoru reģistrācijas priekšskatījums',dialog);el('p','Ievadītais sektora nosaukums: '+result.sector_name+' · Tabulā — sektoru nosaukumi tieši tā, kā tos saglabās serveris.',dialog);el('p','Organizācija: '+result.registration_identity.organization_name,dialog);el('p','Atbildīgā persona: '+result.responsible_person.first_name+' '+result.responsible_person.last_name,dialog);el('p','Avots: VMD Meža valsts reģistrs · '+body.dataset_version,dialog);
  const metrics=el('div',undefined,dialog);metrics.className='vmd-preview-metrics';[[result.requested,'nogabali'],[result.total_area_ha.toFixed(2)+' ha','kopējā platība'],[result.valid_geometry_count,'derīgas ģeometrijas'],[result.already_exists,'jau reģistrēti']].forEach(([value,label])=>{const box=el('div',undefined,metrics);el('strong',value,box);el('span',label,box);});
  const wrap=el('div',undefined,dialog);wrap.className='vmd-table-scroll';const table=el('table',undefined,wrap),head=el('tr',undefined,el('thead',undefined,table));['Sektora nosaukums','Avota kadastra apzīmējums','VMD nogabala ID','Platība (ha)','Kadastra saistība','Ģeometrija','Pārbaude'].forEach(label=>el('th',label,head));const tbody=el('tbody',undefined,table);
  result.results.forEach(r=>{const tr=el('tr',undefined,tbody);[r.name||'—',r.kadastrs,r.external_id,Number(r.area_ha||0).toFixed(2),r.cadastral_association?.status==='verified_source_attribute'?'VMD atribūts pārbaudīts':'Nav pārbaudīts',r.geometry_repaired?'Normalizējot labota':r.geometry_valid?'Derīga':'Nav apstiprināta',r.status==='ready'?'Gatavs':r.status==='already_exists'?'Jau reģistrēts':lvmError(r.reason)].forEach(value=>el('td',value??'—',tr));});
  const mapBox=el('div',undefined,dialog);mapBox.style.height='240px';mapBox.setAttribute('aria-label','Reģistrējamo nogabalu precīzās robežas');let geometryMap=null;
  el('p','Tiks saglabāta avota ģeometrija un izcelsmes informācija. Esošie sektori netiks pārrakstīti.',dialog);
- const actions=el('div',undefined,dialog);actions.className='vmd-inline-actions';const closeReview=()=>{geometryMap?.remove();geometryMap=null;s.review=null;s.step=2;dialog.close();dialog.remove();buttons();};dialog.addEventListener?.('cancel',event=>{event.preventDefault();closeReview();});const cancel=el('button','Atpakaļ uz atlasi',actions);cancel.className='btn';cancel.onclick=closeReview;const confirm=el('button','Reģistrēt sektorus',actions);confirm.className='btn vmd-primary';confirm.disabled=!result.would_import;confirm.onclick=async()=>{if(confirm.disabled)return;confirm.disabled=true;closeReview();await executeImport(false,body);};document.body.append(dialog);dialog.showModal();geometryMap=L.map(mapBox);const geometries=L.geoJSON({type:'FeatureCollection',features:Array.from(s.selected.values())},{style:{color:'#d4a017',weight:2,fillOpacity:.2}}).addTo(geometryMap);geometryMap.fitBounds(geometries.getBounds(),{padding:[15,15]});setTimeout(()=>geometryMap?.invalidateSize(),0);
+ const actions=el('div',undefined,dialog);actions.className='vmd-inline-actions';const closeReview=()=>{geometryMap?.remove();geometryMap=null;s.review=null;s.step=2;dialog.close();dialog.remove();buttons();};dialog.addEventListener?.('cancel',event=>{event.preventDefault();closeReview();});const cancel=el('button','Atpakaļ uz atlasi',actions);cancel.className='btn';cancel.onclick=closeReview;const confirm=el('button','Apstiprināt un reģistrēt ('+result.would_import+')',actions);confirm.className='btn vmd-primary';confirm.disabled=!result.would_import;confirm.onclick=async()=>{if(confirm.disabled)return;confirm.disabled=true;closeReview();await executeImport(false,body);};document.body.append(dialog);dialog.showModal();geometryMap=L.map(mapBox);const geometries=L.geoJSON({type:'FeatureCollection',features:Array.from(s.selected.values())},{style:{color:'#d4a017',weight:2,fillOpacity:.2}}).addTo(geometryMap);geometryMap.fitBounds(geometries.getBounds(),{padding:[15,15]});setTimeout(()=>geometryMap?.invalidateSize(),0);
 }
 function renderSpatial(result){
  if(s.spatialLayer)s.map.removeLayer(s.spatialLayer);s.spatialLayer=null;s.spatialSummary=result.spatial_summary||null;

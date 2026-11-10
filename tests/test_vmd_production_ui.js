@@ -7,7 +7,7 @@ const features=original.features.map((f,i)=>({...f,id:'VMD:nodala2651:'+f.proper
 class Node{constructor(){this.style={};this.children=[];this.value='';this.textContent='';this.hidden=true;}append(...n){this.children.push(...n);}replaceChildren(...n){this.children=n;}setAttribute(k,v){this[k]=v;}removeAttribute(k){delete this[k];}focus(){this.focused=true;}scrollIntoView(){this.scrolled=true;}showModal(){this.open=true;}close(){this.open=false;}remove(){this.removed=true;}}
 function bounds(points){const x=points.map(p=>p[0]),y=points.map(p=>p[1]);return {isValid:()=>!!points.length,getWest:()=>Math.min(...x),getEast:()=>Math.max(...x),getSouth:()=>Math.min(...y),getNorth:()=>Math.max(...y),intersects:()=>true};}
 function setup(fail=false,paginate=false){
- const nodes=new Map(),requests=[],groups=[],events={},imported=new Set();let consent=false,cache=0,identityFailure=false,searchFailure=false,nationalMode=false,nationalState='VMD_MATCHES_FOUND';
+ const nodes=new Map(),requests=[],groups=[],events={},imported=new Set();let consent=false,cache=0,importFailure=false,identityFailure=false,searchFailure=false,nationalMode=false,nationalState='VMD_MATCHES_FOUND';
  const document={body:new Node(),createElement:()=>new Node(),getElementById(id){if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);}};
  document.getElementById('vmd-sector-name').value='Testa sektors';document.getElementById('vmd-mode').value='intersects';document.getElementById('vmd-overlap').value='0';
  const map={panes:{},layers:new Set(),fits:[],fitOptions:[],area:bounds([[24.414,56.676],[24.418,56.679]]),getPane(k){return this.panes[k];},createPane(k){return this.panes[k]={style:{}};},getBounds(){return this.area;},fitBounds(b,options){this.fits.push(b);this.fitOptions.push(options);},hasLayer(l){return this.layers.has(l);},removeLayer(l){this.layers.delete(l);},on(k,f){events[k]=f;},off(k){delete events[k];}};const base={osm:true};map.layers.add(base);
@@ -30,12 +30,14 @@ function setup(fail=false,paginate=false){
   else if(url.includes('/cadastre?')&&searchFailure){status=503;data={detail:'Source unavailable'};}
   else if(url.includes('/cadastre?'))data={cadastral_verification:{status:'verified_source_attribute',verified_count:3,unverified_count:0},type:'FeatureCollection',dataset_version:'a'.repeat(64),features:!url.includes('kadastrs=40940020002')?[]:paginate?[features[url.includes('offset=1')?1:0]]:features,summary:{found:!url.includes('kadastrs=40940020002')?0:3,returned:!url.includes('kadastrs=40940020002')?0:paginate?1:3,total_compartment_area_ha:1.66,territory_area_ha:3.07,fully_inside:2,boundary_intersections:1,offset:paginate&&url.includes('offset=1')?1:0,limit:paginate?1:100,has_more:paginate}};
   else if(url.endsWith('/select-matching'))data={type:'FeatureCollection',dataset_version:'a'.repeat(64),features,selected_count:3,excluded_count:0,summary:{found:3,offset:0,limit:100}};
-  else if(url.endsWith('/import-selected')){const body=JSON.parse(options.body);if(!body.dry_run)body.feature_ids.forEach(id=>imported.add(id));data={sector_name:body.sector_name,registration_identity:{organization_id:1,organization_name:'Testa organizācija'},responsible_person:{first_name:body.responsible_first_name,last_name:body.responsible_last_name},target_client:{id:body.client_id||'unit-account',name:body.client_name||'',account:'unit-account'},total_area_ha:.61,valid_geometry_count:body.feature_ids.length,requested:body.feature_ids.length,dry_run:body.dry_run,would_import:body.dry_run?body.feature_ids.length:0,imported:body.dry_run?0:body.feature_ids.length,already_exists:0,failed:0,results:body.feature_ids.map(id=>({external_id:id,kadastrs:'40940020002',kvart:'1',nog:'1',area_ha:.18,geometry_valid:true,status:body.dry_run?'ready':'imported',id:31,name:'VMD real source sector'}))};}
+  else if(url.endsWith('/import-selected')){const body=JSON.parse(options.body);if(importFailure){status=500;data={detail:'Neizdevās saglabāt sektoru (testa kļūda)'};}else{const prior=new Set(imported);if(!body.dry_run)body.feature_ids.forEach(id=>imported.add(id));
+   const results=body.feature_ids.map((id,i)=>({external_id:id,kadastrs:'40940020002',kvart:'1',nog:String(i+1),area_ha:.18,geometry_valid:true,cadastral_association:{status:'verified_source_attribute'},status:prior.has(id)?'already_exists':body.dry_run?'ready':'imported',id:31+i,name:body.feature_ids.length===1?body.sector_name:body.sector_name+' — K1 N'+(i+1)+' [nodala2651:'+id.split(':').at(-1)+']'})),n=st=>results.filter(r=>r.status===st).length;
+   data={sector_name:body.sector_name,registration_identity:{organization_id:1,organization_name:'Testa organizācija'},responsible_person:{first_name:body.responsible_first_name,last_name:body.responsible_last_name},target_client:{id:'unit-account',name:'',account:'unit-account'},total_area_ha:.18*results.length,valid_geometry_count:results.length,requested:results.length,dry_run:body.dry_run,would_import:n('ready'),imported:n('imported'),already_exists:n('already_exists'),failed:n('failed'),results};}}
   else throw Error('Unexpected API / any live geoserver request prohibited');
   if(nationalMode&&url.includes('/cadastre?')){data.state=nationalState;data.search_message=nationalState==='SOURCE_ERROR'?'Datu avota kļūda':'Valsts avoti pārbaudīti';data.cadastral_validation={registration_allowed:true,land_unit_exists:true,source_designation:'40940020002',land_unit_area_ha:1,land_unit_geometry:features[0].geometry};data.spatial_candidates=[{...features[1],id:'unit:spatial',properties:{...features[1].properties,kadastrs:'40440040167',importable:false,cadastral_validation:{registration_allowed:false,status:'spatial_candidate_only',overlap_percent:50}}}];data.spatial_summary={found:1,returned:1,offset:0,limit:100,has_more:false};if(nationalState==='SOURCE_ERROR'){data.features=[];data.spatial_candidates=[];data.spatial_summary.found=0;data.summary={...data.summary,found:0,returned:0};}}
   return {ok:status===200,status,headers:{get:()=> 'application/json'},json:async()=>JSON.parse(JSON.stringify(data))};
  }});vm.runInContext(fs.readFileSync(path.join(__dirname,'../assets/lvm-geodata.js'),'utf8'),ctx);vm.runInContext(script,ctx);
- return {api:window.VmdLocalDataset,map,base,nodes,document,requests,groups,events,imported,consent(v){consent=v;},cache:()=>cache,ctx,setFailure(v){fail=v;},failIdentity(v){identityFailure=v;},failSearch(v){searchFailure=v;},national(v=true){nationalMode=v;},nationalState(v){nationalState=v;}};
+ return {api:window.VmdLocalDataset,map,base,nodes,document,requests,groups,events,imported,consent(v){consent=v;},cache:()=>cache,ctx,setFailure(v){fail=v;},failIdentity(v){identityFailure=v;},failImport(v){importFailure=v;},failSearch(v){searchFailure=v;},national(v=true){nationalMode=v;},nationalState(v){nationalState=v;}};
 }
 
 test('initial page loads catalogue metadata, no national geometry or territory requests',async()=>{
@@ -168,4 +170,58 @@ test('master checkbox scope is the current page; recalculated on page change, ne
 });
 test('master checkbox keeps the 100-compartment limit and its message (source guard; the fixture has only 3 rows)',()=>{
  assert.match(script,/if\(s\.selected\.size\+features\.length>100\)\{message\('Vienā reizē var reģistrēt līdz 100 nogabaliem\.'\);syncRows\(\);return buttons\(\);\}/);
+});
+
+async function found(e){await e.api.attach(e.map);e.document.getElementById('vmd-kadastrs').value='40940020002';await e.api.find();}
+const confirmButton=e=>e.document.body.children.at(-1).children.at(-1).children.at(-1);
+test('"Reģistrēt sektorus (N)" shows why it is disabled',async()=>{
+ const e=setup();await found(e);const b=e.nodes.get('lvm-import'),why=()=>e.nodes.get('vmd-submit-reason').textContent;
+ assert.equal(b.textContent,'Reģistrēt sektorus (0)');assert.equal(b.disabled,true);assert.match(why(),/Atlasiet vismaz vienu nogabalu/);
+ masterBox(e).checked=true;masterBox(e).onchange();assert.equal(b.textContent,'Reģistrēt sektorus (3)');assert.equal(b.disabled,false);assert.equal(why(),'');
+ e.document.getElementById('vmd-sector-name').value=' ';e.api.inputChanged();assert.equal(b.disabled,true);assert.match(why(),/sektora nosaukumu/);
+ e.document.getElementById('vmd-sector-name').value='Mežs';e.document.getElementById('vmd-responsible-last-name').value='';e.api.inputChanged();assert.equal(b.disabled,true);assert.match(why(),/vārdu un uzvārdu/);
+ e.document.getElementById('vmd-responsible-last-name').value='Persona';e.document.getElementById('vmd-kadastrs').value='01000950031';e.api.inputChanged();assert.equal(b.disabled,true);assert.match(why(),/Meklēšana ir mainīta/);
+ const f=setup();f.failIdentity(true);await found(f);masterBox(f).checked=true;masterBox(f).onchange();assert.equal(f.nodes.get('lvm-import').disabled,true);assert.match(f.nodes.get('vmd-submit-reason').textContent,/Reģistrācijas konteksts nav pieejams/);
+});
+test('counter shows count and hectares; unknown area is never shown as 0',async()=>{
+ const e=setup();await found(e);rowInput(e,0).checked=true;rowInput(e,0).onchange();assert.match(e.nodes.get('vmd-selected-summary').textContent,/^Atlasīti: 1 nogabals · /);e.api.clearSelection();masterBox(e).checked=true;masterBox(e).onchange();
+ const ha=features.reduce((a,f)=>a+Number(f.properties.area_ha),0).toFixed(2);assert.equal(e.nodes.get('vmd-selected-summary').textContent,'Atlasīti: 3 nogabali · '+ha+' ha');
+ const saved=features[0].properties.area_ha;features[0].properties.area_ha=null;
+ try{const g=setup();await found(g);masterBox(g).checked=true;masterBox(g).onchange();assert.match(g.nodes.get('vmd-selected-summary').textContent,/platība nav zināma/);}finally{features[0].properties.area_ha=saved;}
+});
+test('3 rows → preview with server names → confirm → rows "Reģistrēts", not selectable; form kept; honest message with link',async()=>{
+ const e=setup();await found(e);e.document.getElementById('vmd-sector-name').value='Biķernieki';e.document.getElementById('vmd-responsible-first-name').value='Anna';e.document.getElementById('vmd-responsible-last-name').value='Ozola';e.api.inputChanged();
+ masterBox(e).checked=true;masterBox(e).onchange();await e.api.goStep(3);const dialog=e.document.body.children.at(-1);assert(dialog.open);
+ const table=dialog.children.find(n=>n.className==='vmd-table-scroll').children[0],names=table.children[1].children.map(tr=>tr.children[0].textContent);
+ assert.deepEqual([...names],features.map((f,i)=>'Biķernieki — K1 N'+(i+1)+' [nodala2651:'+f.id.split(':').at(-1)+']'),'names exactly as the backend returned them');
+ assert.equal(e.imported.size,0,'nothing is written before confirmation');assert.match(confirmButton(e).textContent,/\(3\)/);
+ await confirmButton(e).onclick();assert.equal(e.imported.size,3);const body=JSON.parse(e.requests.at(-1).options.body);assert.equal(body.confirmed,true);assert.equal(body.dry_run,false);
+ const rowsNow=e.nodes.get('lvm-feature-rows').children;for(let i=0;i<3;i++){assert.match(rowsNow[i].children.at(-1).textContent,/^Reģistrēts → Biķernieki/);assert.equal(rowsNow[i].children[0].children[0].disabled,true);}
+ assert.deepEqual(sel(e),[]);assert.equal(masterBox(e).disabled,true);
+ assert.equal(e.document.getElementById('vmd-sector-name').value,'Biķernieki');assert.equal(e.document.getElementById('vmd-responsible-first-name').value,'Anna');
+ const state=e.nodes.get('lvm-preview-state');assert.match(state.children[0].textContent,/^Reģistrēti 3 sektori · 0\.54 ha$/);assert.equal(state.children.at(-1).href,'#sectors');
+});
+test('re-submitting the same rows creates no duplicates: rows show "Jau reģistrēts" and never a success message',async()=>{
+ const e=setup();await found(e);e.api.selectAll();await e.api.goStep(3);await confirmButton(e).onclick();assert.equal(e.imported.size,3);
+ const g=setup();g.imported.add(features[0].id);await found(g);rowInput(g,0).checked=true;rowInput(g,0).onchange();await g.api.goStep(3);
+ assert.equal(confirmButton(g).disabled,true,'nothing new to register');
+ const dialog=g.document.body.children.at(-1),table=dialog.children.find(n=>n.className==='vmd-table-scroll').children[0];
+ assert.equal(table.children[1].children[0].children.at(-1).textContent,'Jau reģistrēts');assert.equal(g.imported.size,1);
+});
+test('commit that registers nothing says so; already registered rows are marked "Jau reģistrēts"',async()=>{
+ const e=setup();await found(e);e.api.selectAll();await e.api.goStep(3);
+ features.forEach(f=>e.imported.add(f.id));// another tab registered them between preview and confirm
+ await confirmButton(e).onclick();const state=e.nodes.get('lvm-preview-state');
+ assert.equal(state.children[0].textContent,'Neviens sektors netika reģistrēts.');assert.doesNotMatch(state.children.map(c=>c.textContent).join(''),/Reģistrēti \d/);
+ assert.match(e.nodes.get('lvm-feature-rows').children[0].children.at(-1).textContent,/^Jau reģistrēts/);
+});
+test('backend error: message shown, selection and form preserved',async()=>{
+ const e=setup();await found(e);e.document.getElementById('vmd-sector-name').value='Mežs';e.api.selectAll();await e.api.goStep(3);e.failImport(true);
+ await confirmButton(e).onclick();assert.match(e.nodes.get('lvm-preview-state').textContent,/testa kļūda/);assert.equal(sel(e).length,3);assert.equal(e.document.getElementById('vmd-sector-name').value,'Mežs');assert.equal(e.nodes.get('lvm-import').disabled,false);
+});
+test('registration fields live in the action bar of the results card, IDs unique',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'),section=html.slice(html.indexOf('id="sec-lvm-geodata"'),html.indexOf('<!-- INTEGRATION DETAIL'));
+ const bar=section.slice(section.indexOf('id="vmd-register-bar"'));
+ for(const id of ['vmd-sector-name','vmd-responsible-first-name','vmd-responsible-last-name','lvm-import','vmd-selected-summary','vmd-submit-reason']){assert.equal(html.split('id="'+id+'"').length,2,id);assert(bar.includes('id="'+id+'"'),id);}
+ assert(section.indexOf('id="vmd-register-bar"')>section.indexOf('id="lvm-feature-rows"'));assert(!section.slice(0,section.indexOf('vmd-map-results')).includes('vmd-sector-name'),'not in the left column');
 });
