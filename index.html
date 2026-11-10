@@ -908,7 +908,7 @@ function nav(id, push=true) {
   if(id!=='forest-map')window.ForestMap?.deactivate();
   currentSection = id;
   document.body.classList.toggle('vmd-workflow-open',id==='lvm-geodata');
-  localizeGeodataNavigation(id==='lvm-geodata');
+  localizeGeodataNavigation(true);  // Latvian sidebar labels on every page (was LVM GEO only)
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el = document.getElementById('sec-'+id);
@@ -918,7 +918,7 @@ function nav(id, push=true) {
   if (navMap[id]!==undefined) items[navMap[id]].classList.add('active');
   document.getElementById('page-title').textContent = titles[id]||id;
   document.getElementById('page-refresh').textContent=id==='lvm-geodata'?'↻ Atjaunot':'↻ Refresh';
-  document.getElementById('page-sub').textContent = id==='lvm-geodata'?new Date().toLocaleString('lv-LV'):new Date().toLocaleString();
+  document.getElementById('page-sub').textContent = new Date().toLocaleString('lv-LV');
   if (push) history.pushState({type:'nav', id}, '', '#'+id);
   load(id);
 }
@@ -1083,7 +1083,7 @@ function openObject(boundaryPlanId, push=true) {
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('sec-object-detail').classList.add('active');
-  document.getElementById('page-sub').textContent = new Date().toLocaleString();
+  document.getElementById('page-sub').textContent = new Date().toLocaleString('lv-LV');
   if (push) history.pushState({type:'object', id: boundaryPlanId}, '', '#object-'+boundaryPlanId);
   objDetailTab('overview');
 }
@@ -4540,6 +4540,7 @@ window.addEventListener('popstate', e=>{
 // INIT
 const initRoute = routeFromHash();
 history.replaceState(initRoute, '', location.hash || '#overview');
+localizeGeodataNavigation(true);  // deep links (#sector-…, #object-…, #risk/…) start with Latvian labels too
 openRoute(initRoute);
 document.getElementById('last-update').innerHTML = '<span class="auto-refresh-badge"><span class="pulse"></span> tiešsaistē · v2.1</span>';
 </script>
