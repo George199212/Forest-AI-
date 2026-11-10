@@ -3,3 +3,33 @@
 .vmd-dialog .leaflet-container{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;margin:14px 0}.vmd-table-scroll td{overflow-wrap:anywhere}.vmd-table-scroll table{min-width:850px}
 .vmd-progress button{display:flex;align-items:center;gap:9px;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;text-align:left}.vmd-progress button:disabled{opacity:.5;cursor:default}.vmd-progress button:focus-visible{outline:2px solid var(--green);outline-offset:5px}.vmd-registration-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}.vmd-registration-fields .vmd-field:first-child{grid-column:1/-1}@media(min-width:1300px){.vmd-workspace{grid-template-columns:360px minmax(0,1fr)}.vmd-registration-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:900px){.vmd-registration-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.vmd-registration-fields .vmd-field:first-child{grid-column:auto}}@media(max-width:560px){.vmd-registration-fields{grid-template-columns:1fr}.vmd-progress button{gap:5px}}
 @media(min-width:561px){.vmd-registration-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.vmd-registration-fields .vmd-field:first-child{grid-column:auto}}
+/* Selection only via explicit controls: row click = inspect (highlight), checkbox/popup button = select */
+#lvm-feature-rows tr{cursor:pointer}
+#lvm-feature-rows tr[data-selected=true] td{background:rgba(212,160,23,.10)}
+#lvm-feature-rows tr[data-active=true] td{box-shadow:inset 0 1px 0 var(--gbright),inset 0 -1px 0 var(--gbright)}
+#lvm-feature-rows tr[data-active=true] td:first-child{box-shadow:inset 3px 0 0 var(--gbright),inset 0 1px 0 var(--gbright),inset 0 -1px 0 var(--gbright)}
+.vmd-popup-action{margin-top:8px;font-size:11px!important;padding:6px 10px!important;width:100%;justify-content:center}
+.vmd-popup-action:disabled{opacity:.55;cursor:not-allowed}
+.vmd-master{display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.vmd-master input{margin:0}
+/* Registration action bar: sticky at the bottom of "Atrastie nogabali", visible without scrolling past the table */
+.vmd-register-bar{position:sticky;bottom:0;z-index:5;background:var(--bg2);border-top:1px solid var(--border2);margin:14px -16px -16px;padding:12px 16px 10px;box-shadow:0 -8px 16px rgba(0,0,0,.35);border-radius:0 0 var(--r) var(--r)}
+.vmd-register-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.vmd-register-top strong{color:var(--gbright);font:12px var(--mono)}
+.vmd-register-top .btn{font-size:10px!important}
+.vmd-register-form{display:grid;grid-template-columns:minmax(160px,1.4fr) minmax(110px,1fr) minmax(110px,1fr) auto;gap:10px;align-items:end}
+.vmd-register-form .vmd-field{margin:0}
+.vmd-register-form .vmd-primary{padding:10px 16px;white-space:nowrap}
+.vmd-register-form .vmd-primary:disabled{opacity:.5;cursor:not-allowed}
+.vmd-register-bar .vmd-hint{margin:6px 0 0}
+.vmd-submit-reason{color:var(--amber)!important;min-height:1.2em}
+#lvm-preview-state strong{color:var(--text)}
+#lvm-preview-state a{color:var(--gbright);margin-left:6px}
+@media(max-width:950px){.vmd-register-form{grid-template-columns:1fr 1fr}.vmd-register-form .vmd-field:first-child,.vmd-register-form .vmd-primary{grid-column:1/-1}}
+@media(max-width:700px){.vmd-register-bar{margin:12px -13px -13px;padding:10px 13px}.vmd-register-form{grid-template-columns:1fr}}
+.vmd-register-message{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--text)}
+.vmd-register-message:empty,.vmd-submit-reason:empty{display:none}
+.vmd-register-notes{font-size:11px!important;line-height:1.5!important}
+#vmd-profile-note:not(:empty)::before{content:"· "}
+/* Phones: a sticky bar would cover the whole table, so it stays in the flow directly below the table */
+@media(max-width:700px){.vmd-register-bar{position:static;box-shadow:none}}
