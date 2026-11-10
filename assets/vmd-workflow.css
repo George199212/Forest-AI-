@@ -3,3 +3,10 @@
 .vmd-dialog .leaflet-container{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;margin:14px 0}.vmd-table-scroll td{overflow-wrap:anywhere}.vmd-table-scroll table{min-width:850px}
 .vmd-progress button{display:flex;align-items:center;gap:9px;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;text-align:left}.vmd-progress button:disabled{opacity:.5;cursor:default}.vmd-progress button:focus-visible{outline:2px solid var(--green);outline-offset:5px}.vmd-registration-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}.vmd-registration-fields .vmd-field:first-child{grid-column:1/-1}@media(min-width:1300px){.vmd-workspace{grid-template-columns:360px minmax(0,1fr)}.vmd-registration-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:900px){.vmd-registration-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.vmd-registration-fields .vmd-field:first-child{grid-column:auto}}@media(max-width:560px){.vmd-registration-fields{grid-template-columns:1fr}.vmd-progress button{gap:5px}}
 @media(min-width:561px){.vmd-registration-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.vmd-registration-fields .vmd-field:first-child{grid-column:auto}}
+/* Selection only via explicit controls: row click = inspect (highlight), checkbox/popup button = select */
+#lvm-feature-rows tr{cursor:pointer}
+#lvm-feature-rows tr[data-selected=true] td{background:rgba(212,160,23,.10)}
+#lvm-feature-rows tr[data-active=true] td{box-shadow:inset 0 1px 0 var(--gbright),inset 0 -1px 0 var(--gbright)}
+#lvm-feature-rows tr[data-active=true] td:first-child{box-shadow:inset 3px 0 0 var(--gbright),inset 0 1px 0 var(--gbright),inset 0 -1px 0 var(--gbright)}
+.vmd-popup-action{margin-top:8px;font-size:11px!important;padding:6px 10px!important;width:100%;justify-content:center}
+.vmd-popup-action:disabled{opacity:.55;cursor:not-allowed}
