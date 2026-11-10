@@ -53,6 +53,7 @@ these are committed, a release built from git alone would revert them.
                                                  e74b624 only; geo-ac8f6bf9b054). Kept because existing folders are never
                                                  modified or deleted.
   forest-api-lvm-geo-lv-ui-20261110T0858Z        ACTIVE on :8000 since 2026-11-10 09:16 UTC
+  forest-api-forest-map-contrast-20261110T0949Z  PREPARED, NOT ACTIVE — candidate (feature/forest-map-basemap-contrast; geo-d0015b1f82a0)
                                                  (release/2026-11-10-lvm-geo-lv-ui beb09d0; geo-1ae5a85bfd23)
 ```
 
@@ -77,6 +78,43 @@ these are committed, a release built from git alone would revert them.
 - **`.env`** is not in the folder. The unit loads `EnvironmentFile=/root/forest_ai/.env`.
 - **The geodata manifest** comes from the drop-in `geodata.conf`
   (`FOREST_GEODATA_MANIFEST=/root/forest_ai/data/geodata/nationwide/active.json`).
+
+## Prepared release: forest-api-forest-map-contrast-20261110T0949Z (2026-11-10, NOT active)
+
+**Status:** prepared, not active. :8000 serves `forest-api-lvm-geo-lv-ui-20261110T0858Z` (`geo-1ae5a85bfd23`).
+Activation needs an explicit human OK.
+
+- **Source:** `feature/forest-map-basemap-contrast` (code `ae638d8`, docs `66572fa`) from `origin/master` `9140473`.
+- **Built as:** copy of the ACTIVE folder `forest-api-lvm-geo-lv-ui-20261110T0858Z`; only `assets/forest-map.js` replaced.
+  The live-only nav edit in `index.html` and the `fd3d2c6` `assets/lvm-geodata.js` are kept as they are live.
+- **Checks:** `pre-activation-check.sh` OK (70 files; baseline = active folder unchanged). Smoke test of the folder on
+  127.0.0.1:8016 (DB copy): `geo-d0015b1f82a0`; satellite map area pixel-identical to the live :8000 (0 differing
+  pixels); Karte boundaries dark green; 0 tile requests per basemap switch; Latvian sidebar; LVM GEO unchanged
+  (62420110056 → 25 rows, 18 selectable); 0 JS errors, 0 tracebacks.
+- **Drop-in:** `96-forest-map-contrast-release.conf` (inside the folder) only sets `WorkingDirectory`; it overrides `95-`,
+  which stays in place. `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`.
+
+Activate:
+```sh
+REL=/root/forest_ai/releases/forest-api-forest-map-contrast-20261110T0949Z
+$REL/pre-activation-check.sh                                   # must print OK
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+sqlite3 /root/forest_ai/data/forest_ai.db ".backup /root/backups/forest_ai_before_forest_map_contrast_$TS.db"
+sqlite3 /root/backups/forest_ai_before_forest_map_contrast_$TS.db 'PRAGMA integrity_check'   # ok
+cp -a /etc/systemd/system/forest-api.service.d /root/backups/forest-api.service.d-$TS
+install -m 0644 $REL/96-forest-map-contrast-release.conf /etc/systemd/system/forest-api.service.d/96-forest-map-contrast-release.conf
+systemctl daemon-reload && systemctl restart forest-api
+readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd          # → …/forest-api-forest-map-contrast-20261110T0949Z
+# /api/deployment → geo-d0015b1f82a0
+```
+
+Roll back (code only, no data restore):
+```sh
+rm -f /etc/systemd/system/forest-api.service.d/96-forest-map-contrast-release.conf
+systemctl daemon-reload && systemctl restart forest-api
+readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd          # → …/forest-api-lvm-geo-lv-ui-20261110T0858Z
+# /api/deployment → geo-1ae5a85bfd23
+```
 
 ## Activation record: lvm-geo-lv-ui (2026-11-10 09:16 UTC)
 
