@@ -2,7 +2,21 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
-## 2026-11-10 — `feature/lvm-geo-finish` (not deployed)
+## 2026-11-10 — `feature/forest-map-basemap-contrast` (not deployed)
+
+### Forest Map
+- Basemap "Karte" (OSM): VMD compartments, review-required compartments, VZD parcels and the generalized
+  overview are drawn in darker colours (e.g. compartments `#1e6b34`, 1.6 px) so they stay visible on OSM's
+  green woodland. "Satelīts" is unchanged (pixel-identical screenshots).
+- Switching the basemap repaints the already-loaded boundary tiles in place: no new tile requests.
+- Legend swatches follow the active basemap. On Karte only: selected compartment `#b8860b`, cadastral
+  land-unit outline `#1f6fb2`, GPS transitions/gaps with a white casing.
+
+## 2026-11-10 — `feature/lv-ui-global` (deployed 2026-11-10 09:16 UTC via `release/2026-11-10-lvm-geo-lv-ui`)
+
+- Latvian sidebar labels and lv-LV header time on every page (were LVM GEO only).
+
+## 2026-11-10 — `feature/lvm-geo-finish` (deployed 2026-11-10 09:16 UTC via `release/2026-11-10-lvm-geo-lv-ui`)
 
 ### Forest Map
 - On-map basemap switch "Satelīts" / "Karte" (top-right Leaflet control), synced with the sidebar

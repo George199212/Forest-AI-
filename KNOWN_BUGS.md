@@ -37,3 +37,8 @@
 - Pre-existing test failures on master with the real data catalogues (unrelated to this branch):
   `tests/test_vmd_production.py::test_actual_logged_no_match_reports_limited_source_coverage` (3 params) and
   `::test_official_outside_parcel_is_coverage_diagnostic_never_a_forest_match`. Found 2026-11-10.
+- Forest Map on basemap "Karte" (fixed on `feature/forest-map-basemap-contrast`, not deployed, 2026-11-10): VMD
+  compartment boundaries (`#74c484`, 1.1 px) were almost invisible on OSM's green woodland; VZD parcels and the
+  grey GPS transition line were weak on white. Satellite was fine and is unchanged.
+- No GPS session in the production DB has transitions or gaps yet (only session #32 has track points), so the
+  white-casing style for them was checked with a clearly labelled synthetic sample only. Found 2026-11-10.
