@@ -1,5 +1,6 @@
 """python3 -m satellite_monitoring.report --area <id|name>  ->  Markdown timeline + evidence paths."""
 import argparse
+import os
 import json
 import sys
 
@@ -80,6 +81,7 @@ def render(conn, area):
 
 
 def main(argv=None):
+    os.umask(0o077)                         # data dir 700 / files 600
     ap = argparse.ArgumentParser(prog="satellite_monitoring.report")
     ap.add_argument("--area", required=True)
     args = ap.parse_args(argv)

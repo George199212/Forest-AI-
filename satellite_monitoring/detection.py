@@ -25,7 +25,7 @@ Neither field states a cause.
 
 Classification (first rule that matches):
   1. INSUFFICIENT_EVIDENCE              evidence_quality == POOR
-  2. POSSIBLE_SEASONAL_OR_ENVIRONMENTAL after-image month in Nov–Mar, or snow
+  2. POSSIBLE_SEASONAL_OR_ENVIRONMENTAL after-image month in Oct–Apr, or snow
                                         (S2 SCL=11) > snow_max_pct of INSIDE
   3. POTENTIAL_CHANGE_OUTSIDE_BOUNDARY  changed area in BUFFER >= outside_min_ha
   4. POTENTIAL_FOREST_LOSS              otherwise
@@ -162,7 +162,7 @@ def classify(evidence_q, after_month, snow_pct_inside, changed_ha_buffer, cfg=No
     cfg = cfg or config.DEFAULTS
     caveat = None
     if after_month in cfg["seasonal_months"]:
-        caveat = ("After-image is from Nov–Mar: leaf-off, frozen/wet ground and snow change "
+        caveat = ("After-image is from Oct–Apr: leaf fall/leaf-off, frozen or wet ground and snow change "
                   "optical indices and radar backscatter without any felling.")
     elif snow_pct_inside is not None and snow_pct_inside > cfg["snow_max_pct"]:
         caveat = f"Snow on {snow_pct_inside:.0f}% of the area in the after-image."

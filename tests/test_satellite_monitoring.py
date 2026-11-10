@@ -270,8 +270,11 @@ def test_inside_vs_buffer_area_split():
 def test_classification_rules():
     c = det.classify
     assert c("POOR", 7, None, 5.0)[0] == "INSUFFICIENT_EVIDENCE"
-    cls, cav = c("GOOD", 11, None, 0.0)
-    assert cls == "POSSIBLE_SEASONAL_OR_ENVIRONMENTAL" and "Nov" in cav
+    for month in (10, 11, 12, 1, 2, 3, 4):
+        cls, cav = c("GOOD", month, None, 0.0)
+        assert cls == "POSSIBLE_SEASONAL_OR_ENVIRONMENTAL" and "Oct–Apr" in cav
+    for month in (5, 6, 7, 8, 9):
+        assert c("GOOD", month, None, 0.0)[0] == "POTENTIAL_FOREST_LOSS"
     assert c("GOOD", 6, 25.0, 0.0)[0] == "POSSIBLE_SEASONAL_OR_ENVIRONMENTAL"
     assert c("LIMITED", 6, 0.0, 0.3)[0] == "POTENTIAL_CHANGE_OUTSIDE_BOUNDARY"
     assert c("LIMITED", 6, 0.0, 0.29)[0] == "POTENTIAL_FOREST_LOSS"
@@ -309,10 +312,15 @@ def test_s1_relative_orbit_parsing():
                         "sar:instrument_mode": "IW", "sar:polarizations": ["VV", "VH"]}}
     p = prov.parse_catalog_feature("S1", f)
     assert p.orbit_direction == "ASCENDING" and p.relative_orbit == ((60123 - 73) % 175) + 1
+    assert p.relative_orbit_source == "DERIVED_S1A"
     f2 = {**f, "id": "S1C_IW_GRDH_1SDV_20261001T160355_20261001T160420_004123_00ABCD_1234"}
-    assert prov.parse_catalog_feature("S1", f2).relative_orbit is None   # unknown -> never compared
+    p2 = prov.parse_catalog_feature("S1", f2)
+    assert p2.relative_orbit is None and p2.relative_orbit_source is None   # unknown -> never compared
+    assert p2.platform == "sentinel-1c"
     f3 = {**f, "properties": {**f["properties"], "sat:relative_orbit": 131}}
-    assert prov.parse_catalog_feature("S1", f3).relative_orbit == 131
+    p3 = prov.parse_catalog_feature("S1", f3)
+    assert p3.relative_orbit == 131 and p3.relative_orbit_source == "CATALOG"
+    assert "sat:relative_orbit" in p3.catalog_property_keys
     ew = {**f, "properties": {**f["properties"], "sar:instrument_mode": "EW"}}
     assert prov.parse_catalog_feature("S1", ew) is None
 
@@ -689,3 +697,21 @@ def test_decode_tiff_roundtrip():
     b2 = io.BytesIO()
     tifffile.imwrite(b2, np.moveaxis(arr, -1, 0), photometric="minisblack", planarconfig="separate")
     assert np.allclose(raster.decode_tiff(b2.getvalue(), expected_shape=(7, 9), bands=6), arr)
+
+
+def test_data_files_are_private(env):
+    import os
+    import stat
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=4)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    root = env["tmp"] / "sat"
+    mode = lambda p: stat.S_IMODE(os.stat(p).st_mode)
+    assert mode(root) == 0o700
+    seen = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        assert mode(dirpath) == 0o700, dirpath
+        for f in filenames:
+            assert mode(os.path.join(dirpath, f)) == 0o600, f
+            seen += 1
+    assert seen >= 9          # db (+wal/shm), 4 tif, 4 png, event mask, lock

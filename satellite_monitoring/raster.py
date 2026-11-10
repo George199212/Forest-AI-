@@ -42,9 +42,14 @@ def raster_paths(area_id, sensor, sensing_time_utc, product_id, root=None):
 
 
 def write_file(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Atomic write, file mode 600, directories 700."""
+    import os
+    config.secure_dir(path.parent)
     tmp = path.with_suffix(path.suffix + ".part")
-    tmp.write_bytes(data)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(data)
+    os.chmod(tmp, 0o600)
     tmp.replace(path)
     return sha256_bytes(data)
 

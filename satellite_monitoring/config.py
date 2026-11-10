@@ -24,6 +24,30 @@ def forest_db_path() -> Path:
     return Path(os.environ.get("FOREST_DB_PATH", os.environ.get("DB_PATH", "data/forest_ai.db")))
 
 
+def secure_dir(path):
+    """Create path (and parents) with mode 700; tighten existing dirs we own up to data_dir()."""
+    p = Path(path)
+    p.mkdir(parents=True, exist_ok=True)
+    stop = data_dir().resolve()
+    cur = p.resolve()
+    while True:
+        try:
+            os.chmod(cur, 0o700)
+        except OSError:
+            pass
+        if cur == stop or cur.parent == cur or stop not in cur.parents:
+            break
+        cur = cur.parent
+    return p
+
+
+def secure_file(path):
+    try:
+        os.chmod(path, 0o600)
+    except FileNotFoundError:
+        pass
+
+
 DEFAULTS = {
     # Geometry
     "buffer_m": 100.0,
@@ -66,7 +90,7 @@ DEFAULTS = {
     "ongoing_max_gap_days": 60,
 
     # Classification
-    "seasonal_months": [11, 12, 1, 2, 3],
+    "seasonal_months": [10, 11, 12, 1, 2, 3, 4],   # Oct–Apr (leaf fall/leaf-off, frost, snow, spring thaw)
     "snow_max_pct": 10.0,                # S2: SCL=11 share of the INSIDE zone
 
     # Evidence quality (separate from detection confidence)

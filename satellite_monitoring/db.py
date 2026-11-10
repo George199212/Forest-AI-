@@ -188,12 +188,14 @@ def iso(dt):
 def connect(path=None):
     path = path or config.sat_db_path()
     from pathlib import Path
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    config.secure_dir(Path(path).parent)
     conn = sqlite3.connect(str(path), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    for suffix in ("", "-wal", "-shm"):
+        config.secure_file(str(path) + suffix)
     return conn
 
 

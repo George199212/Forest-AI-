@@ -10,6 +10,7 @@
 Run with /root/forest_ai_satellite_venv/bin/python (tifffile).
 """
 import argparse
+import os
 import json
 import math
 import sys
@@ -88,11 +89,30 @@ def dry_run(args, sensors, cfg):
         for s in sensors:
             prods = [x for x in sh.discover(s, g["bbox"], args.from_, args.to)
                      if not x.footprint or shapely.geometry.shape(x.footprint).intersects(footprint)]
+            if s == "S1":
+                check = {}
+                for it in getattr(sh, "last_raw_items", []):
+                    k = (it.platform or "unknown").upper().replace("SENTINEL-", "S")
+                    c = check.setdefault(k, {"catalog_items": 0, "sat:relative_orbit_present": 0,
+                                             "derived_from_absolute_orbit_S1A": 0, "unknown": 0,
+                                             "sat:orbit_state_present": 0, "property_keys_seen": set()})
+                    c["catalog_items"] += 1
+                    c["sat:relative_orbit_present"] += it.relative_orbit_source == "CATALOG"
+                    c["derived_from_absolute_orbit_S1A"] += it.relative_orbit_source == "DERIVED_S1A"
+                    c["unknown"] += it.relative_orbit_source is None
+                    c["sat:orbit_state_present"] += it.orbit_direction is not None
+                    c["property_keys_seen"] |= set(it.catalog_property_keys or [])
+                for c in check.values():
+                    c["property_keys_seen"] = sorted(c["property_keys_seen"])
+                for plat in ("S1A", "S1C", "S1D"):
+                    check.setdefault(plat, {"catalog_items": 0, "note": "no items in this window"})
+                out["s1_orbit_field_check"] = check
             rows = []
             for x in prods:
                 skip = s == "S2" and x.scene_cloud_pct is not None and x.scene_cloud_pct > cfg["s2_max_scene_cloud_pct"]
                 rows.append({"product_id": x.product_id, "sensing_time_utc": x.sensing_time_utc, "platform": x.platform,
                              "orbit": x.orbit_direction, "relative_orbit": x.relative_orbit,
+                             "relative_orbit_source": x.relative_orbit_source,
                              "scene_cloud_pct": x.scene_cloud_pct, "items": len(x.item_ids),
                              "action": "already stored" if x.product_id in stored else
                                        ("SKIPPED_CLOUD (no request)" if skip else "would fetch")})
@@ -106,6 +126,7 @@ def dry_run(args, sensors, cfg):
 
 
 def main(argv=None):
+    os.umask(0o077)                         # data dir 700 / files 600
     ap = argparse.ArgumentParser(prog="satellite_monitoring.backfill")
     ap.add_argument("--area", required=True)
     ap.add_argument("--from", dest="from_", required=True)

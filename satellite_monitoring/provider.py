@@ -46,6 +46,8 @@ class Product:
     scene_cloud_pct: float = None      # S2
     footprint: dict = None             # GeoJSON geometry (CRS84) or None
     item_ids: list = field(default_factory=list)
+    relative_orbit_source: str = None  # S1: CATALOG (sat:relative_orbit) | DERIVED_S1A | None (unknown)
+    catalog_property_keys: list = None # S1: property names the Catalog item actually carried
 
 
 @dataclass
@@ -98,12 +100,15 @@ def parse_catalog_feature(sensor, f):
                     "S1D": "sentinel-1d"}.get(item_id[:3])
     orbit = p.get("sat:orbit_state")
     rel = p.get("sat:relative_orbit")
+    source = "CATALOG" if rel is not None else None
     if rel is None:
         rel = s1_relative_orbit(platform, p.get("sat:absolute_orbit") or _s1_abs_orbit_from_id(item_id))
+        source = "DERIVED_S1A" if rel is not None else None
     return Product("S1", item_id, p.get("datetime"), platform=platform,
                    orbit_direction=orbit.upper() if orbit else None,
                    relative_orbit=int(rel) if rel is not None else None,
-                   footprint=f.get("geometry"), item_ids=[item_id])
+                   footprint=f.get("geometry"), item_ids=[item_id],
+                   relative_orbit_source=source, catalog_property_keys=sorted(p.keys()))
 
 
 def group_datatakes(products, max_gap_s=120):
@@ -180,6 +185,8 @@ class SentinelHubProvider:
             if nxt is None or pages >= max_pages:
                 break
             body = {**body, "next": nxt}
+        self.last_raw_items = [Product(**{**p.__dict__, "item_ids": list(p.item_ids)}) for p in products]
+        self.last_pages = pages
         return group_datatakes(products)
 
     def request_body(self, sensor, product, grid):

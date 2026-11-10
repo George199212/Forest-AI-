@@ -34,8 +34,9 @@ class RunLock:
         self.fh = None
 
     def __enter__(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        config.secure_dir(self.path.parent)
         self.fh = open(self.path, "a+")
+        config.secure_file(self.path)
         try:
             fcntl.flock(self.fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -385,6 +386,12 @@ class Detector:
                               "AND zone='INSIDE'", (acq_id,)).fetchone()
         return r["mean"] if r else None
 
+    @staticmethod
+    def _save_mask(path, mask):
+        config.secure_dir(path.parent)
+        np.save(path, mask)
+        config.secure_file(path)
+
     def _mask_path(self, event_id):
         return config.raster_root() / str(self.a["id"]) / "events" / f"event_{event_id}_mask.npy"
 
@@ -467,7 +474,7 @@ class Detector:
             confidence=conf, evidence_quality=eq, classification=cls, seasonal_caveat=caveat,
             gps_context_json=sdb.dumps(ctx))
         if target:
-            np.save(self._mask_path(target["id"]), mask)
+            self._save_mask(self._mask_path(target["id"]), mask)
             sets = ", ".join(f"{k}=?" for k in values)
             self.conn.execute(f"UPDATE sat_change_events SET {sets} WHERE id=?", (*values.values(), target["id"]))
             self.conn.commit()
@@ -478,8 +485,7 @@ class Detector:
                                 tuple(values.values()))
         eid = cur.lastrowid
         p = self._mask_path(eid)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        np.save(p, mask)
+        self._save_mask(p, mask)
         self.conn.execute("UPDATE sat_change_events SET change_mask_path=? WHERE id=?", (str(p), eid))
         self.conn.commit()
         return eid, "EVENT_CREATED"
