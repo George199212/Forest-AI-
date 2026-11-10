@@ -7,6 +7,35 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-10 — LVM GEO registration UX + Forest Map basemap (branch `feature/lvm-geo-finish`, NOT deployed)
+
+Frontend only (`assets/vmd-production.js`, `assets/forest-map.js`, `index.html` `#sec-lvm-geodata`,
+CSS). No backend, `import-selected` contract, schema or endpoint change.
+
+- **Live :8000 is not master for LVM GEO.** The active release
+  (`releases/forest-api-forest-map-violations-20261109T1623Z`) serves the LVM GEO frontend of
+  `feature/boundary-plan@fd3d2c6` (see `docs/DEPLOY_RELEASES.md`, "Live files not in git") with the master
+  backend. This branch builds on master and supersedes that frontend when deployed.
+- **Forest Map:** on-map basemap switch "Satelīts" / "Karte" (top-right), synced with the sidebar
+  "Pamatkarte" select, choice kept in localStorage, satellite failure falls back to "Karte" with a notice.
+  Root cause of "cannot switch": the only switch was a sidebar `<select>` below the fold (y=905 in a 750 px
+  sidebar viewport at 1440×900), labelled only "Kartes slāņi"; it worked when reached.
+- **LVM GEO:** polygon / row click only inspects; selection changes only via row checkbox, popup button
+  "Atlasīt" / "Noņemt no atlases", tri-state master checkbox (current page, importable rows) or
+  "Noņemt atlasi". Sticky action bar "Reģistrēt sektorus (N)" with sector name, Vārds, Uzvārds and inline
+  reason when disabled; dry-run preview + confirm kept; results marked "Reģistrēts" / "Jau reģistrēts".
+- Verified in headless Chromium on a throwaway server (127.0.0.1:8015, DB copy in `/tmp/lgf`):
+  62420110056 → 25 rows, 18 importable, master selects 18 (28.18 ha); 3 rows registered with full
+  `geodata_sources` provenance and visible in `/api/sectors` and the Forest Map sectors layer.
+
+Observations (not changed):
+- Boundary rule blocks compartments with < 1 m² outside the VZD land unit: 62420110056 — 7 blocked, 5 of
+  them < 1 m²; 01000920499 — 35 blocked, all 35 < 1 m² (smallest 3.1e-8 m²).
+- :8000 runs without `UI_LANGUAGE=lv`, so the sidebar is English. `localizeGeodataNavigation()`
+  (`index.html` ~893) translates the sidebar to Latvian only while LVM GEO is open, and the header time is
+  `lv-LV` only there (`index.html` ~921, other pages use the browser locale). Leaving LVM GEO for
+  "Meža karte" therefore shows an English menu and en-US time.
+
 ## 1. What exists and works in code
 
 | Area | State |
