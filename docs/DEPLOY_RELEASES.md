@@ -1,7 +1,7 @@
 # Deploy releases (`releases/`): how :8000 is deployed today
 
-State as of 2026-11-09 16:28 UTC (activation of the Forest Map violations release). Mirrors of the
-live systemd files are in `deploy/systemd/` (the `70-`/`90-` drop-ins below are not mirrored there yet).
+State as of 2026-11-10 09:16 UTC (activation of the LVM GEO + LV UI release). Mirrors of the
+live systemd files are in `deploy/systemd/` (the `70-`/`90-`/`95-` drop-ins below are not mirrored there yet).
 
 **Rule (AGENTS.md / CLAUDE.md):** agents may create NEW folders in `/root/forest_ai/releases/`, never
 modify or delete existing ones. Production never runs from a worktree path. Activation (drop-in
@@ -11,7 +11,7 @@ change + restart) only after an explicit human OK in the chat.
 
 | port | unit | code location | git |
 |---|---|---|---|
-| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-forest-map-violations-20261109T1623Z` (via drop-in `90-forest-map-violations-release.conf`) | tag `prod-2026-11-09-forest-map-violations` (master), dashboard version `geo-3b9cdfaac106`, backend `552c46ae547b`. **Not all live files are in git**: see "Live files not in git" below |
+| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-lvm-geo-lv-ui-20261110T0858Z` (via drop-in `95-lvm-geo-lv-ui-release.conf`; `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `release/2026-11-10-lvm-geo-lv-ui` @ `beb09d0` (runtime), dashboard version `geo-1ae5a85bfd23`, backend `552c46ae547b`. **Live-only content kept**: the manual nav edit and the `fd3d2c6` `assets/lvm-geodata.js` (see the activation record below) |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
 | 8003 | `forest-review-api` | `/root/forest_ai_review` (copy of `84cb00b`) | 84cb00b |
@@ -48,7 +48,12 @@ these are committed, a release built from git alone would revert them.
   forest-api-remove-map-sidebar-20261109T1431Z   ROLLBACK TARGET for :8000: permanent copy (diff -r = 0) of
                                                  /root/wt/remove-map-sidebar/releases/forest-api-remove-map-sidebar-20261109,
                                                  which was active 14:31–16:28 UTC from that worktree path (geo-091ed8e852f9)
-  forest-api-forest-map-violations-20261109T1623Z ACTIVE on :8000 since 2026-11-09 16:28 UTC (geo-3b9cdfaac106)
+  forest-api-forest-map-violations-20261109T1623Z ROLLBACK TARGET for :8000: was active 2026-11-09 16:28 – 2026-11-10 09:16 UTC (geo-3b9cdfaac106)
+  forest-api-lvm-geo-finish-20261110T0825Z       PREPARED, NOT ACTIVE, SUPERSEDED — do not activate (feature/lvm-geo-finish
+                                                 e74b624 only; geo-ac8f6bf9b054). Kept because existing folders are never
+                                                 modified or deleted.
+  forest-api-lvm-geo-lv-ui-20261110T0858Z        ACTIVE on :8000 since 2026-11-10 09:16 UTC
+                                                 (release/2026-11-10-lvm-geo-lv-ui beb09d0; geo-1ae5a85bfd23)
 ```
 
 ### History of :8000
@@ -58,6 +63,7 @@ these are committed, a release built from git alone would revert them.
 | 2026-11-07 08:52 | `forest-api-meza-karte-20261107T084300Z` | c5801dc23be5 (later edited in place) | `50-` drop-in |
 | 2026-11-09 11:44 | `forest-api-forest-map-gps-20261109T1129Z` | 9c94d506a565 | `70-` drop-in |
 | 2026-11-09 14:31 | worktree `/root/wt/remove-map-sidebar/releases/forest-api-remove-map-sidebar-20261109` | 091ed8e852f9 | `80-` drop-in (from a worktree; not documented at the time) |
+| 2026-11-10 09:16 | `forest-api-lvm-geo-lv-ui-20261110T0858Z` | 1ae5a85bfd23 | `95-` drop-in (overrides `90-` WorkingDirectory; `90-` Environment kept) |
 | 2026-11-09 16:28 | `forest-api-forest-map-violations-20261109T1623Z` | 3b9cdfaac106 | `90-` drop-in; `80-` removed |
 
 - **Name:** `forest-api-<feature-slug>-<UTC timestamp YYYYMMDDTHHMM[SS]Z>`. The timestamp is
@@ -71,6 +77,73 @@ these are committed, a release built from git alone would revert them.
 - **`.env`** is not in the folder. The unit loads `EnvironmentFile=/root/forest_ai/.env`.
 - **The geodata manifest** comes from the drop-in `geodata.conf`
   (`FOREST_GEODATA_MANIFEST=/root/forest_ai/data/geodata/nationwide/active.json`).
+
+## Activation record: lvm-geo-lv-ui (2026-11-10 09:16 UTC)
+
+**Status:** ACTIVE on :8000 since 2026-11-10 09:16:12 UTC (`geo-1ae5a85bfd23`), activated after an explicit
+human OK (tested by the owner on a loopback test server first). Rollback target:
+`forest-api-forest-map-violations-20261109T1623Z` (`geo-3b9cdfaac106`).
+
+1. Before: active folder `forest-api-forest-map-violations-20261109T1623Z`, PID 2869442.
+2. `pre-activation-check.sh` printed OK (70 release files match the manifest; baseline = violations folder, 70 files unchanged).
+3. Backups: DB `/root/backups/forest_ai_before_lvm_geo_lv_ui_20261110T091603Z.db` (`sqlite3 .backup`,
+   `integrity_check` = ok, 1.3 MB); unit files `/root/backups/forest-api.service.d-20261110T091603Z/` and
+   `/root/backups/forest-api.service-20261110T091603Z`.
+4. Installed only `95-lvm-geo-lv-ui-release.conf` (from the release folder). `50-`, `70-`, `90-` stay in place;
+   `90-` still provides `FOREST_GPS_VIOLATIONS_DAYS=90`. The superseded `95-lvm-geo-finish-release.conf` was NOT installed.
+5. `systemctl daemon-reload && systemctl restart forest-api`. Only `forest-api` restarted: new PID 2905224,
+   cwd = release folder. :8002 (2411749), :8003 (2535074), :8004 (2538345), forest-bot (2538882) and the
+   ingka/rigas Telegram workers (2696056 / 2690389) kept their PIDs.
+6. Verified on :8000 (headless Chromium, read-only): `/api/deployment` = `geo-1ae5a85bfd23`; Latvian sidebar and
+   lv-LV header time on Pārskats, Meža karte and LVM GEO; Forest Map on-map switch Satelīts → Karte (OSM tiles)
+   → Satelīts (Esri tiles), sidebar select in sync, violations panel and overlays present; LVM GEO search
+   62420110056 → 25 rows, master checkbox, action bar with "Reģistrēt sektorus (0)" and its reason; 0 JS errors;
+   no tracebacks in the forest-api journal after the restart.
+
+Release contents:
+
+- **Source:** branch `release/2026-11-10-lvm-geo-lv-ui` @ `beb09d0` = `origin/master` `99bc3be` + merge of
+  `feature/lvm-geo-finish` (`e74b624`: LVM GEO registration UX, Forest Map basemap switch) + merge of
+  `feature/lv-ui-global` (`4f3bbc0`: Latvian sidebar labels and lv-LV header time on every page).
+- **Built as:** copy of the live violations folder; only 5 runtime files replaced from `beb09d0`:
+  `index.html`, `assets/vmd-production.js`, `assets/vmd-workflow.css`, `assets/forest-map.js`,
+  `assets/forest-map.css`. `api.py`, `database.py`, `services/` unchanged; no migrations; `data` symlink.
+- **Live-only content preserved:** the manual nav edit (Photos, AI group, AI Inspector, Satellite hidden) is
+  re-applied to `index.html` (its `<nav>` is identical to live); `assets/lvm-geodata.js` stays the live
+  `fd3d2c6` version (extra Latvian error texts, superset of master). The `fd3d2c6` LVM GEO frontend is replaced
+  by the `feature/lvm-geo-finish` one. `assets/vmd-workflow.css` is the branch version (the live-only `fd3d2c6`
+  rules target classes no longer used).
+- **Checks:** `pre-activation-check.sh` OK (70 files; baseline = live violations folder unchanged). Smoke test of
+  the folder itself on 127.0.0.1:8016 with a DB copy: `/api/deployment` = `geo-1ae5a85bfd23`; Latvian sidebar and
+  lv-LV time on all routes; Forest Map basemap control, violations, GPS; LVM GEO 62420110056 → 25 rows,
+  18 selectable (28.18 ha); 0 JS errors, 0 tracebacks.
+- **Drop-in:** `95-lvm-geo-lv-ui-release.conf` (inside the folder) only sets `WorkingDirectory`. The `90-`
+  drop-in stays, so `FOREST_GPS_VIOLATIONS_DAYS=90` is kept.
+
+Commands used to activate (2026-11-10 09:16 UTC):
+```sh
+REL=/root/forest_ai/releases/forest-api-lvm-geo-lv-ui-20261110T0858Z
+$REL/pre-activation-check.sh                                   # must print OK
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+sqlite3 /root/forest_ai/data/forest_ai.db ".backup /root/backups/forest_ai_before_lvm_geo_lv_ui_$TS.db"
+sqlite3 /root/backups/forest_ai_before_lvm_geo_lv_ui_$TS.db 'PRAGMA integrity_check'      # ok
+cp -a /etc/systemd/system/forest-api.service.d /root/backups/forest-api.service.d-$TS
+install -m 0644 $REL/95-lvm-geo-lv-ui-release.conf /etc/systemd/system/forest-api.service.d/95-lvm-geo-lv-ui-release.conf
+systemctl daemon-reload && systemctl restart forest-api
+readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd          # → …/forest-api-lvm-geo-lv-ui-20261110T0858Z
+# /api/deployment → geo-1ae5a85bfd23
+```
+
+Roll back (code only, no data restore; sectors registered meanwhile stay as ordinary sectors):
+```sh
+rm -f /etc/systemd/system/forest-api.service.d/95-lvm-geo-lv-ui-release.conf
+systemctl daemon-reload && systemctl restart forest-api
+readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd          # → …/forest-api-forest-map-violations-20261109T1623Z
+# /api/deployment → geo-3b9cdfaac106
+```
+
+`forest-api-lvm-geo-finish-20261110T0825Z` is an earlier, superseded candidate (no LV UI change). Do not
+activate it and do not install its `95-lvm-geo-finish-release.conf` next to the one above.
 
 ## Manifest format (`release-manifest.json` in the release folder)
 
@@ -191,7 +264,15 @@ remain in place.
   It checks `releases/forest-api-baseline-.../api.py` has SHA-256 `dfbf12fe…`, installs
   `rollback-release.conf` over `50-meza-karte-release.conf`, runs `daemon-reload`, restarts
   `forest-api` and checks it is active.
-- **forest-map-violations → remove-map-sidebar (current rollback target):**
+- **lvm-geo-lv-ui → forest-map-violations (current rollback target):**
+  ```sh
+  rm -f /etc/systemd/system/forest-api.service.d/95-lvm-geo-lv-ui-release.conf
+  systemctl daemon-reload && systemctl restart forest-api
+  readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd   # → …/forest-api-forest-map-violations-20261109T1623Z
+  ```
+  Confirm `/api/deployment` reports `geo-3b9cdfaac106`. No data to restore (no migrations). Sectors registered
+  through the new LVM GEO bar remain as ordinary sectors with their provenance.
+- **forest-map-violations → remove-map-sidebar (older):**
   ```sh
   printf '[Service]\nWorkingDirectory=/root/forest_ai/releases/forest-api-remove-map-sidebar-20261109T1431Z\n' \
     > /etc/systemd/system/forest-api.service.d/90-forest-map-violations-release.conf

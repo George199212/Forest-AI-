@@ -22,3 +22,18 @@
   cannot verify same place for forest photos taken from different positions (parallax), so it is not used.
 - `bot.py` hardcodes the dashboard link as `http://164.90.188.136:8000` (3 places). A bot for
   a client instance would send users to the main dashboard. Still present (checked 2026-11-09).
+
+- LVM GEO (fixed on `feature/lvm-geo-finish`, not deployed, 2026-11-10): clicking a compartment polygon to
+  read its popup toggled its selection; clicking an off-page selected polygon removed it; a row click
+  scrolled the page to the map; every toggle rebuilt the table. Live :8000 (frontend `fd3d2c6`) still has
+  the polygon-click toggle until this branch is deployed.
+- Forest Map (fixed on `feature/lvm-geo-finish`, not deployed, 2026-11-10): basemap switch only in the
+  sidebar, below the fold; no control on the map.
+- LVM GEO boundary rule (by design, not changed): compartments with a few cm² outside the VZD land unit
+  are blocked as "Robežu neatbilstība" (e.g. 01000920499: 35 of 84 blocked, all < 1 m² outside).
+  Needs a product decision on a tolerance.
+- Sidebar language switches with the page on :8000: Latvian only while LVM GEO is open
+  (`localizeGeodataNavigation`), English elsewhere; header time `lv-LV` only on LVM GEO. Found 2026-11-10.
+- Pre-existing test failures on master with the real data catalogues (unrelated to this branch):
+  `tests/test_vmd_production.py::test_actual_logged_no_match_reports_limited_source_coverage` (3 params) and
+  `::test_official_outside_parcel_is_coverage_diagnostic_never_a_forest_match`. Found 2026-11-10.
