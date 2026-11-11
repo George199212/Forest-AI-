@@ -440,6 +440,55 @@ Radar anomalies (S1-only, two consecutive same-geometry drops). None is promoted
 
 The series and sheets were produced with `satellite_monitoring/evidence.py` (`event_review`).
 
+## 10. Offline re-run after the Ķekava fixes F1–F4 (2026-11-11)
+
+**Code:** `4853cc0`. The fixes are described in `docs/SATELLITE_POSITIVE_CONTROL_KEKAVA.md` §5/§7:
+- **F1:** rule b deduplicated.
+- **F2:** class decided on the onset month.
+- **F3:** VMD forest mask, and rule b needs ≥ 3 distinct relative orbits.
+- **F4:** evaluation only, not used for BIK-001.
+
+**How:**
+- Same method as §9, on a **copy** of the live `satellite.db` (sha256 `9ce79c76…`, unchanged).
+- Two fresh DBs over the same 127 stored acquisitions: **before** = `ae6bdfa` (the §9 code plus EVAL_BBOX and
+  the evaluation module), **after** = `4853cc0`.
+- 0 requests, 0 PU, 0 errors. The before run reproduces §9 exactly.
+
+**Forest mask, BIK-001** (PROCESSED):
+- 114 VMD compartments, all zkat 10.
+- Forest share: inside 0.783, buffer 0.618. **Non-forest share of INSIDE+BUFFER: 0.283** (stored in
+  `sat_area_masks`).
+- 5,970 pixels analysed.
+
+| | before (`ae6bdfa`, = §9) | after (`4853cc0`) |
+|---|---|---|
+| events | 2 | **0** |
+| distinct change locations | 2 | 0 |
+| classifications | SEASONAL 2 | — |
+| outside events (POTENTIAL_CHANGE_OUTSIDE_BOUNDARY) | 0 | 0 |
+| radar anomalies (promoted) | 5 (0) | 3 (0) |
+| S2 candidates CONFIRMED / PENDING / TRANSIENT | 2 / 1 / 7 | 0 / 0 / 6 |
+| detections CANDIDATE_BELOW_MIN | 6 | 17 |
+
+**Why the two seasonal events disappear (PROCESSED, checked on the copies):**
+- 111 of event 1's 299 pixels (37 %) and 65 of event 2's 116 pixels (56 %) lie outside VMD compartments. They
+  are no longer analysed.
+- With the mask, the 10-20 change shrinks to 126 px (candidate 6). On 10-27 its persistence is **0.0** →
+  TRANSIENT. The persistent part of the old candidate 8 (57 %) was on non-forest land.
+- The 10-27 and 11-06 changes break into clusters below `min_cluster_ha` 0.3 ha (largest 0.17 and 0.29 ha) →
+  CANDIDATE_BELOW_MIN, so no candidate is created.
+
+BIK-001 is the negative control (no felling expected), so 0 events is the expected direction.
+
+**Per stand / per event:** BIK-001 has no ground-truth stands. The before/after per-event rows are in
+`/root/forest_ai_satellite_data/eval/rerun_f1f4_{before,after}_20261111.json` (`summary."1"`).
+
+**Not verified:**
+- The masked-out pixels were not visually confirmed as non-forest. The VMD register snapshot is 2026-10-07.
+- The §9 HUMAN decision (both events seasonal) still stands. The re-run does not replace it.
+- The masking cuts clusters at the forest edge. Here that removed small clusters (0.17 / 0.29 ha), and it
+  could also hide a small felling at a stand edge. Not measured.
+
 ## Appendix A — product list (Catalog discovery 2026-08-01 … 2026-11-10, stored status)
 
 | acq | sensor | platform | sensing (UTC) | orbit / rel. orbit | scene cloud % | status |
