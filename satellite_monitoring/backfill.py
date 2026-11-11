@@ -28,7 +28,7 @@ def _resolve(conn, args):
         with open(args.geometry_file) as fh:
             g = json.load(fh)
         g = g.get("geometry", g) if g.get("type") == "Feature" else g
-        src = {"source": "LVM_GEO", "source_ref": args.source_ref, "name": args.name or args.area,
+        src = {"source": args.source, "source_ref": args.source_ref, "name": args.name or args.area,
                "geometry": geo.to_crs84(g, args.geometry_crs)}
         if not src["source_ref"]:
             raise SystemExit("--geometry-file needs --source-ref")
@@ -141,6 +141,8 @@ def main(argv=None):
     ap.add_argument("--geometry-file")
     ap.add_argument("--geometry-crs", default="EPSG:4326")
     ap.add_argument("--source-ref")
+    ap.add_argument("--source", default="LVM_GEO", choices=["LVM_GEO", "EVAL_BBOX"],
+                    help="for --geometry-file: LVM_GEO polygon or EVAL_BBOX evaluation/test area")
     ap.add_argument("--name")
     ap.add_argument("--added-by", default="cli")
     ap.add_argument("--json", action="store_true")

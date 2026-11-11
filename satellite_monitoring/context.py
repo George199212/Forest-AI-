@@ -101,7 +101,7 @@ def operational_context(area, window_from_iso, window_to_iso, buffer_m, forest_c
             if not _table_exists(c, table):
                 continue
             if sector is None:
-                out["sources"][key] = {"count": None, "reason": "no sector link for this area (LVM GEO)"}
+                out["sources"][key] = {"count": None, "reason": "no sector link for this area (source is not SECTOR)"}
                 continue
             demo = ", COALESCE(is_demo,0) AS is_demo" if table == "timber_movements" else ", 0 AS is_demo"
             rows = c.execute(f"SELECT id{demo} FROM {table} WHERE sector=? AND substr({col},1,19) BETWEEN ? AND ?",

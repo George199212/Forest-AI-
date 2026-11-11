@@ -970,3 +970,31 @@ def test_evidence_series_nulls_and_review_sheet(env, monkeypatch):
     assert [r for r, _ in out["roles"]][-1] == "after" and out["roles"][0][0] in ("baseline", "last clear")
     p = env["tmp"] / "review" / f"event_{ev['id']}_review.png"
     assert p.exists() and p.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n" and (p.stat().st_mode & 0o777) == 0o600
+
+
+def test_area_source_migration_adds_eval_bbox(tmp_path):
+    """An old DB (CHECK only SECTOR/LVM_GEO) is rebuilt on connect; rows, ids and FKs survive."""
+    old = SCHEMA_OLD = sdb.SCHEMA.replace("CHECK (source IN ('SECTOR','LVM_GEO','EVAL_BBOX'))",
+                                          "CHECK (source IN ('SECTOR','LVM_GEO'))")
+    assert SCHEMA_OLD != sdb.SCHEMA
+    p = tmp_path / "old.db"
+    c = sqlite3.connect(p)
+    c.executescript(old)
+    c.execute("INSERT INTO sat_monitored_areas (id, source, source_ref, name, geometry_geojson, area_ha, buffer_m,"
+              " grid_json, added_by, added_at_utc) VALUES (7,'SECTOR','26','BIK-001','{}',50,100,'{}','t','x')")
+    c.execute("INSERT INTO sat_acquisitions (monitored_area_id, sensor, product_id, sensing_time_utc, status)"
+              " VALUES (7,'S2','P1','2026-08-01T00:00:00Z','PENDING')")
+    c.commit()
+    with pytest.raises(sqlite3.IntegrityError):
+        c.execute("INSERT INTO sat_monitored_areas (source, source_ref, name, geometry_geojson, area_ha, buffer_m,"
+                  " grid_json, added_by, added_at_utc) VALUES ('EVAL_BBOX','k','K','{}',1,100,'{}','t','x')")
+    c.close()
+    conn = sdb.connect(p)                                                # migrates
+    assert "'EVAL_BBOX'" in conn.execute("SELECT sql FROM sqlite_master WHERE name='sat_monitored_areas'").fetchone()[0]
+    assert conn.execute("SELECT id, name FROM sat_monitored_areas").fetchall()[0][:] == (7, "BIK-001")
+    assert conn.execute("SELECT monitored_area_id FROM sat_acquisitions").fetchone()[0] == 7
+    assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+    aid, created = areas.create(conn, "EVAL_BBOX", "kekava-test", "Kekava test", SQUARE, "test")
+    assert created and areas.load(conn, aid)["source"] == "EVAL_BBOX"
+    conn.close()
+    sdb.connect(p).close()                                               # idempotent

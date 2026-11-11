@@ -42,8 +42,8 @@ def prepare(geometry, cfg=None):
 
 def create(conn, source, source_ref, name, geometry, added_by, cfg=None):
     cfg = cfg or config.DEFAULTS
-    if source not in ("SECTOR", "LVM_GEO"):
-        raise AreaError("source must be SECTOR or LVM_GEO")
+    if source not in sdb.AREA_SOURCES:
+        raise AreaError("source must be one of " + ", ".join(sdb.AREA_SOURCES))
     if not source_ref or not name:
         raise AreaError("source_ref and name are required")
     existing = conn.execute("SELECT id FROM sat_monitored_areas WHERE source=? AND source_ref=? AND active=1",

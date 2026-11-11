@@ -14,7 +14,7 @@ from . import config
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sat_monitored_areas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source TEXT NOT NULL CHECK (source IN ('SECTOR','LVM_GEO')),
+    source TEXT NOT NULL CHECK (source IN ('SECTOR','LVM_GEO','EVAL_BBOX')),   -- EVAL_BBOX: evaluation/test area
     source_ref TEXT NOT NULL,
     name TEXT NOT NULL,
     geometry_geojson TEXT NOT NULL,          -- GeoJSON Polygon, CRS84 (lon,lat)
@@ -240,6 +240,43 @@ def iso(dt):
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+AREA_SOURCES = ("SECTOR", "LVM_GEO", "EVAL_BBOX")
+
+
+def _migrate_area_source_check(conn):
+    """2026-11-11: sat_monitored_areas.source gains 'EVAL_BBOX'. SQLite cannot alter a CHECK, so the table
+    is rebuilt (documented 12-step procedure: FKs off, copy, drop, rename, FK check). Idempotent."""
+    sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='sat_monitored_areas'").fetchone()[0]
+    if "'EVAL_BBOX'" in sql:
+        return
+    new_sql = sql.replace("CHECK (source IN ('SECTOR','LVM_GEO'))",
+                          "CHECK (source IN ('SECTOR','LVM_GEO','EVAL_BBOX'))", 1)
+    if new_sql == sql:
+        raise RuntimeError("sat_monitored_areas: unexpected schema, refusing to migrate")
+    n = conn.execute("SELECT COUNT(*) FROM sat_monitored_areas").fetchone()[0]
+    conn.execute("PRAGMA foreign_keys=OFF")
+    try:
+        conn.execute("BEGIN")
+        conn.execute(new_sql.replace("CREATE TABLE sat_monitored_areas", "CREATE TABLE sat_monitored_areas_new", 1)
+                     .replace("CREATE TABLE IF NOT EXISTS sat_monitored_areas",
+                              "CREATE TABLE sat_monitored_areas_new", 1))
+        conn.execute("INSERT INTO sat_monitored_areas_new SELECT * FROM sat_monitored_areas")
+        conn.execute("DROP TABLE sat_monitored_areas")
+        conn.execute("ALTER TABLE sat_monitored_areas_new RENAME TO sat_monitored_areas")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_sat_area_active_ref ON sat_monitored_areas (source, "
+                     "source_ref) WHERE active = 1")
+        if conn.execute("SELECT COUNT(*) FROM sat_monitored_areas").fetchone()[0] != n:
+            raise RuntimeError("row count changed")
+        if conn.execute("PRAGMA foreign_key_check").fetchall():
+            raise RuntimeError("foreign key check failed")
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys=ON")
+
+
 def connect(path=None):
     path = path or config.sat_db_path()
     from pathlib import Path
@@ -249,6 +286,7 @@ def connect(path=None):
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    _migrate_area_source_check(conn)
     for suffix in ("", "-wal", "-shm"):
         config.secure_file(str(path) + suffix)
     return conn
