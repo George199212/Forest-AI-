@@ -998,3 +998,17 @@ def test_area_source_migration_adds_eval_bbox(tmp_path):
     assert created and areas.load(conn, aid)["source"] == "EVAL_BBOX"
     conn.close()
     sdb.connect(p).close()                                               # idempotent
+
+
+def test_positive_control_helpers():
+    from satellite_monitoring import positive_control as pc
+    assert pc.wilson(0, 0) == (None, None)
+    lo, hi = pc.wilson(9, 18)
+    assert lo < 0.5 < hi and 0.25 < lo and hi < 0.75
+    assert pc.wilson(18, 18)[1] == 1.0
+    m = np.zeros((7, 7), bool)
+    m[1:6, 1:6] = True                                                   # 5x5 -> interior 3x3 (-1 px = -10 m)
+    assert int(pc._erode(m).sum()) == 9
+    g = geo.make_grid(SQUARE, 0, 10.0)
+    r = pc._raster(SQUARE, g)
+    assert r.dtype == bool and 0.8 < r.mean() <= 1.0

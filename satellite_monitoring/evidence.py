@@ -58,17 +58,38 @@ def _outline(mask):
     return edge & m
 
 
-def review_sheet(conn, area, acq_ids, mask, out_path, scale=4):
-    """acq_ids: ordered list of (role, acq_id). Writes a PNG (file mode 600) and returns its path."""
+def _crop_box(mask, margin=30, min_side=80):
+    """Pixel window around the mask (+margin), at least min_side px, clipped to the grid."""
+    h, w = mask.shape
+    rows, cols = np.where(mask)
+    if rows.size == 0:
+        return 0, h, 0, w
+    r0, r1 = rows.min() - margin, rows.max() + 1 + margin
+    c0, c1 = cols.min() - margin, cols.max() + 1 + margin
+    if r1 - r0 < min_side:
+        d = (min_side - (r1 - r0)) // 2
+        r0, r1 = r0 - d, r1 + d
+    if c1 - c0 < min_side:
+        d = (min_side - (c1 - c0)) // 2
+        c0, c1 = c0 - d, c1 + d
+    return max(0, r0), min(h, r1), max(0, c0), min(w, c1)
+
+
+def review_sheet(conn, area, acq_ids, mask, out_path, scale=None, max_tile_px=360):
+    """acq_ids: ordered list of (role, acq_id). Tiles are cropped to the mask extent (+30 px) so the outline is
+    readable on large areas. Writes a PNG (file mode 600) and returns its path."""
     from PIL import Image, ImageDraw
     tiles = []
-    edge = _outline(mask)
+    r0, r1, c0, c1 = _crop_box(mask)
+    edge = _outline(mask)[r0:r1, c0:c1]
+    if scale is None:
+        scale = max(1, min(6, max_tile_px // max(r1 - r0, c1 - c0)))
     for role, aid in acq_ids:
         acq = dict(conn.execute("SELECT * FROM sat_acquisitions WHERE id=?", (aid,)).fetchone())
         arr = _arr(acq, area["grid"])
         valid = met.s2_layers(arr)["valid"] if acq["sensor"] == "S2" else met.s1_layers(arr)["valid"]
         img = Image.open(io.BytesIO(raster.quicklook_png(acq["sensor"], arr, valid))).convert("RGB")
-        a = np.array(img)
+        a = np.array(img)[r0:r1, c0:c1].copy()
         a[edge] = (255, 230, 0)
         img = Image.fromarray(a).resize((a.shape[1] * scale, a.shape[0] * scale), Image.NEAREST)
         canvas = Image.new("RGB", (img.width, img.height + 16), (0, 0, 0))
