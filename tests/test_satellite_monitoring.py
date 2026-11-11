@@ -950,3 +950,23 @@ def test_local_cut_is_not_uniform():
     ch, comp, d = det.s2_change(met.s2_layers(s2_arr(g, m)), [base], zone)
     u = det.uniform_drop(ch, comp, d)
     assert u["drop_fraction"] == pytest.approx(0.25) and not u["is_uniform"]
+
+
+def test_evidence_series_nulls_and_review_sheet(env, monkeypatch):
+    from satellite_monitoring import evidence
+    monkeypatch.setattr(evidence.raster, "decode_tiff", decoder)        # stored fake rasters are .npy bytes
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=5)
+    cloudy = s2_arr(a["grid"])
+    cloudy[centre_block(a, 16), 4] = 9.0                                 # cloud over the (later) cut only
+    rasters["S2_2026-06-15"] = cloudy
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    c = env["conn"]
+    ev = dict(c.execute("SELECT * FROM sat_change_events").fetchone())
+    out = evidence.event_review(c, areas.load(c, a["id"]), ev, env["tmp"] / "review")
+    by_day = {r["time"][:10]: r for r in out["S2"]}
+    assert by_day["2026-06-15"]["NDVI"] is None and by_day["2026-06-15"]["valid_pct"] == 0.0   # NULL, not 0
+    assert by_day["2026-06-05"]["NDVI"] > by_day["2026-07-15"]["NDVI"]
+    assert [r for r, _ in out["roles"]][-1] == "after" and out["roles"][0][0] in ("baseline", "last clear")
+    p = env["tmp"] / "review" / f"event_{ev['id']}_review.png"
+    assert p.exists() and p.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n" and (p.stat().st_mode & 0o777) == 0o600

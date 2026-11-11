@@ -365,6 +365,81 @@ system numpy. I did not check whether the 13:22 install affects the :8000 API or
   Note: in the BIK-001 offline re-run of 2026-11-11, G never triggered (highest drop fraction 0.358,
   on 2026-10-10).
 
+## 9. Offline re-run 2026-11-11 (A/B/F/G + RADAR_ANOMALY rule)
+
+**How:** code at the commit that adds this section (`fde1302` A/B/F/G, the S1 RADAR_ANOMALY rule, venv2).
+Detection was re-run on a **scratch copy**. A fresh DB was built in the session scratchpad from the 127 stored
+acquisitions of run #1. The stored RAW GeoTIFFs were sha256-checked, and the provider refuses any network
+call. Result: **0 requests, 0 PU, no errors**. The live `satellite.db` still holds the run #1 detections
+and the 9 events of §4; it was not modified.
+
+**Result:** 2 suspected events, both S2-only and both `POSSIBLE_SEASONAL_OR_ENVIRONMENTAL`. There are 0 S1
+events. The 5 S1-only drops are now `RADAR_ANOMALY` rows and none is promoted. 10 S2 candidates: 7
+`TRANSIENT`, 2 `CONFIRMED` (both into event 1) and 1 still `PENDING_CONFIRMATION` (11-06).
+
+**HUMAN decision (2026-11-11):** both events are accepted as seasonal. No risk is created. The evidence below
+is attached so that a human can verify it.
+
+| # | classification | conf. / evidence | basis | after window (UTC) | changed ha (in / buffer) | ctx | S2 confirmation |
+|---|---|---|---|---|---|---|---|
+| 1 | POSSIBLE_SEASONAL_OR_ENVIRONMENTAL | MEDIUM / LIMITED | S2 | 2026-10-20 … 2026-11-06 | 2.99 (2.99 / 0.00) | CHANGE_DURING_REGISTERED_WORK | cand. 8 (10-20) confirmed by 10-27, 57 % persist; cand. 9 (10-27) confirmed by 11-06, 96 % |
+| 2 | POSSIBLE_SEASONAL_OR_ENVIRONMENTAL | MEDIUM / LIMITED | S2 | 2026-10-27 … 2026-11-06 | 1.16 (0.76 / 0.40) | CHANGE_DURING_REGISTERED_WORK | clusters of cand. 9 not matching event 1 |
+
+Both events are at mostly new locations: only 17 of event 1's 299 pixels overlap the §4 events.
+
+**Review sheets** (PROCESSED, false colour B11/B08/B04, yellow = event mask outline, grey = invalid; file
+mode 600): `/root/forest_ai_satellite_data/satellite/1/events/review_rerun_20261111/event_{1,2}_review.png`.
+Tiles: `baseline` (last S2 baseline, #90 09-07, cloud-masked over the event), `last clear` (latest S2 that is
+usable over the mask), then every `after` image.
+
+**My reading (INTERPRETATION, not a decision):**
+- **Event 1 should be checked by a human before the "seasonal" label is relied on.**
+  - From 10-20 a compact brown patch appears inside the outline. In this false colour that is the
+    bare-soil / clear-cut colour, and it is not a uniform fade.
+  - The context is CHANGE_DURING_REGISTERED_WORK.
+  - Against that, S1 VH over the same mask shows no drop: it stays at −14.8 … −12.4 dB on all four
+    geometries from August to November. A clear-cut usually lowers VH by ≥ 2 dB.
+  - So: a thinning or small local clearing, or seasonal. I cannot tell which from these images.
+- **Event 2:** thin linear clusters along a ditch/track and a field edge. This is consistent with edge
+  senescence.
+
+Per-event S2 medians over the event mask (NULL = < 60 % of the mask valid after the 3-px cloud dilation):
+
+| date | acq | mask valid % | ev 1 NDVI | ev 1 NBR | ev 1 NDMI | ev 2 NDVI | ev 2 NBR | ev 2 NDMI |
+|---|---|---|---|---|---|---|---|---|
+| 2026-08-14 | 76 | 100 / 100 | 0.845 | 0.676 | 0.396 | 0.829 | 0.637 | 0.353 |
+| 2026-08-19 | 79 | 2 / 100 | NULL | NULL | NULL | 0.864 | 0.643 | 0.349 |
+| 2026-08-21 | 80 | 100 / 100 | 0.861 | 0.678 | 0.392 | 0.804 | 0.610 | 0.331 |
+| 2026-08-21 | 81 | 74 / 61 | 0.867 | 0.689 | 0.396 | 0.836 | 0.623 | 0.334 |
+| 2026-08-28 | 84 | 100 / 100 | 0.880 | 0.670 | 0.376 | 0.876 | 0.639 | 0.343 |
+| 2026-09-07 | 90 | 20 / 74 | NULL | NULL | NULL | 0.861 | 0.622 | 0.329 |
+| 2026-09-15 | 95 | 100 / 100 | 0.853 | 0.637 | 0.339 | 0.857 | 0.631 | 0.336 |
+| 2026-09-28 | 103 | 99 / 71 | 0.859 | 0.639 | 0.335 | 0.870 | 0.665 | 0.361 |
+| 2026-10-03 | 106 | 100 / 100 | 0.806 | 0.582 | 0.294 | 0.794 | 0.562 | 0.282 |
+| 2026-10-07 | 108 | 100 / 100 | 0.781 | 0.559 | 0.263 | 0.769 | 0.514 | 0.235 |
+| 2026-10-10 | 110 | 100 / 100 | 0.654 | 0.492 | 0.249 | 0.594 | 0.413 | 0.218 |
+| 2026-10-18 | 115 | 100 / 100 | 0.765 | 0.532 | 0.245 | 0.730 | 0.468 | 0.194 |
+| 2026-10-20 | 116 | 98 / 83 | 0.670 | 0.489 | 0.201 | 0.634 | 0.459 | 0.192 |
+| 2026-10-27 | 119 | 100 / 100 | 0.631 | 0.427 | 0.153 | 0.600 | 0.393 | 0.116 |
+| 2026-11-06 | 124 | 100 / 100 | 0.597 | 0.388 | 0.110 | 0.607 | 0.339 | 0.085 |
+
+S2 images where both masks are < 60 % valid (08-04, 08-08, 08-11, 08-24, 08-26, 09-03, 09-27, 10-10 #111) are
+left out.
+
+Radar anomalies (S1-only, two consecutive same-geometry drops). None is promoted:
+- rule a: no S2-backed event overlaps them within 24 days;
+- rule b: no pixels drop in ≥ 3 anomalies on ≥ 2 geometries.
+
+| # | S1 image (UTC) | geometry | ha | status |
+|---|---|---|---|---|
+| 1 | 2026-08-14 16:03 | ASCENDING/58 | 0.79 | RADAR_ANOMALY |
+| 2 | 2026-08-15 04:42 | DESCENDING/153 | 0.38 | RADAR_ANOMALY |
+| 3 | 2026-10-07 16:03 | ASCENDING/58 | 0.31 | RADAR_ANOMALY |
+| 4 | 2026-10-14 04:42 | DESCENDING/153 | 0.32 | RADAR_ANOMALY |
+| 5 | 2026-11-02 04:34 | DESCENDING/80 | 0.32 | RADAR_ANOMALY |
+
+The series and sheets were produced with `satellite_monitoring/evidence.py` (`event_review`).
+
 ## Appendix A — product list (Catalog discovery 2026-08-01 … 2026-11-10, stored status)
 
 | acq | sensor | platform | sensing (UTC) | orbit / rel. orbit | scene cloud % | status |
