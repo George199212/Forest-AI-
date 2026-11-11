@@ -328,6 +328,11 @@ def selected_import(feature_ids,version,actor,dry_run=True,territory_id=None,res
         source_report=report(src)
         if source_report['dataset_version']!=version:raise DatasetError('Dataset version changed; repeat your search',409)
         if not dry_run:app.execute('BEGIN IMMEDIATE')
+        plan_id=None
+        if not dry_run:
+            plan_cur=app.execute('''INSERT INTO boundary_plans(file_path,document_type,uploaded_at,status,uploaded_by,plan_data_json,object_name)
+                VALUES(?,?,?,?,?,?,?)''',('','vmd_production_import',store.stamp(),'registered',actor,'{}',name_input))
+            plan_id=plan_cur.lastrowid
         try:
             for fid in feature_ids:
                 result={'external_id':fid};row=src.execute('SELECT * FROM compartments WHERE external_id=?',(fid,)).fetchone()
@@ -366,8 +371,8 @@ def selected_import(feature_ids,version,actor,dry_run=True,territory_id=None,res
                     'source_crs':row['source_crs'] if 'source_crs' in row.keys() else 'EPSG:10306','imported_at':now,'source_last_checked_at':now}
                 app.execute('SAVEPOINT compartment_import')
                 try:
-                    cur=app.execute('''INSERT INTO sectors(name,contractor,status,approved_volume,map_url,image_path,boundary_json,center_lat,center_lon,area_ha,color,created_at,updated_at,data_origin,organization_id,created_by_user_id,created_by_account,responsible_first_name,responsible_last_name)
-                        VALUES(?,?,'Planned','','','',?,?,?,?,'#4b9d54',?,?,'REAL',?,?,?,?,?)''',(name,'',encoded,lat,lon,props['area_ha'],now,now,identity['organization_id'],identity['user_id'],actor,first,last))
+                    cur=app.execute('''INSERT INTO sectors(name,contractor,status,approved_volume,map_url,image_path,boundary_json,center_lat,center_lon,area_ha,color,created_at,updated_at,data_origin,organization_id,created_by_user_id,created_by_account,responsible_first_name,responsible_last_name,boundary_plan_id,object_name)
+                        VALUES(?,?,'Planned','','','',?,?,?,?,'#4b9d54',?,?,'REAL',?,?,?,?,?,?,?)''',(name,'',encoded,lat,lon,props['area_ha'],now,now,identity['organization_id'],identity['user_id'],actor,first,last,plan_id,name_input))
                     sector={'id':cur.lastrowid,'name':name};columns=list(metadata)
                     app.execute('INSERT INTO geodata_sources(sector_id,sector,organization_id,'+','.join(columns)+') VALUES('+','.join('?' for _ in range(len(columns)+3))+')',[sector['id'],name,1]+[metadata[k] for k in columns])
                     store._history(app,sector,actor,'IMPORT_VMD_OPEN_DATA',None,encoded,metadata);app.execute('RELEASE compartment_import')

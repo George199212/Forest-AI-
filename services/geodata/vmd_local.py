@@ -130,6 +130,12 @@ def import_features(feature_ids, version, actor):
         c.execute('BEGIN IMMEDIATE')
         _check_storage(c)
         mappings = _mappings(c)
+        first_feature = next((features[fid] for fid in feature_ids if fid in features), None)
+        kadastrs = str(first_feature['properties'].get('kadastrs', '')).strip() if first_feature else ''
+        object_name = f"VMD {kadastrs}" if kadastrs else "VMD local import"
+        plan_cur = c.execute('''INSERT INTO boundary_plans(file_path,document_type,uploaded_at,status,uploaded_by,plan_data_json,object_name)
+            VALUES(?,?,?,?,?,?,?)''', ('', 'vmd_local_import', store.stamp(), 'registered', actor, '{}', object_name))
+        plan_id = plan_cur.lastrowid
         for fid in feature_ids:
             result = {'external_id': fid}
             if fid not in features:
@@ -162,8 +168,8 @@ def import_features(feature_ids, version, actor):
             c.execute('SAVEPOINT vmd_feature')
             try:
                 cursor = c.execute('''INSERT INTO sectors
-                    (name,contractor,status,approved_volume,map_url,image_path,boundary_json,center_lat,center_lon,area_ha,color,created_at,updated_at,data_origin)
-                    VALUES(?,'','Planned','','','',?,?,?,?, '#4b9d54',?,?,'REAL')''', (name, encoded, lat, lon, area, t, t))
+                    (name,contractor,status,approved_volume,map_url,image_path,boundary_json,center_lat,center_lon,area_ha,color,created_at,updated_at,data_origin,boundary_plan_id,object_name)
+                    VALUES(?,'','Planned','','','',?,?,?,?, '#4b9d54',?,?, 'REAL', ?, ?)''', (name, encoded, lat, lon, area, t, t, plan_id, object_name))
                 sector = {'id': cursor.lastrowid, 'name': name}
                 columns = list(source)
                 c.execute('INSERT INTO geodata_sources (sector_id,sector,organization_id,'+','.join(columns)+') VALUES('+','.join('?' for _ in range(len(columns)+3))+')',

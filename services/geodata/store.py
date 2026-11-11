@@ -185,6 +185,11 @@ def import_selected(token, feature_ids, actor):
     with closing(connect()) as c, c:
         c.execute('BEGIN IMMEDIATE')
         payload = _payload(c, token, actor, 'import')
+        layer = payload['layer']
+        object_name = f"LVM GEO — {layer.get('title') or layer.get('name') or 'import'}"
+        plan_cur = c.execute('''INSERT INTO boundary_plans(file_path,document_type,uploaded_at,status,uploaded_by,plan_data_json,object_name)
+            VALUES(?,?,?,?,?,?,?)''', ('', 'lvm_geo_wfs_import', stamp(), 'registered', actor, '{}', object_name))
+        plan_id = plan_cur.lastrowid
         results = []
         for fid in feature_ids:
             f = payload['features'].get(fid)
@@ -207,8 +212,8 @@ def import_selected(token, feature_ids, actor):
                 next_id += 1; name = f'GEO-{next_id:04d}'
             t = stamp()
             cursor = c.execute('''INSERT INTO sectors
-                (name,contractor,status,approved_volume,boundary_json,center_lat,center_lon,area_ha,color,created_at,updated_at,data_origin)
-                VALUES(?,'','Planned','',?,?,?,?, 'green',?,?,'REAL')''', (name,encoded,lat,lon,area,t,t))
+                (name,contractor,status,approved_volume,boundary_json,center_lat,center_lon,area_ha,color,created_at,updated_at,data_origin,boundary_plan_id,object_name)
+                VALUES(?,'','Planned','',?,?,?,?, 'green',?,?, 'REAL', ?, ?)''', (name,encoded,lat,lon,area,t,t,plan_id,object_name))
             sector = {'id': cursor.lastrowid, 'name': name}
             source = _source(payload['layer'], f)
             columns = list(source)
