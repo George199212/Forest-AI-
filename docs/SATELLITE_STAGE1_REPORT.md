@@ -351,6 +351,20 @@ system numpy. I did not check whether the 13:22 install affects the :8000 API or
   if you want this kept reproducible.
 - Review sheets: `/root/forest_ai_satellite_data/satellite/1/events/review/event_<n>_review.png` (600).
 
+### Open calibration items (recorded 2026-11-11; nothing changed)
+
+- **C1: uniform drop (G) vs. near-total clear-cut of a small area.** G marks an S2 image as
+  `UNIFORM_DROP_ATMOSPHERIC` when at least 60 % of the comparable pixels (INSIDE + BUFFER) pass the change rule
+  and std(dNDVI) ≤ 0.10 (`uniform_drop_min_fraction`, `uniform_drop_max_std_dndvi`). A small area felled almost
+  completely, buffer included, has the same signature, and G would hide it. G uses NDVI only, so it cannot
+  tell the two apart. A possible separator to test: haze and thin cloud raise blue reflectance (B02) across
+  the scene, while a fresh cut raises SWIR (B11/B12) on the cut pixels. B11/B12 are already stored. B02 is
+  **not** requested (the evalscript asks for B04, B08, B11, B12, SCL and dataMask), so a B02 test needs an
+  evalscript change, and the PU per S2 request rises from 5/3 to 6/3 band factor. Calibrate on the Ķekava positive
+  control (19 VMD 2026 clear-cuts) and the BIK-001 negative control before any threshold or rule change.
+  Note: in the BIK-001 offline re-run of 2026-11-11, G never triggered (highest drop fraction 0.358,
+  on 2026-10-10).
+
 ## Appendix A — product list (Catalog discovery 2026-08-01 … 2026-11-10, stored status)
 
 | acq | sensor | platform | sensing (UTC) | orbit / rel. orbit | scene cloud % | status |
