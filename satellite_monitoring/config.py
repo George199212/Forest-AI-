@@ -93,6 +93,17 @@ DEFAULTS = {
     "s2_dndmi_threshold": -0.10,         # supporting metric only (bare-soil indicator)
     "s1_vh_drop_db": 2.0,
     "s1_filter_size": 3,
+    # S1-only persistent drops are RADAR_ANOMALY observations (timeline only, no event, no risk).
+    # Promotion to an event (decided 2026-11-11):
+    #  (a) an S2-backed event overlaps the anomaly and has an S2 after-image within this many days, or
+    #  (b) the same pixels drop in >= s1_promote_min_acq anomaly acquisitions from >= s1_promote_min_orbits
+    #      different (orbit_direction, relative_orbit) geometries, as a cluster >= s1_promote_min_ha,
+    #      all anomalies within s1_promote_window_days.
+    "s1_anomaly_s2_confirm_days": 24,
+    "s1_promote_min_acq": 3,
+    "s1_promote_min_orbits": 2,
+    "s1_promote_min_ha": 0.5,
+    "s1_promote_window_days": 60,        # INITIAL; equals ongoing_max_gap_days
     "min_cluster_ha": 0.3,
     "outside_min_ha": 0.3,               # changed ha in BUFFER for POTENTIAL_CHANGE_OUTSIDE_BOUNDARY
     "high_confidence_max_gap_days": 24,  # S1 and S2 both within this -> HIGH
@@ -145,5 +156,7 @@ def thresholds_snapshot():
             "baseline_max_age_days", "min_valid_pct", "s2_valid_scl", "high_confidence_max_gap_days",
             "ongoing_overlap_fraction", "ongoing_max_gap_days", "seasonal_months", "snow_max_pct",
             "buffer_m", "pixel_m", "s2_cloud_scl", "s2_cloud_dilate_px", "candidate_min_comparable_fraction",
-            "candidate_persist_fraction", "uniform_drop_min_fraction", "uniform_drop_max_std_dndvi"]
+            "candidate_persist_fraction", "uniform_drop_min_fraction", "uniform_drop_max_std_dndvi",
+            "s1_anomaly_s2_confirm_days", "s1_promote_min_acq", "s1_promote_min_orbits", "s1_promote_min_ha",
+            "s1_promote_window_days"]
     return {k: DEFAULTS[k] for k in keys}

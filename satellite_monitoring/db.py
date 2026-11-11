@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS sat_detections (
     monitored_area_id INTEGER NOT NULL,
     sensor TEXT NOT NULL,
     ran_at_utc TEXT NOT NULL,
-    outcome TEXT NOT NULL,                   -- NOT_USABLE | NO_BASELINE | NO_CHANGE | SINGLE_DROP | CANDIDATE_BELOW_MIN | EVENT_CREATED | EVENT_UPDATED
+    outcome TEXT NOT NULL,                   -- NOT_USABLE | NO_BASELINE | NO_CHANGE | SINGLE_DROP | CANDIDATE_BELOW_MIN | RADAR_ANOMALY | PENDING_CONFIRMATION | UNIFORM_DROP_ATMOSPHERIC | EVENT_CREATED | EVENT_UPDATED
     baseline_acq_ids TEXT,
     n_changed_pixels INTEGER,
     changed_area_ha REAL,
@@ -186,6 +186,35 @@ CREATE TABLE IF NOT EXISTS sat_provider_status (
     key TEXT PRIMARY KEY,                    -- token | catalog | process
     last_ok_utc TEXT, last_error_utc TEXT, last_error TEXT
 );
+
+CREATE TABLE IF NOT EXISTS sat_radar_anomalies (
+    -- INTERPRETATION: S1-only persistent VH drop (same geometry, two consecutive passes).
+    -- Shown in the timeline; NOT an event and never a risk unless promoted (rules a/b in config).
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitored_area_id INTEGER NOT NULL REFERENCES sat_monitored_areas(id),
+    acquisition_id INTEGER NOT NULL UNIQUE REFERENCES sat_acquisitions(id),
+    sensing_time_utc TEXT NOT NULL,
+    orbit_direction TEXT NOT NULL,
+    relative_orbit INTEGER NOT NULL,
+    baseline_acq_ids TEXT NOT NULL,
+    previous_acq_id INTEGER REFERENCES sat_acquisitions(id),
+    created_at_utc TEXT NOT NULL,
+    mask_path TEXT NOT NULL,
+    n_pixels INTEGER NOT NULL,
+    changed_area_ha REAL NOT NULL,
+    evidence_quality TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'RADAR_ANOMALY' CHECK (status IN ('RADAR_ANOMALY','PROMOTED')),
+    promotion_rule TEXT CHECK (promotion_rule IN ('S2_CONFIRMED','S1_PERSISTENT_MULTI_ORBIT')),
+    promoted_at_utc TEXT,
+    event_id INTEGER REFERENCES sat_change_events(id),
+    details_json TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_sat_radar_area ON sat_radar_anomalies (monitored_area_id, sensing_time_utc);
+CREATE TRIGGER IF NOT EXISTS trg_radar_no_delete BEFORE DELETE ON sat_radar_anomalies
+BEGIN SELECT RAISE(ABORT, 'sat_radar_anomalies is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS trg_radar_update_only_anomaly BEFORE UPDATE ON sat_radar_anomalies
+WHEN OLD.status <> 'RADAR_ANOMALY'
+BEGIN SELECT RAISE(ABORT, 'sat_radar_anomalies: only RADAR_ANOMALY rows may change'); END;
 
 CREATE TRIGGER IF NOT EXISTS trg_acq_no_delete BEFORE DELETE ON sat_acquisitions
 BEGIN SELECT RAISE(ABORT, 'sat_acquisitions is append-only'); END;

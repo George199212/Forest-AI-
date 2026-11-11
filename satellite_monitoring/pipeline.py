@@ -381,13 +381,146 @@ class Detector:
             return self._record(acq, outcome, baseline, stats_all, persisted=persisted, details=extra)
         gap = (prov.parse_time(acq["sensing_time_utc"]) - prov.parse_time(baseline[0]["sensing_time_utc"])).days
         eq = det.evidence_quality(acq["valid_pct_inside"], len(baseline), gap, self.cfg)
-        results = self._upsert_events(acq, baseline, big, eq, extra)
+        stats_big = det.event_stats(big, self.a["_inside"], self.a["_buffer"], self.a["_dist"], self.a["grid"],
+                                    self.a["area_ha"])
+        # S1-only persistent drop -> RADAR_ANOMALY (timeline only). Promoted to an event only by rule a/b.
+        aid = self._create_radar_anomaly(acq, baseline, extra["previous_same_geometry_acq"], big, eq,
+                                         {**extra, "gap_days": gap})
+        results, rule = self._promote_radar(aid)
+        details = {**extra, "evidence_quality": eq, "gap_days": gap, "radar_anomaly_id": aid}
+        if not results:
+            return self._record(acq, "RADAR_ANOMALY", baseline, stats_big, persisted=persisted,
+                                details={**details, "note": "S1-only persistent drop; not an event unless promoted"})
         outcome = "EVENT_UPDATED" if all(o == "EVENT_UPDATED" for _, o in results) else "EVENT_CREATED"
-        self._record(acq, outcome, baseline, det.event_stats(big, self.a["_inside"], self.a["_buffer"],
-                                                             self.a["_dist"], self.a["grid"], self.a["area_ha"]),
-                     persisted=persisted, event_id=results[0][0],
-                     details={**extra, "evidence_quality": eq, "gap_days": gap,
+        self._record(acq, outcome, baseline, stats_big, persisted=persisted, event_id=results[0][0],
+                     details={**details, "promotion_rule": rule,
                               "events": [{"event_id": e, "outcome": o} for e, o in results]})
+
+    # ── S1 radar anomalies (S1-only persistent drops) ────────────────────────
+    def _radar_mask_path(self, aid):
+        return config.raster_root() / str(self.a["id"]) / "radar_anomalies" / f"anomaly_{aid}_mask.npy"
+
+    def _create_radar_anomaly(self, acq, baseline, prev_id, mask, eq, details):
+        stats = det.event_stats(mask, self.a["_inside"], self.a["_buffer"], self.a["_dist"], self.a["grid"],
+                                self.a["area_ha"])
+        cur = self.conn.execute(
+            "INSERT INTO sat_radar_anomalies (monitored_area_id, acquisition_id, sensing_time_utc, orbit_direction,"
+            " relative_orbit, baseline_acq_ids, previous_acq_id, created_at_utc, mask_path, n_pixels, changed_area_ha,"
+            " evidence_quality, details_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (self.a["id"], acq["id"], acq["sensing_time_utc"], acq["orbit_direction"], acq["relative_orbit"],
+             sdb.dumps([b["id"] for b in baseline]), prev_id, sdb.iso(sdb.utcnow()), "", stats["n_changed_pixels"],
+             stats["changed_area_ha"], eq, sdb.dumps(details)))
+        aid = cur.lastrowid
+        p = self._radar_mask_path(aid)
+        self._save_mask(p, mask)
+        self.conn.execute("UPDATE sat_radar_anomalies SET mask_path=? WHERE id=?", (str(p), aid))
+        self.conn.commit()
+        return aid
+
+    def _anomaly(self, aid):
+        an = dict(self.conn.execute("SELECT * FROM sat_radar_anomalies WHERE id=?", (aid,)).fetchone())
+        acq = dict(self.conn.execute("SELECT * FROM sat_acquisitions WHERE id=?", (an["acquisition_id"],)).fetchone())
+        base = [dict(self.conn.execute("SELECT * FROM sat_acquisitions WHERE id=?", (i,)).fetchone())
+                for i in json.loads(an["baseline_acq_ids"])]
+        return an, acq, base, np.load(an["mask_path"]).astype(bool)
+
+    def _mark_promoted(self, aid, rule, event_id):
+        self.conn.execute("UPDATE sat_radar_anomalies SET status='PROMOTED', promotion_rule=?, promoted_at_utc=?,"
+                          " event_id=? WHERE id=? AND status='RADAR_ANOMALY'",
+                          (rule, sdb.iso(sdb.utcnow()), event_id, aid))
+        self.conn.commit()
+
+    def _attach_to_events(self, aid, s2_only):
+        """Rule a (and continuation of an already promoted S1 event): clusters of the anomaly that overlap an
+        open event are added to it. s2_only=True: only events with an S2 after-image within
+        s1_anomaly_s2_confirm_days of the anomaly. Returns [(event_id, outcome)]."""
+        an, acq, base, mask = self._anomaly(aid)
+        t = prov.parse_time(an["sensing_time_utc"])
+        days = self.cfg["s1_anomaly_s2_confirm_days"]
+        ongoing = timedelta(days=self.cfg["ongoing_max_gap_days"])
+        labels, sizes = det.clusters(mask, self.a["grid"]["pixel_area_ha"])
+        out = []
+        for ev in self.conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN "
+                                    "('SUSPECTED','FIELD_CHECK_REQUESTED') ORDER BY id", (self.a["id"],)).fetchall():
+            ev = dict(ev)
+            hist = json.loads(ev["after_acq_history_json"])
+            s2_times = [prov.parse_time(h["time"]) for h in hist if h["sensor"] == "S2"]
+            if s2_times:
+                ok = any(abs((x - t).days) <= days for x in s2_times)
+            else:                                    # S1-only event: exists only via rule b
+                ok = (not s2_only and prov.parse_time(ev["first_after_time_utc"]) - ongoing <= t
+                      <= prov.parse_time(ev["last_after_time_utc"]) + ongoing)
+            if not ok:
+                continue
+            old = np.load(ev["change_mask_path"]).astype(bool)
+            grown = det.dilate1(old)
+            m = np.zeros_like(mask)
+            for k in range(1, sizes.size + 1):
+                cm = labels == k
+                if det.overlap_fraction(cm, grown) >= self.cfg["ongoing_overlap_fraction"]:
+                    m |= cm
+            if m.any():
+                out.append(self._apply_event(acq, base, m, an["evidence_quality"], ev, old))
+        return out
+
+    def _persistent_multi_orbit_mask(self, t_iso):
+        """Rule b: pixels changed in >= s1_promote_min_acq anomalies from >= s1_promote_min_orbits geometries
+        within s1_promote_window_days before t, as clusters >= s1_promote_min_ha."""
+        since = (prov.parse_time(t_iso) - timedelta(days=self.cfg["s1_promote_window_days"])).strftime(
+            "%Y-%m-%dT%H:%M:%SZ")
+        rows = [dict(r) for r in self.conn.execute(
+            "SELECT * FROM sat_radar_anomalies WHERE monitored_area_id=? AND sensing_time_utc>=? AND sensing_time_utc<=?"
+            " ORDER BY sensing_time_utc", (self.a["id"], since, t_iso))]
+        if len(rows) < self.cfg["s1_promote_min_acq"]:
+            return None, []
+        masks = [np.load(r["mask_path"]).astype(bool) for r in rows]
+        count = np.sum(masks, axis=0)
+        per_geom = {}
+        for r, m in zip(rows, masks):
+            k = (r["orbit_direction"], r["relative_orbit"])
+            per_geom[k] = per_geom.get(k, np.zeros_like(m)) | m
+        n_geom = np.sum(list(per_geom.values()), axis=0)
+        ok = (count >= self.cfg["s1_promote_min_acq"]) & (n_geom >= self.cfg["s1_promote_min_orbits"])
+        keep = det.keep_large_clusters(ok, self.a["grid"], self.cfg["s1_promote_min_ha"])
+        if not keep.any():
+            return None, []
+        return keep, [r for r, m in zip(rows, masks) if (m & keep).any()]
+
+    def _promote_radar(self, aid):
+        """Returns ([(event_id, outcome)], rule) or ([], None) when the anomaly stays an anomaly."""
+        res = self._attach_to_events(aid, s2_only=False)
+        if res:
+            ev = self.conn.execute("SELECT sensor_basis FROM sat_change_events WHERE id=?", (res[0][0],)).fetchone()
+            rule = "S2_CONFIRMED" if "S2" in ev[0] else "S1_PERSISTENT_MULTI_ORBIT"
+            self._mark_promoted(aid, rule, res[0][0])
+            return res, rule
+        an = self.conn.execute("SELECT sensing_time_utc FROM sat_radar_anomalies WHERE id=?", (aid,)).fetchone()
+        keep, contrib = self._persistent_multi_orbit_mask(an[0])
+        if keep is None:
+            return [], None
+        eid, results = None, []
+        for r in contrib:                                   # oldest first: one event, full S1 history
+            _, acq, base, _ = self._anomaly(r["id"])
+            target = old = None
+            if eid is not None:
+                target = dict(self.conn.execute("SELECT * FROM sat_change_events WHERE id=?", (eid,)).fetchone())
+                old = np.load(target["change_mask_path"]).astype(bool)
+            e, o = self._apply_event(acq, base, keep, r["evidence_quality"], target, old)
+            eid = e
+            if r["status"] == "RADAR_ANOMALY":
+                self._mark_promoted(r["id"], "S1_PERSISTENT_MULTI_ORBIT", e)
+            if r["id"] == aid:
+                results.append((e, o))
+        return results or [(eid, "EVENT_CREATED")], "S1_PERSISTENT_MULTI_ORBIT"
+
+    def _attach_anomalies_after_s2(self):
+        """Rule a, other direction: an S2-confirmed event promotes earlier/later radar anomalies that overlap it
+        within s1_anomaly_s2_confirm_days."""
+        for (aid,) in self.conn.execute("SELECT id FROM sat_radar_anomalies WHERE monitored_area_id=? AND "
+                                        "status='RADAR_ANOMALY' ORDER BY sensing_time_utc", (self.a["id"],)).fetchall():
+            res = self._attach_to_events(aid, s2_only=True)
+            if res:
+                self._mark_promoted(aid, "S2_CONFIRMED", res[0][0])
 
     # ── S2 (A, B, F, G) ──────────────────────────────────────────────────────
     def _run_s2(self, acq, zone, n_base):
@@ -484,6 +617,7 @@ class Detector:
                 event_id = self._upsert_events(orig, base, keep, c["evidence_quality"], extra)[0][0]
                 gap = (prov.parse_time(t) - prov.parse_time(base[0]["sensing_time_utc"])).days
                 self._upsert_events(acq, base, keep, det.evidence_quality(vp, len(base), gap, self.cfg), extra)
+                self._attach_anomalies_after_s2()
             rec.update(decision=status, event_id=event_id)
             self.conn.execute("UPDATE sat_s2_candidates SET status=?, resolved_by_acq_id=?, resolved_at_utc=?, "
                               "event_id=?, details_json=? WHERE id=?",

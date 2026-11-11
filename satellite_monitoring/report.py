@@ -4,7 +4,7 @@ import os
 import json
 import sys
 
-from . import areas, db as sdb
+from . import areas, config, db as sdb
 
 
 def _f(v, nd=3):
@@ -71,6 +71,24 @@ def render(conn, area):
                      f"{pct(res.get('persist_fraction'))} | "
                      f"{' / '.join(_f(md.get(k)) for k in ('dNDVI', 'dNBR', 'dNDMI')) if md else 'NULL'} | "
                      f"{_f(c['event_id'])} |")
+    try:
+        rads = conn.execute("SELECT * FROM sat_radar_anomalies WHERE monitored_area_id=? ORDER BY sensing_time_utc",
+                            (area["id"],)).fetchall()
+    except Exception:                      # read-only handle on a DB created before the table existed
+        rads = []
+    L.append(f"\n## Radar anomalies ({len(rads)}) — INTERPRETATION\n")
+    L.append("S1-only persistent VH drop (two consecutive passes, same geometry). Not an event and never a risk, "
+             "unless promoted: (a) an S2-backed event overlaps it within "
+             f"{config.DEFAULTS['s1_anomaly_s2_confirm_days']} days, or (b) the same pixels drop in "
+             f">= {config.DEFAULTS['s1_promote_min_acq']} anomalies from >= {config.DEFAULTS['s1_promote_min_orbits']} "
+             f"orbits, cluster >= {config.DEFAULTS['s1_promote_min_ha']} ha.\n")
+    if rads:
+        L.append("| # | S1 image (UTC) | geometry | ha | evidence | status | rule | event |")
+        L.append("|---|---|---|---|---|---|---|---|")
+        for r in rads:
+            L.append(f"| {r['id']} | {r['sensing_time_utc']} | {r['orbit_direction']}/{r['relative_orbit']} | "
+                     f"{r['changed_area_ha']:.2f} | {r['evidence_quality']} | {r['status']} | "
+                     f"{r['promotion_rule'] or '—'} | {_f(r['event_id'])} |")
     evs = conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? ORDER BY id", (area["id"],)).fetchall()
     L.append(f"\n## Suspected change events ({len(evs)}) — INTERPRETATION\n")
     if not evs:

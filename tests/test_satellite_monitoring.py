@@ -547,19 +547,115 @@ def _s1_series(a, drops, orbits=None):
     return prods, rasters
 
 
-def test_s1_single_drop_is_not_an_event_persistent_drop_is(env):
+def test_s1_single_drop_is_not_an_event_persistent_drop_is_a_radar_anomaly(env):
     a = make_area(env["conn"])
     prods, rasters = _s1_series(a, [False, False, False, True])
     run(env, FakeProvider(prods, rasters), sensors=("S1",), date_to="2026-07-10")
     c = env["conn"]
     assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
     assert c.execute("SELECT outcome FROM sat_detections ORDER BY acquisition_id DESC").fetchone()[0] == "SINGLE_DROP"
-    # the next same-geometry image confirms the drop -> event (LOW confidence: radar only)
+    # the next same-geometry image repeats the drop -> RADAR_ANOMALY (timeline only), still no event
     prods, rasters = _s1_series(a, [False, False, False, True, True])
     run(env, FakeProvider(prods, rasters), sensors=("S1",))
-    e = c.execute("SELECT * FROM sat_change_events").fetchall()
-    assert len(e) == 1 and e[0]["sensor_basis"] == "S1" and e[0]["confidence"] == "LOW"
-    assert c.execute("SELECT persisted FROM sat_detections WHERE event_id=?", (e[0]["id"],)).fetchone()[0] == 1
+    assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
+    d = c.execute("SELECT * FROM sat_detections ORDER BY acquisition_id DESC").fetchone()
+    assert d["outcome"] == "RADAR_ANOMALY" and d["persisted"] == 1 and d["event_id"] is None
+    an = c.execute("SELECT * FROM sat_radar_anomalies").fetchall()
+    assert len(an) == 1 and an[0]["status"] == "RADAR_ANOMALY" and an[0]["event_id"] is None
+    assert an[0]["acquisition_id"] == d["acquisition_id"] and an[0]["relative_orbit"] == 58
+    from satellite_monitoring import report
+    md = report.render(c, areas.load(c, a["id"]))
+    assert "## Radar anomalies (1)" in md and "RADAR_ANOMALY" in md
+
+
+def _s1_multi(a, plan, mask=None):
+    """plan: {(direction, rel_orbit): (first_day 'YYYY-MM-DD', [drop bools])}, 12-day repeat per geometry."""
+    from datetime import date, timedelta as td
+    m = mask if mask is not None else centre_block(a, 10)
+    prods, rasters = [], {}
+    for (dirn, ro), (start, drops) in plan.items():
+        d0 = date.fromisoformat(start)
+        for i, dr in enumerate(drops):
+            day = (d0 + td(days=12 * i)).isoformat()
+            pid = f"S1_{dirn[0]}{ro}_{day}"
+            prods.append(P("S1", pid, day + "T16:03:00Z", orbit_direction=dirn, relative_orbit=ro))
+            rasters[pid] = s1_arr(a["grid"], m if dr else None)
+    return prods, rasters
+
+
+def test_s1_promoted_when_persistent_in_3_acquisitions_on_2_orbits(env):
+    a = make_area(env["conn"])                       # 10x10 px block = 1 ha >= 0.5 ha
+    prods, rasters = _s1_multi(a, {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1, 1]),     # anomalies 07-19, 07-31
+                                   ("DESCENDING", 80): ("2026-06-04", [0, 0, 0, 1, 1])})      # anomaly 07-22
+    run(env, FakeProvider(prods, rasters), sensors=("S1",))
+    c = env["conn"]
+    evs = c.execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1 and evs[0]["sensor_basis"] == "S1" and evs[0]["confidence"] == "LOW"
+    hist = json.loads(evs[0]["after_acq_history_json"])
+    assert len(hist) == 3                            # all three contributing anomalies are in the event
+    an = c.execute("SELECT status, promotion_rule, event_id FROM sat_radar_anomalies ORDER BY sensing_time_utc").fetchall()
+    assert [tuple(r) for r in an] == [("PROMOTED", "S1_PERSISTENT_MULTI_ORBIT", evs[0]["id"])] * 3
+    last = c.execute("SELECT d.outcome, d.event_id FROM sat_detections d JOIN sat_acquisitions s ON "
+                     "s.id=d.acquisition_id WHERE s.sensor='S1' ORDER BY s.sensing_time_utc DESC").fetchone()
+    assert tuple(last) == ("EVENT_UPDATED", evs[0]["id"])      # the 3rd anomaly promotes; event built oldest-first
+
+
+def test_s1_not_promoted_on_one_orbit(env, monkeypatch):
+    # Within the 60-day window a single geometry yields 2 anomalies (a 3rd pass has the drop in its baseline
+    # median), so the orbit condition is isolated with min_acq=2: 2 anomalies on ONE geometry -> no event.
+    monkeypatch.setitem(config.DEFAULTS, "s1_promote_min_acq", 2)
+    a = make_area(env["conn"])
+    prods, rasters = _s1_multi(a, {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1, 1])})
+    run(env, FakeProvider(prods, rasters), sensors=("S1",))
+    c = env["conn"]
+    assert c.execute("SELECT COUNT(*) FROM sat_radar_anomalies WHERE status='RADAR_ANOMALY'").fetchone()[0] == 2
+    assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
+
+
+def test_s1_not_promoted_below_min_area(env):
+    a = make_area(env["conn"])
+    small = centre_block(a, 6)                       # 36 px = 0.36 ha: >= min_cluster_ha 0.3, < 0.5 ha
+    prods, rasters = _s1_multi(a, {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1, 1]),
+                                   ("DESCENDING", 80): ("2026-06-04", [0, 0, 0, 1, 1])}, mask=small)
+    run(env, FakeProvider(prods, rasters), sensors=("S1",))
+    c = env["conn"]
+    assert c.execute("SELECT COUNT(*) FROM sat_radar_anomalies WHERE status='RADAR_ANOMALY'").fetchone()[0] == 3
+    assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
+
+
+def test_s1_promotion_rules_are_config_driven(env, monkeypatch):
+    monkeypatch.setitem(config.DEFAULTS, "s1_promote_min_orbits", 1)          # same series as the test above
+    monkeypatch.setitem(config.DEFAULTS, "s1_promote_min_acq", 2)
+    a = make_area(env["conn"])
+    prods, rasters = _s1_multi(a, {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1, 1])})
+    run(env, FakeProvider(prods, rasters), sensors=("S1",))
+    evs = env["conn"].execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1 and evs[0]["sensor_basis"] == "S1"
+    assert json.loads(evs[0]["thresholds_json"])["s1_promote_min_orbits"] == 1
+
+
+def test_s1_anomaly_before_s2_is_promoted_when_s2_confirms_within_24_days(env):
+    a = make_area(env["conn"])
+    p1, r1 = _s1_series(a, [False, False, False, True, True])         # anomaly 07-19 (S2 not yet confirmed)
+    p2, r2 = s2_series(a, n=6, cut_from_index=4)                      # S2 cut 07-15, confirmed 07-25
+    run(env, FakeProvider(p2 + p1, {**r2, **r1}), sensors=("S1", "S2"))
+    c = env["conn"]
+    evs = c.execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1 and evs[0]["sensor_basis"] == "S1+S2" and evs[0]["confidence"] == "HIGH"
+    an = c.execute("SELECT status, promotion_rule, event_id FROM sat_radar_anomalies").fetchone()
+    assert tuple(an) == ("PROMOTED", "S2_CONFIRMED", evs[0]["id"])
+
+
+def test_s1_anomaly_not_promoted_by_s2_more_than_24_days_away(env, monkeypatch):
+    monkeypatch.setitem(config.DEFAULTS, "s1_anomaly_s2_confirm_days", 3)   # 07-19 vs S2 07-05/07-15
+    a = make_area(env["conn"])
+    p2, r2 = s2_series(a, n=5)
+    p1, r1 = _s1_series(a, [False, False, False, True, True])
+    run(env, FakeProvider(p2 + p1, {**r2, **r1}), sensors=("S1", "S2"))
+    c = env["conn"]
+    evs = c.execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1 and evs[0]["sensor_basis"] == "S2"
+    assert c.execute("SELECT status FROM sat_radar_anomalies").fetchone()[0] == "RADAR_ANOMALY"
 
 
 def test_s1_drop_on_other_orbit_is_not_compared(env):
