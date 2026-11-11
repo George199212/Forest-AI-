@@ -325,6 +325,49 @@ def test_s1_relative_orbit_parsing():
     assert prov.parse_catalog_feature("S1", ew) is None
 
 
+class _PagedCatalog:
+    """Mocked CDSE client: returns the given Catalog pages in order, records request bodies."""
+    def __init__(self, pages):
+        self.pages, self.bodies = list(pages), []
+
+    def post_json(self, kind, url, payload, accept="application/json", timeout=60):
+        assert kind == "CATALOG" and url == cdse.CATALOG_SEARCH_URL
+        self.bodies.append(json.loads(json.dumps(payload)))
+        page = self.pages.pop(0)
+        return type("R", (), {"json": lambda _self: page})()
+
+
+def _s2_item(i, t):
+    return {"id": f"S2C_item_{i}", "geometry": None,
+            "properties": {"datetime": t, "platform": "sentinel-2c", "eo:cloud_cover": 10.0}}
+
+
+def test_catalog_discovery_follows_pagination_until_exhausted():
+    page1 = {"features": [_s2_item(1, "2026-06-01T09:50:00Z"), _s2_item(2, "2026-06-03T09:50:00Z")],
+             "context": {"next": "100", "limit": 2, "returned": 2}}
+    page2 = {"features": [_s2_item(3, "2026-06-05T09:50:00Z")],
+             "context": {"limit": 2, "returned": 1}}                    # no "next" -> exhausted
+    client = _PagedCatalog([page1, page2])
+    sh = prov.SentinelHubProvider(client, config.DEFAULTS)
+    prods = sh.discover("S2", [24.1, 56.8, 24.2, 56.9], "2026-06-01", "2026-06-30", page_limit=2)
+    assert [p.product_id for p in prods] == ["S2C_item_1", "S2C_item_2", "S2C_item_3"]   # page-2 item kept
+    assert sh.last_pages == 2 and client.pages == []
+    assert "next" not in client.bodies[0] and client.bodies[1]["next"] == "100"
+    assert {k: v for k, v in client.bodies[1].items() if k != "next"} == client.bodies[0]  # same query
+
+
+def test_catalog_discovery_never_truncates_silently(monkeypatch):
+    loop = {"features": [_s2_item(1, "2026-06-01T09:50:00Z")], "context": {"next": "100"}}
+    with pytest.raises(cdse.CdseError) as e:                             # repeated token
+        prov.SentinelHubProvider(_PagedCatalog([loop, loop, loop])).discover("S2", [24, 56, 25, 57], "2026-06-01", "2026-06-30")
+    assert e.value.kind == "PAGINATION"
+    monkeypatch.setattr(prov, "CATALOG_MAX_PAGES", 2)                     # safety cap raises, not truncates
+    pages = [{"features": [], "context": {"next": str(n)}} for n in (1, 2, 3)]
+    with pytest.raises(cdse.CdseError) as e:
+        prov.SentinelHubProvider(_PagedCatalog(pages)).discover("S2", [24, 56, 25, 57], "2026-06-01", "2026-06-30")
+    assert e.value.kind == "PAGINATION"
+
+
 def test_datatake_grouping_merges_tiles():
     a = P("S2", "S2B_T35VLC", "2026-06-05T09:50:10Z", scene_cloud_pct=10.0)
     b = P("S2", "S2B_T34VFH", "2026-06-05T09:50:30Z", scene_cloud_pct=30.0)

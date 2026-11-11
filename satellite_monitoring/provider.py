@@ -14,6 +14,9 @@ from . import cdse, config
 
 COLLECTION = {"S2": "sentinel-2-l2a", "S1": "sentinel-1-grd"}
 
+# Safety stop only (raises, never truncates): 500 pages x 100 items = 50,000 items.
+CATALOG_MAX_PAGES = 500
+
 # Evalscripts return raw values as FLOAT32; every index / dB is computed locally
 # so the stored GeoTIFF is the unmodified evidence.
 EVALSCRIPT_S2 = """//VERSION=3
@@ -163,16 +166,19 @@ class SentinelHubProvider:
         self.client = client
         self.cfg = cfg or config.DEFAULTS
 
-    def discover(self, sensor, bbox, date_from, date_to, page_limit=100, max_pages=20):
-        """One Catalog search over the union bbox; follows `next` paging (each page
-        is a counted request). date_from/date_to: 'YYYY-MM-DD' inclusive."""
+    def discover(self, sensor, bbox, date_from, date_to, page_limit=100):
+        """One Catalog search over the union bbox; follows `context.next` until the
+        listing is exhausted (each page is a counted request). Never truncates
+        silently: a repeated token or more than CATALOG_MAX_PAGES pages raises
+        CdseError("PAGINATION") so the caller records a discovery error.
+        date_from/date_to: 'YYYY-MM-DD' inclusive."""
         body = {
             "bbox": bbox,
             "datetime": f"{date_from}T00:00:00Z/{date_to}T23:59:59Z",
             "collections": [COLLECTION[sensor]],
             "limit": page_limit,
         }
-        products, pages = [], 0
+        products, pages, seen = [], 0, set()
         while True:
             r = self.client.post_json("CATALOG", cdse.CATALOG_SEARCH_URL, body, accept="application/geo+json")
             data = r.json()
@@ -182,8 +188,13 @@ class SentinelHubProvider:
                     products.append(p)
             pages += 1
             nxt = (data.get("context") or {}).get("next")
-            if nxt is None or pages >= max_pages:
+            if nxt is None:
                 break
+            if str(nxt) in seen:
+                raise cdse.CdseError("PAGINATION", f"{sensor}: Catalog repeated next token after {pages} pages")
+            if pages >= CATALOG_MAX_PAGES:
+                raise cdse.CdseError("PAGINATION", f"{sensor}: Catalog listing exceeds {CATALOG_MAX_PAGES} pages")
+            seen.add(str(nxt))
             body = {**body, "next": nxt}
         self.last_raw_items = [Product(**{**p.__dict__, "item_ids": list(p.item_ids)}) for p in products]
         self.last_pages = pages

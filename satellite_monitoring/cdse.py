@@ -30,7 +30,7 @@ RETRY_STATUSES = {429, 500, 502, 503, 504}
 class CdseError(Exception):
     def __init__(self, kind, message, http_status=None):
         super().__init__(f"{kind}: {message}")
-        self.kind = kind            # NOT_CONFIGURED | AUTH | HTTP | NETWORK
+        self.kind = kind            # NOT_CONFIGURED | AUTH | HTTP | NETWORK | PAGINATION
         self.http_status = http_status
 
 
