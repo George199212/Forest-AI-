@@ -20,12 +20,21 @@ def s2_layers(arr, cfg=None):
     ndvi = _ratio(b08, b04)
     nbr = _ratio(b08, b12)
     ndmi = _ratio(b08, b11)
-    valid = (dm == 1) & np.isin(np.rint(scl).astype(int), cfg["s2_valid_scl"]) \
+    scl_i = np.rint(np.nan_to_num(scl, nan=0.0)).astype(int)
+    cloud = (dm == 1) & np.isin(scl_i, cfg.get("s2_cloud_scl", []))
+    k = int(cfg.get("s2_cloud_dilate_px", 0) or 0)
+    if k > 0 and cloud.any():
+        from scipy import ndimage
+        cloud_grown = ndimage.binary_dilation(cloud, structure=np.ones((3, 3), dtype=bool), iterations=k)
+    else:
+        cloud_grown = cloud
+    valid = (dm == 1) & np.isin(scl_i, cfg["s2_valid_scl"]) & ~cloud_grown \
         & np.isfinite(ndvi) & np.isfinite(nbr) & np.isfinite(ndmi)
-    snow = (dm == 1) & (np.rint(scl).astype(int) == 11)
+    snow = (dm == 1) & (scl_i == 11)
     for a in (ndvi, nbr, ndmi):
         a[~valid] = np.nan
-    return {"NDVI": ndvi, "NBR": nbr, "NDMI": ndmi, "valid": valid, "snow": snow}
+    return {"NDVI": ndvi, "NBR": nbr, "NDMI": ndmi, "valid": valid, "snow": snow,
+            "cloud_ring": cloud_grown & ~cloud}
 
 
 def s1_layers(arr):

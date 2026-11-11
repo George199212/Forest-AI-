@@ -117,6 +117,32 @@ CREATE TABLE IF NOT EXISTS sat_change_events (
     reviewed_by TEXT, reviewed_at_utc TEXT, review_note TEXT
 );
 
+CREATE TABLE IF NOT EXISTS sat_s2_candidates (
+    -- INTERPRETATION (B): an optical change held until the next usable S2 decides.
+    -- Never deleted; only PENDING rows change (trigger below).
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitored_area_id INTEGER NOT NULL REFERENCES sat_monitored_areas(id),
+    acquisition_id INTEGER NOT NULL REFERENCES sat_acquisitions(id),
+    baseline_acq_ids TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL,
+    mask_path TEXT NOT NULL,
+    n_pixels INTEGER NOT NULL,
+    changed_area_ha REAL NOT NULL,
+    evidence_quality TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING_CONFIRMATION'
+        CHECK (status IN ('PENDING_CONFIRMATION','CONFIRMED','TRANSIENT')),
+    resolved_by_acq_id INTEGER REFERENCES sat_acquisitions(id),
+    resolved_at_utc TEXT,
+    event_id INTEGER REFERENCES sat_change_events(id),
+    details_json TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_sat_cand_area ON sat_s2_candidates (monitored_area_id, status);
+CREATE TRIGGER IF NOT EXISTS trg_cand_no_delete BEFORE DELETE ON sat_s2_candidates
+BEGIN SELECT RAISE(ABORT, 'sat_s2_candidates is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS trg_cand_update_only_pending BEFORE UPDATE ON sat_s2_candidates
+WHEN OLD.status <> 'PENDING_CONFIRMATION'
+BEGIN SELECT RAISE(ABORT, 'sat_s2_candidates: only PENDING_CONFIRMATION rows may change'); END;
+
 CREATE TABLE IF NOT EXISTS sat_review_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id INTEGER NOT NULL REFERENCES sat_change_events(id),

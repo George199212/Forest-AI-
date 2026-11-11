@@ -353,7 +353,7 @@ def s2_series(area, cut_from_index=3, n=5, cut=None):
 
 def test_s2_change_creates_one_suspected_event(env):
     a = make_area(env["conn"])
-    prods, rasters = s2_series(a, n=4)
+    prods, rasters = s2_series(a, n=5)                               # cut 07-05, confirmed by 07-15 (B)
     res = run(env, FakeProvider(prods, rasters), sensors=("S2",))
     evs = env["conn"].execute("SELECT * FROM sat_change_events").fetchall()
     assert res["status"] == "OK" and len(evs) == 1
@@ -381,7 +381,7 @@ def test_change_in_buffer_reported_outside_boundary(env):
     rows = np.where(inside.any(axis=1))[0]
     cols = np.where(inside.any(axis=0))[0]
     cut = block(a, rows[len(rows) // 2], cols[-1] + 2, 7)           # entirely in the buffer ring
-    prods, rasters = s2_series(a, n=4, cut=cut)
+    prods, rasters = s2_series(a, n=5, cut=cut)
     run(env, FakeProvider(prods, rasters), sensors=("S2",))
     e = env["conn"].execute("SELECT * FROM sat_change_events").fetchone()
     assert e["classification"] == "POTENTIAL_CHANGE_OUTSIDE_BOUNDARY"
@@ -394,14 +394,17 @@ def test_ongoing_change_updates_same_event(env):
     prods, rasters = s2_series(a, n=6)
     grown = centre_block(a, 14)                                     # later images: bigger, overlapping cut
     rasters["S2_2026-07-25"] = s2_arr(a["grid"], grown)
+    prods.append(P("S2", "S2_2026-08-04", "2026-08-04T09:50:00Z", scene_cloud_pct=5.0))
+    rasters["S2_2026-08-04"] = s2_arr(a["grid"], grown)              # confirms the growth (B)
     run(env, FakeProvider(prods, rasters), sensors=("S2",))
     evs = env["conn"].execute("SELECT * FROM sat_change_events").fetchall()
     assert len(evs) == 1
     hist = json.loads(evs[0]["after_acq_history_json"])
-    assert len(hist) >= 2
+    assert len(hist) >= 3
     assert evs[0]["changed_area_ha"] == pytest.approx(196 * a["grid"]["pixel_area_ha"], rel=1e-6)
-    outcomes = [r[0] for r in env["conn"].execute("SELECT outcome FROM sat_detections ORDER BY acquisition_id")]
-    assert outcomes.count("EVENT_CREATED") == 1 and "EVENT_UPDATED" in outcomes
+    st = [r[0] for r in env["conn"].execute("SELECT status FROM sat_s2_candidates ORDER BY id")]
+    assert st.count("CONFIRMED") >= 2 and "TRANSIENT" not in st
+    assert {r[0] for r in env["conn"].execute("SELECT event_id FROM sat_s2_candidates WHERE status='CONFIRMED'")} == {evs[0]["id"]}
 
 
 def test_separate_change_is_a_separate_event(env):
@@ -419,16 +422,17 @@ def test_separate_change_is_a_separate_event(env):
 
 def test_idempotent_rerun(env):
     a = make_area(env["conn"])
-    prods, rasters = s2_series(a, n=4)
+    prods, rasters = s2_series(a, n=5)
     fp = FakeProvider(prods, rasters)
     r1 = run(env, fp, sensors=("S2",))
     r2 = run(env, fp, sensors=("S2",))
     c = env["conn"]
-    assert r1["new_acquisitions"] == 4 and r2["new_acquisitions"] == 0
-    assert len(fp.fetch_calls) == 4                                  # nothing fetched twice
-    assert c.execute("SELECT COUNT(*) FROM sat_acquisitions").fetchone()[0] == 4
+    assert r1["new_acquisitions"] == 5 and r2["new_acquisitions"] == 0
+    assert len(fp.fetch_calls) == 5                                  # nothing fetched twice
+    assert c.execute("SELECT COUNT(*) FROM sat_acquisitions").fetchone()[0] == 5
     assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 1
-    assert c.execute("SELECT COUNT(*) FROM sat_detections").fetchone()[0] == 4
+    assert c.execute("SELECT COUNT(*) FROM sat_detections").fetchone()[0] == 5
+    assert c.execute("SELECT COUNT(*) FROM sat_s2_candidates").fetchone()[0] == 2   # 07-05 confirmed, 07-15 pending
 
 
 def test_retry_then_error_after_three_attempts(env):
@@ -529,7 +533,7 @@ def test_s1_drop_on_other_orbit_is_not_compared(env):
 
 def test_s1_plus_s2_within_24_days_is_high(env):
     a = make_area(env["conn"])
-    p2, r2 = s2_series(a, n=4)                                       # S2 cut 2026-07-05
+    p2, r2 = s2_series(a, n=5)                                       # S2 cut 07-05, confirmed 07-15
     p1, r1 = _s1_series(a, [False, False, False, True, True])         # S1 persistent 07-07/07-19
     run(env, FakeProvider(p2 + p1, {**r2, **r1}), sensors=("S1", "S2"))
     evs = env["conn"].execute("SELECT * FROM sat_change_events").fetchall()
@@ -553,12 +557,13 @@ def test_low_valid_pct_never_used_as_after_or_baseline(env):
 def test_report_markdown_labels_layers_and_nulls(env):
     from satellite_monitoring import report
     a = make_area(env["conn"])
-    prods, rasters = s2_series(a, n=4)
+    prods, rasters = s2_series(a, n=5)
     prods.append(P("S2", "S2_CLOUD", "2026-07-08T09:50:00Z", scene_cloud_pct=99.0))
     run(env, FakeProvider(prods, rasters), sensors=("S2",))
     md = report.render(env["conn"], areas.load(env["conn"], a["id"]))
     for s in ("**RAW**", "**PROCESSED**", "**INTERPRETATION**", "**HUMAN**", "Contains modified Copernicus Sentinel data",
-              "SKIPPED_CLOUD", "NULL (SKIPPED_CLOUD", "suspected change", "EVENT_CREATED → event #1"):
+              "SKIPPED_CLOUD", "NULL (SKIPPED_CLOUD", "suspected change", "PENDING_CONFIRMATION → candidate #1",
+              "Optical change candidates (2)", "| CONFIRMED |"):
         assert s in md, s
     assert "violation" not in md.lower() and "illegal" not in md.lower()
 
@@ -715,3 +720,94 @@ def test_data_files_are_private(env):
             assert mode(os.path.join(dirpath, f)) == 0o600, f
             seen += 1
     assert seen >= 9          # db (+wal/shm), 4 tif, 4 png, event mask, lock
+
+
+# ── Stage 1 fixes: A (cloud dilation), B (confirm/transient), F (exclusion), G (uniform drop) ─────
+def test_cloud_mask_is_dilated_by_three_pixels():
+    from satellite_monitoring import config as cfgmod
+    g = {"height": 30, "width": 30}
+    a = s2_arr(g)
+    a[15, 15, 4] = 9.0                                               # one cloud pixel
+    L = met.s2_layers(a, cfgmod.DEFAULTS)
+    assert not L["valid"][12:19, 12:19].any()                        # 3 px ring (7x7) invalid
+    assert L["valid"][11, 15] and L["valid"][15, 19]                 # 4th pixel out is valid again
+    assert int(L["cloud_ring"].sum()) == 48
+    L0 = met.s2_layers(a, {**cfgmod.DEFAULTS, "s2_cloud_dilate_px": 0})
+    assert L0["valid"][14, 15] and not L0["valid"][15, 15]
+
+
+def test_drop_at_cloud_edge_is_masked_not_detected(env):
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=5, cut_from_index=99)            # no real change
+    c = centre_block(a, 6)
+    edge = det.dilate1(det.dilate1(c)) & ~c                          # 2-px halo around a cloud
+    for pid in ("S2_2026-07-05",):
+        x = s2_arr(a["grid"], edge)
+        x[c, 4] = 9.0
+        rasters[pid] = x
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    cc = env["conn"]
+    assert cc.execute("SELECT COUNT(*) FROM sat_s2_candidates").fetchone()[0] == 0
+    assert cc.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
+
+
+def test_single_date_dip_becomes_transient_not_event(env):
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=5, cut_from_index=99)
+    rasters["S2_2026-07-05"] = s2_arr(a["grid"], centre_block(a))    # dip on one date only
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    cc = env["conn"]
+    cand = cc.execute("SELECT * FROM sat_s2_candidates").fetchall()
+    assert len(cand) == 1 and cand[0]["status"] == "TRANSIENT"
+    res = json.loads(cand[0]["details_json"])["resolution"]
+    assert res["decision"] == "TRANSIENT" and res["persist_fraction"] == 0
+    assert cc.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
+    with pytest.raises(sqlite3.DatabaseError):                       # recorded, never rewritten/deleted
+        cc.execute("UPDATE sat_s2_candidates SET status='CONFIRMED' WHERE id=?", (cand[0]["id"],))
+    with pytest.raises(sqlite3.DatabaseError):
+        cc.execute("DELETE FROM sat_s2_candidates")
+
+
+def test_candidate_waits_while_next_image_is_cloudy_there(env):
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=6)                               # cut 07-05 ...
+    x = s2_arr(a["grid"], centre_block(a))
+    x[centre_block(a, 4), 4] = 9.0                                   # 07-15: cloud (+3 px) over the cut
+    rasters["S2_2026-07-15"] = x
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    cc = env["conn"]
+    first = cc.execute("SELECT * FROM sat_s2_candidates ORDER BY id").fetchone()
+    assert first["status"] == "CONFIRMED"
+    assert first["resolved_by_acq_id"] == cc.execute(
+        "SELECT id FROM sat_acquisitions WHERE product_id='S2_2026-07-25'").fetchone()[0]
+    assert cc.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 1
+
+
+def test_uniform_drop_is_atmospheric_and_never_baseline_or_after(env):
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=5, cut_from_index=99)
+    haze = s2_arr(a["grid"])
+    haze[..., 0], haze[..., 1], haze[..., 3] = 0.06, 0.22, 0.12      # whole scene darker in NIR
+    rasters["S2_2026-07-05"] = haze
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    cc = env["conn"]
+    d = cc.execute("SELECT d.* FROM sat_detections d JOIN sat_acquisitions s ON s.id=d.acquisition_id "
+                   "WHERE s.product_id='S2_2026-07-05'").fetchone()
+    assert d["outcome"] == "UNIFORM_DROP_ATMOSPHERIC"
+    det_ = json.loads(d["details_json"])
+    assert det_["classification"] == "POSSIBLE_SEASONAL_OR_ENVIRONMENTAL" and det_["uniform_drop"]["is_uniform"]
+    assert cc.execute("SELECT COUNT(*) FROM sat_s2_candidates").fetchone()[0] == 0
+    assert cc.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
+    hazy_id = d["acquisition_id"]
+    for (b,) in cc.execute("SELECT baseline_acq_ids FROM sat_detections WHERE baseline_acq_ids IS NOT NULL"):
+        assert hazy_id not in json.loads(b)
+
+
+def test_local_cut_is_not_uniform():
+    g = {"height": 40, "width": 40}
+    zone = np.ones((40, 40), dtype=bool)
+    base = met.s2_layers(s2_arr(g))
+    m = np.zeros((40, 40), dtype=bool); m[5:25, 5:25] = True         # 25 % of the area cut
+    ch, comp, d = det.s2_change(met.s2_layers(s2_arr(g, m)), [base], zone)
+    u = det.uniform_drop(ch, comp, d)
+    assert u["drop_fraction"] == pytest.approx(0.25) and not u["is_uniform"]

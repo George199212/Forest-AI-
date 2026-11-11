@@ -2,9 +2,16 @@
 
 INTERPRETATION rules (all thresholds INITIAL, from config, stored per event):
 
-S2  baseline = per-pixel median of up to 3 previous VALID acquisitions (VALID_PCT
-    INSIDE >= min_valid_pct) within 90 days. Changed if dNBR <= -0.15 AND
-    dNDVI <= -0.10. dNDMI is recorded as a supporting bare-soil indicator only.
+S2  validity: SCL 4/5 only, and SCL cloud/shadow (3/8/9/10) grown by 3 px is invalid (A).
+    baseline = per-pixel median of up to 3 previous VALID acquisitions (VALID_PCT
+    INSIDE >= min_valid_pct after dilation) within 90 days, excluding acquisitions that
+    were NOT_USABLE, UNIFORM_DROP_ATMOSPHERIC, or hold a PENDING/TRANSIENT candidate (F).
+    Changed if dNBR <= -0.15 AND dNDVI <= -0.10. dNDMI is a supporting indicator only.
+    Uniform drop (G): >= 60 % of comparable pixels changed and std(dNDVI) <= 0.10 ->
+    UNIFORM_DROP_ATMOSPHERIC, no candidate, never baseline/after.
+    A change is a PENDING_CONFIRMATION candidate (B); the next usable S2 confirms it
+    (>= 50 % of its comparable pixels still changed vs the same baseline) -> event, or
+    marks it TRANSIENT (recorded, never deleted).
 S1  only the same orbit_direction AND relative_orbit is compared (unknown relative
     orbit -> never compared). 3x3 mean filter on linear VH, then dB. Baseline =
     median of up to 3 earlier same-geometry acquisitions. Changed if VH drops
@@ -173,6 +180,22 @@ def classify(evidence_q, after_month, snow_pct_inside, changed_ha_buffer, cfg=No
     if changed_ha_buffer is not None and changed_ha_buffer >= cfg["outside_min_ha"]:
         return "POTENTIAL_CHANGE_OUTSIDE_BOUNDARY", None
     return "POTENTIAL_FOREST_LOSS", None
+
+
+def uniform_drop(changed, comparable, d, cfg=None):
+    """G: image-level test for an atmospheric/illumination drop. Returns a dict with the
+    measured values (always) and is_uniform. NULL (None) values when nothing is comparable."""
+    cfg = cfg or config.DEFAULTS
+    n = int(comparable.sum())
+    if n == 0:
+        return {"comparable_pixels": 0, "drop_fraction": None, "std_dndvi": None, "median_dndvi": None,
+                "is_uniform": False}
+    frac = float((changed & comparable).sum()) / n
+    v = d["dNDVI"][comparable].astype(np.float64)
+    std = float(np.std(v))
+    return {"comparable_pixels": n, "drop_fraction": round(frac, 4), "std_dndvi": round(std, 4),
+            "median_dndvi": round(float(np.median(v)), 4),
+            "is_uniform": frac >= cfg["uniform_drop_min_fraction"] and std <= cfg["uniform_drop_max_std_dndvi"]}
 
 
 def dilate1(mask):

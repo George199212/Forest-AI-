@@ -60,7 +60,12 @@ DEFAULTS = {
     # Acquisition
     "s2_max_scene_cloud_pct": 80.0,      # above -> SKIPPED_CLOUD, not fetched, NULL metrics
     "s2_valid_scl": [4, 5],              # vegetation, not-vegetated (bare soil)
-    "min_valid_pct": 60.0,               # below -> stored, never used as baseline or "after"
+    # A: SCL cloud shadow (3), cloud medium/high probability (8, 9), thin cirrus (10) are grown by
+    # this many pixels (8-neighbourhood, ~10 m each) and the grown ring is invalid too: SCL misses
+    # cloud edges/halos, which look like an NDVI/NBR drop.
+    "s2_cloud_scl": [3, 8, 9, 10],
+    "s2_cloud_dilate_px": 3,
+    "min_valid_pct": 60.0,               # below (after dilation) -> never used as baseline or "after"
     "s1_backcoeff": "GAMMA0_ELLIPSOID",
     "s1_dem_instance": "COPERNICUS_30",
     "s1_orthorectify": True,
@@ -88,6 +93,19 @@ DEFAULTS = {
     "high_confidence_max_gap_days": 24,  # S1 and S2 both within this -> HIGH
     "ongoing_overlap_fraction": 0.30,
     "ongoing_max_gap_days": 60,
+
+    # B: an optical (S2) change is a PENDING_CONFIRMATION candidate, not an event. The next usable
+    # S2 acquisition (same baseline, candidate pixels only) decides: CONFIRMED -> event, else TRANSIENT.
+    "candidate_min_comparable_fraction": 0.60,   # share of candidate pixels valid in the next image
+    "candidate_persist_fraction": 0.50,          # share of those still changed -> CONFIRMED
+
+    # G: image-level uniform drop (haze/thin cloud/illumination). If >= this share of the comparable
+    # pixels (INSIDE+BUFFER) pass the S2 change rule AND the spatial std of dNDVI is low, the image is
+    # UNIFORM_DROP_ATMOSPHERIC (classified POSSIBLE_SEASONAL_OR_ENVIRONMENTAL) and, per F, never
+    # used as baseline or "after". Known limit: a sector felled almost completely, buffer included,
+    # would also look uniform.
+    "uniform_drop_min_fraction": 0.60,
+    "uniform_drop_max_std_dndvi": 0.10,
 
     # Classification
     "seasonal_months": [10, 11, 12, 1, 2, 3, 4],   # Oct–Apr (leaf fall/leaf-off, frost, snow, spring thaw)
@@ -121,5 +139,6 @@ def thresholds_snapshot():
             "s1_filter_size", "min_cluster_ha", "outside_min_ha", "baseline_max_acq",
             "baseline_max_age_days", "min_valid_pct", "s2_valid_scl", "high_confidence_max_gap_days",
             "ongoing_overlap_fraction", "ongoing_max_gap_days", "seasonal_months", "snow_max_pct",
-            "buffer_m", "pixel_m"]
+            "buffer_m", "pixel_m", "s2_cloud_scl", "s2_cloud_dilate_px", "candidate_min_comparable_fraction",
+            "candidate_persist_fraction", "uniform_drop_min_fraction", "uniform_drop_max_std_dndvi"]
     return {k: DEFAULTS[k] for k in keys}

@@ -41,7 +41,9 @@ def render(conn, area):
             med = lambda m: _f(g(m)["median"]) if g(m) and g(m)["median"] is not None else (
                 f"NULL ({g(m)['null_reason']})" if g(m) and g(m)["null_reason"] else "NULL")
             d = det.get(r["id"])
-            dtxt = (d["outcome"] + (f" → event #{d['event_id']}" if d["event_id"] else "")) if d else "—"
+            cid = (json.loads(d["details_json"] or "{}").get("candidate_id") if d else None)
+            dtxt = (d["outcome"] + (f" → event #{d['event_id']}" if d["event_id"] else "")
+                    + (f" → candidate #{cid}" if cid else "")) if d else "—"
             vp = f"{_f(r['valid_pct_inside'], 1)} / {_f(r['valid_pct_buffer'], 1)}"
             if sensor == "S2":
                 L.append(f"| {r['sensing_time_utc']} | {r['status']} | {_f(r['scene_cloud_pct'], 1)} | {vp} | "
@@ -49,6 +51,26 @@ def render(conn, area):
             else:
                 L.append(f"| {r['sensing_time_utc']} | {r['status']} | {r['orbit_direction'] or 'NULL'} | "
                          f"{_f(r['relative_orbit'])} | {vp} | {med('VV_DB')} | {med('VH_DB')} | {dtxt} |")
+    try:
+        cands = conn.execute("SELECT c.*, a.sensing_time_utc AS t FROM sat_s2_candidates c JOIN sat_acquisitions a "
+                             "ON a.id=c.acquisition_id WHERE c.monitored_area_id=? ORDER BY c.id", (area["id"],)).fetchall()
+    except Exception:                      # read-only handle on a DB created before the table existed
+        cands = []
+    L.append(f"\n## Optical change candidates ({len(cands)}) — INTERPRETATION\n")
+    L.append("An S2 change is held as PENDING_CONFIRMATION until the next usable S2 image: still changed → "
+             "CONFIRMED (event), recovered → TRANSIENT.\n")
+    if cands:
+        L.append("| # | S2 image (UTC) | ha | status | decided by acq | comparable % | persist % | median dNDVI / dNBR / dNDMI | event |")
+        L.append("|---|---|---|---|---|---|---|---|---|")
+        for c in cands:
+            res = json.loads(c["details_json"] or "{}").get("resolution") or {}
+            md = res.get("median_deltas_on_candidate") or {}
+            pct = lambda v: "NULL" if v is None else f"{100 * v:.0f}"
+            L.append(f"| {c['id']} | {c['t']} | {c['changed_area_ha']:.2f} | {c['status']} | "
+                     f"{_f(c['resolved_by_acq_id'])} | {pct(res.get('comparable_fraction'))} | "
+                     f"{pct(res.get('persist_fraction'))} | "
+                     f"{' / '.join(_f(md.get(k)) for k in ('dNDVI', 'dNBR', 'dNDMI')) if md else 'NULL'} | "
+                     f"{_f(c['event_id'])} |")
     evs = conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? ORDER BY id", (area["id"],)).fetchall()
     L.append(f"\n## Suspected change events ({len(evs)}) — INTERPRETATION\n")
     if not evs:

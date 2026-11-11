@@ -304,7 +304,22 @@ class Detector:
         rows = [dict(x) for x in rows]
         if acq["sensor"] == "S1":
             rows = [x for x in rows if det.same_geometry(x, acq)]
+        else:
+            excluded = self._excluded_s2()
+            rows = [x for x in rows if x["id"] not in excluded]
         return rows[:limit]
+
+    # F: S2 acquisitions never used as baseline (or "after")
+    EXCLUDED_OUTCOMES = ("NOT_USABLE", "UNIFORM_DROP_ATMOSPHERIC")
+
+    def _excluded_s2(self):
+        ids = {r[0] for r in self.conn.execute(
+            f"SELECT acquisition_id FROM sat_detections WHERE monitored_area_id=? AND sensor='S2' "
+            f"AND outcome IN ({','.join('?' * len(self.EXCLUDED_OUTCOMES))})", (self.a["id"], *self.EXCLUDED_OUTCOMES))}
+        ids |= {r[0] for r in self.conn.execute(
+            "SELECT acquisition_id FROM sat_s2_candidates WHERE monitored_area_id=? "
+            "AND status IN ('PENDING_CONFIRMATION','TRANSIENT')", (self.a["id"],))}
+        return ids
 
     def _record(self, acq, outcome, baseline=None, stats=None, persisted=None, event_id=None, details=None):
         stats = stats or {}
@@ -325,14 +340,7 @@ class Detector:
                                                             "min_valid_pct": self.cfg["min_valid_pct"]})
         n_base = self.cfg["baseline_max_acq"]
         if acq["sensor"] == "S2":
-            baseline = self._earlier(acq, acq["sensing_time_utc"], n_base)
-            if not baseline:
-                return self._record(acq, "NO_BASELINE")
-            after = self._layers(acq)
-            changed, comparable, d = det.s2_change(after, [self._layers(b) for b in baseline], zone, self.cfg)
-            persisted = None
-            extra = {"ndmi_drop_pixels": int((d["ndmi_drop"] & changed).sum()),
-                     "comparable_pixels": int(comparable.sum())}
+            return self._run_s2(acq, zone, n_base)
         else:
             if acq["relative_orbit"] is None or acq["orbit_direction"] is None:
                 return self._record(acq, "NOT_USABLE", details={"reason": "unknown orbit geometry; never compared"})
@@ -380,6 +388,110 @@ class Detector:
                      persisted=persisted, event_id=results[0][0],
                      details={**extra, "evidence_quality": eq, "gap_days": gap,
                               "events": [{"event_id": e, "outcome": o} for e, o in results]})
+
+    # ── S2 (A, B, F, G) ──────────────────────────────────────────────────────
+    def _run_s2(self, acq, zone, n_base):
+        after = self._layers(acq)                       # validity includes the grown cloud mask (A)
+        vp = met.valid_pct(after["valid"], self.a["_inside"])
+        details = {"valid_pct_inside_after_cloud_dilation": vp, "valid_pct_inside_stored": acq["valid_pct_inside"],
+                   "s2_cloud_dilate_px": self.cfg.get("s2_cloud_dilate_px")}
+        if vp is None or vp < self.cfg["min_valid_pct"]:
+            return self._record(acq, "NOT_USABLE", details={**details, "min_valid_pct": self.cfg["min_valid_pct"]})
+        baseline = self._earlier(acq, acq["sensing_time_utc"], n_base)
+        changed = comparable = d = None
+        if baseline:
+            changed, comparable, d = det.s2_change(after, [self._layers(b) for b in baseline], zone, self.cfg)
+            u = det.uniform_drop(changed, comparable, d, self.cfg)
+            details["uniform_drop"] = u
+            if u["is_uniform"]:                         # G -> F: never baseline, never "after"
+                details.update(classification="POSSIBLE_SEASONAL_OR_ENVIRONMENTAL",
+                               reason="uniform drop over most of the area (atmospheric/illumination), not a local change")
+                stats = det.event_stats(changed, self.a["_inside"], self.a["_buffer"], self.a["_dist"],
+                                        self.a["grid"], self.a["area_ha"])
+                return self._record(acq, "UNIFORM_DROP_ATMOSPHERIC", baseline, stats, details=details)
+        resolved = self._resolve_candidates(acq, after, vp)
+        if resolved:
+            details["resolved_candidates"] = resolved
+        if not baseline:
+            return self._record(acq, "NO_BASELINE", details=details)
+        details.update(ndmi_drop_pixels=int((d["ndmi_drop"] & changed).sum()), comparable_pixels=int(comparable.sum()))
+        stats_all = det.event_stats(changed, self.a["_inside"], self.a["_buffer"], self.a["_dist"],
+                                    self.a["grid"], self.a["area_ha"])
+        big = det.keep_large_clusters(changed, self.a["grid"], self.cfg["min_cluster_ha"])
+        if not big.any():
+            return self._record(acq, "NO_CHANGE" if not changed.any() else "CANDIDATE_BELOW_MIN", baseline,
+                                stats_all, details=details)
+        gap = (prov.parse_time(acq["sensing_time_utc"]) - prov.parse_time(baseline[0]["sensing_time_utc"])).days
+        eq = det.evidence_quality(vp, len(baseline), gap, self.cfg)
+        cid = self._create_candidate(acq, baseline, big, eq, {"gap_days": gap, **{k: details[k] for k in
+                                                              ("valid_pct_inside_after_cloud_dilation", "uniform_drop")}})
+        details.update(candidate_id=cid, evidence_quality=eq, gap_days=gap)
+        self._record(acq, "PENDING_CONFIRMATION", baseline,
+                     det.event_stats(big, self.a["_inside"], self.a["_buffer"], self.a["_dist"], self.a["grid"],
+                                     self.a["area_ha"]), details=details)
+
+    def _cand_mask_path(self, cid):
+        return config.raster_root() / str(self.a["id"]) / "candidates" / f"candidate_{cid}_mask.npy"
+
+    def _create_candidate(self, acq, baseline, mask, eq, details):
+        stats = det.event_stats(mask, self.a["_inside"], self.a["_buffer"], self.a["_dist"], self.a["grid"],
+                                self.a["area_ha"])
+        cur = self.conn.execute(
+            "INSERT INTO sat_s2_candidates (monitored_area_id, acquisition_id, baseline_acq_ids, created_at_utc,"
+            " mask_path, n_pixels, changed_area_ha, evidence_quality, details_json) VALUES (?,?,?,?,?,?,?,?,?)",
+            (self.a["id"], acq["id"], sdb.dumps([b["id"] for b in baseline]), sdb.iso(sdb.utcnow()), "",
+             stats["n_changed_pixels"], stats["changed_area_ha"], eq, sdb.dumps({**details, "stats": stats})))
+        cid = cur.lastrowid
+        p = self._cand_mask_path(cid)
+        self._save_mask(p, mask)
+        self.conn.execute("UPDATE sat_s2_candidates SET mask_path=? WHERE id=?", (str(p), cid))
+        self.conn.commit()
+        return cid
+
+    def _resolve_candidates(self, acq, after, vp):
+        """B: the first usable S2 after a candidate decides it, against the candidate's own baseline,
+        on the candidate's pixels only."""
+        out = []
+        t = acq["sensing_time_utc"]
+        for c in [dict(x) for x in self.conn.execute(
+                "SELECT c.*, a.sensing_time_utc AS cand_time FROM sat_s2_candidates c JOIN sat_acquisitions a "
+                "ON a.id=c.acquisition_id WHERE c.monitored_area_id=? AND c.status='PENDING_CONFIRMATION' "
+                "ORDER BY c.id", (self.a["id"],))]:
+            if c["cand_time"] >= t:
+                continue
+            cmask = np.load(c["mask_path"]).astype(bool)
+            base = [dict(self.conn.execute("SELECT * FROM sat_acquisitions WHERE id=?", (i,)).fetchone())
+                    for i in json.loads(c["baseline_acq_ids"])]
+            ch, comp, d = det.s2_change(after, [self._layers(b) for b in base], cmask, self.cfg)
+            n, nc = int(cmask.sum()), int(comp.sum())
+            rec = {"candidate_id": c["id"], "candidate_pixels": n, "comparable_pixels": nc,
+                   "comparable_fraction": round(nc / n, 4) if n else None}
+            if not n or nc / n < self.cfg["candidate_min_comparable_fraction"]:
+                rec["decision"] = "STILL_PENDING"
+                out.append(rec)
+                continue
+            still = ch & cmask
+            persist = int(still.sum()) / nc
+            keep = det.keep_large_clusters(still, self.a["grid"], self.cfg["min_cluster_ha"])
+            med = {k: round(float(np.nanmedian(d[k][comp])), 4) for k in ("dNDVI", "dNBR", "dNDMI")}
+            rec.update(persist_fraction=round(persist, 4), median_deltas_on_candidate=med)
+            status, event_id = "TRANSIENT", None
+            if persist >= self.cfg["candidate_persist_fraction"] and keep.any():
+                status = "CONFIRMED"
+                orig = dict(self.conn.execute("SELECT * FROM sat_acquisitions WHERE id=?",
+                                              (c["acquisition_id"],)).fetchone())
+                extra = {"confirmed_candidate_id": c["id"]}
+                event_id = self._upsert_events(orig, base, keep, c["evidence_quality"], extra)[0][0]
+                gap = (prov.parse_time(t) - prov.parse_time(base[0]["sensing_time_utc"])).days
+                self._upsert_events(acq, base, keep, det.evidence_quality(vp, len(base), gap, self.cfg), extra)
+            rec.update(decision=status, event_id=event_id)
+            self.conn.execute("UPDATE sat_s2_candidates SET status=?, resolved_by_acq_id=?, resolved_at_utc=?, "
+                              "event_id=?, details_json=? WHERE id=?",
+                              (status, acq["id"], sdb.iso(sdb.utcnow()), event_id,
+                               sdb.dumps({**json.loads(c["details_json"] or "{}"), "resolution": rec}), c["id"]))
+            self.conn.commit()
+            out.append(rec)
+        return out
 
     def _snow_pct(self, acq_id):
         r = self.conn.execute("SELECT mean FROM sat_area_metrics WHERE acquisition_id=? AND metric='SNOW_PCT' "
