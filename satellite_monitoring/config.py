@@ -126,6 +126,13 @@ DEFAULTS = {
     "high_confidence_max_gap_days": 24,  # S1 and S2 both within this -> HIGH
     "ongoing_overlap_fraction": 0.30,
     "ongoing_max_gap_days": 60,
+    # F6 (decided 2026-11-11): an event's CURRENT mask = pixels of its union mask still changed vs the
+    # pre-onset baseline in >= event_current_min_changed of the last event_current_last_n valid acquisitions
+    # of a sensor that contributed to the event. Recovered pixels drop out; reported areas come from the
+    # current mask. Pixels with too few observations to decide are KEPT (missing data is not "recovered").
+    "event_current_last_n": 3,
+    "event_current_min_changed": 2,
+    "layer_cache_size": 24,              # decoded rasters kept in memory per run (F6 re-reads recent images)
 
     # B: an optical (S2) change is a PENDING_CONFIRMATION candidate, not an event. The next usable
     # S2 acquisition (same baseline, candidate pixels only) decides: CONFIRMED -> event, else TRANSIENT.
@@ -187,5 +194,6 @@ def thresholds_snapshot():
             "buffer_m", "pixel_m", "s2_cloud_scl", "s2_cloud_dilate_px", "candidate_min_comparable_fraction",
             "candidate_persist_fraction", "uniform_drop_min_fraction", "uniform_drop_max_std_dndvi",
             "s1_anomaly_s2_confirm_days", "s1_promote_min_acq", "s1_promote_min_orbits", "s1_promote_min_ha",
-            "s1_promote_window_days", "forest_mask", "forest_mask_zkat"]
+            "s1_promote_window_days", "forest_mask", "forest_mask_zkat", "event_current_last_n",
+            "event_current_min_changed"]
     return {k: DEFAULTS[k] for k in keys}

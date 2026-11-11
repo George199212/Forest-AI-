@@ -91,6 +91,8 @@ class Runner:
         self.decode = decoder
         self.now = now or sdb.utcnow()
         self.forest_conn = forest_conn
+        from collections import OrderedDict
+        self.layer_cache = OrderedDict()           # acq id -> decoded layers (read-only use)
         self.run_id = None
         self.errors = []
         self.requests = 0
@@ -292,6 +294,17 @@ class Detector:
             self.zone = area["_inside"] | area["_buffer"]
 
     def _layers(self, acq):
+        cache = self.r.layer_cache
+        if acq["id"] in cache:
+            cache.move_to_end(acq["id"])
+            return cache[acq["id"]]
+        L = self._layers_uncached(acq)
+        cache[acq["id"]] = L
+        while len(cache) > self.cfg.get("layer_cache_size", 24):
+            cache.popitem(last=False)
+        return L
+
+    def _layers_uncached(self, acq):
         from . import raster
         raw = Path(acq["raster_path"]).read_bytes()
         if raster.sha256_bytes(raw) != acq["raster_sha256"]:
@@ -343,6 +356,11 @@ class Detector:
         self.conn.commit()
 
     def run(self, acq):
+        self.t_now = acq["sensing_time_utc"]
+        self._run(acq)
+        self._refresh_events(acq)
+
+    def _run(self, acq):
         zone = self.zone
         if not self._usable(acq):
             return self._record(acq, "NOT_USABLE", details={"valid_pct_inside": acq["valid_pct_inside"],
@@ -461,7 +479,7 @@ class Detector:
                       <= prov.parse_time(ev["last_after_time_utc"]) + ongoing)
             if not ok:
                 continue
-            old = np.load(ev["change_mask_path"]).astype(bool)
+            old = self._union_of(ev)
             grown = det.dilate1(old)
             m = np.zeros_like(mask)
             for k in range(1, sizes.size + 1):
@@ -678,7 +696,7 @@ class Detector:
                 "SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN ('SUSPECTED','FIELD_CHECK_REQUESTED')"
                 " ORDER BY id DESC", (self.a["id"],)).fetchall():
             if prov.parse_time(ev["first_after_time_utc"]) - gap <= t <= prov.parse_time(ev["last_after_time_utc"]) + gap:
-                old = np.load(ev["change_mask_path"])
+                old = self._union_of(dict(ev))
                 candidates.append((dict(ev), old, det.dilate1(old)))
         labels, sizes = det.clusters(mask, self.a["grid"]["pixel_area_ha"])
         groups = {}
@@ -697,23 +715,76 @@ class Detector:
             out.append(self._apply_event(acq, baseline, m, eq, target, old_mask))
         return out
 
-    def _apply_event(self, acq, baseline, mask, eq, target, old_mask):
-        t_after = acq["sensing_time_utc"]
-        now = sdb.iso(sdb.utcnow())
-        before_ids = [b["id"] for b in baseline]
-        if target:
-            mask = mask | old_mask
-            history = json.loads(target["after_acq_history_json"])
-            if acq["id"] not in [h["acq_id"] for h in history]:
-                history.append({"acq_id": acq["id"], "sensor": acq["sensor"], "time": t_after, "evidence_quality": eq})
-            before_ids = sorted(set(json.loads(target["before_acq_ids"])) | set(before_ids))
-            eq = max([h["evidence_quality"] for h in history], key=lambda q: det.EQ_ORDER[q])
-        else:
-            history = [{"acq_id": acq["id"], "sensor": acq["sensor"], "time": t_after, "evidence_quality": eq}]
+    # ── F6: current mask (pixels still changed) vs union mask (history) ──────
+    def _union_path(self, event_id):
+        return config.raster_root() / str(self.a["id"]) / "events" / f"event_{event_id}_union.npy"
+
+    @staticmethod
+    def _union_of(ev):
+        """The event's union (history) mask; events written before F6 only have change_mask_path."""
+        return np.load(ev.get("union_mask_path") or ev["change_mask_path"]).astype(bool)
+
+    def _current_mask(self, history, union, upto):
+        """F6: per contributing sensor, walk that sensor's valid acquisitions from the newest (<= upto) back to
+        the event onset; each pixel of the union collects up to event_current_last_n comparable observations
+        (change vs the pre-onset baseline of the same sensor/geometry). Per sensor a pixel is
+        KEEP (>= min_changed changed), DROP (more than last_n - min_changed not changed) or UNDECIDED.
+        Current = KEEP by any sensor, or not DROP by any sensor (UNDECIDED is kept: missing != recovered)."""
+        n_last, k = self.cfg["event_current_last_n"], self.cfg["event_current_min_changed"]
+        onset = min(h["time"] for h in history)
+        keep_any, drop_any, info = np.zeros_like(union), np.zeros_like(union), {"evaluated_up_to": upto}
+        for sensor in sorted({h["sensor"] for h in history}):
+            n_obs = np.zeros(union.shape, np.int16)
+            n_chg = np.zeros(union.shape, np.int16)
+            rows = [dict(r) for r in self.conn.execute(
+                "SELECT * FROM sat_acquisitions WHERE monitored_area_id=? AND sensor=? AND status='OK' "
+                "AND valid_pct_inside>=? AND sensing_time_utc>=? AND sensing_time_utc<=? "
+                "ORDER BY sensing_time_utc DESC", (self.a["id"], sensor, self.cfg["min_valid_pct"], onset, upto))]
+            if sensor == "S2":
+                # never-baseline images (F) and pending/transient candidates are skipped, except the event's own
+                # after-images (a candidate is still PENDING while it is being confirmed into this event)
+                excluded = self._excluded_s2() - {h["acq_id"] for h in history}
+                rows = [r for r in rows if r["id"] not in excluded]
+            used = []
+            for r in rows:
+                need = union & (n_obs < n_last)
+                if not need.any():
+                    break
+                if sensor == "S1" and (r["relative_orbit"] is None or r["orbit_direction"] is None):
+                    continue
+                base = self._earlier(r, onset, self.cfg["baseline_max_acq"])
+                if not base:
+                    continue
+                if sensor == "S2":
+                    ch, comp, _ = det.s2_change(self._layers(r), [self._layers(b) for b in base], need, self.cfg)
+                else:
+                    ch, comp, _ = det.s1_drop(self._layers(r)["VH_LIN"], [self._layers(b)["VH_LIN"] for b in base],
+                                              need, self.cfg)
+                comp = comp & need
+                if not comp.any():
+                    continue
+                n_obs += comp
+                n_chg += ch & comp
+                used.append(r["id"])
+            keep = union & (n_chg >= k)
+            drop = union & ((n_obs - n_chg) > (n_last - k))
+            keep_any |= keep
+            drop_any |= drop
+            info[sensor] = {"acquisitions_used": used, "keep_px": int(keep.sum()), "drop_px": int((drop & ~keep).sum()),
+                            "undecided_px": int((union & ~keep & ~drop).sum())}
+        current = union & (keep_any | ~drop_any)
+        info.update(union_px=int(union.sum()), current_px=int(current.sum()),
+                    last_n=n_last, min_changed=k)
+        return current, info
+
+    def _event_values(self, history, union, eq, upto, prev_max=None):
+        """Columns derived from history + the CURRENT mask (F6) + onset-month class (F2)."""
+        current, cinfo = self._current_mask(history, union, upto)
         sensors = {h["sensor"] for h in history}
         basis = "S1+S2" if sensors == {"S1", "S2"} else next(iter(sensors))
         conf = det.confidence({s: [h["time"] for h in history if h["sensor"] == s] for s in ("S1", "S2")})
-        stats = det.event_stats(mask, self.a["_inside"], self.a["_buffer"], self.a["_dist"], self.a["grid"], self.a["area_ha"])
+        stats = det.event_stats(current, self.a["_inside"], self.a["_buffer"], self.a["_dist"], self.a["grid"],
+                                self.a["area_ha"])
         # F2 (2026-11-11): the class is decided on the ONSET (first after-image) month; the latest after-image
         # only adds a caveat (seasonal_caveat), it never re-classifies an event that started in summer.
         onset = min(history, key=lambda h: h["time"])
@@ -728,39 +799,91 @@ class Detector:
             if cav_last:
                 note = f"Latest after-image {latest['time'][:10]} (not used for the class): {cav_last}"
                 caveat = f"{cav_on} | {note}" if cav_on else note
-        before_times = [r["sensing_time_utc"] for r in self.conn.execute(
-            f"SELECT sensing_time_utc FROM sat_acquisitions WHERE id IN ({','.join('?' * len(before_ids))})", before_ids)]
-        first_after = min(h["time"] for h in history)
-        ctx = context.operational_context({"source": self.a["source"], "name": self.a["name"], "geometry": self.a["geometry"]},
-                                          min(before_times), max(h["time"] for h in history), self.a["buffer_m"],
-                                          forest_conn=self.r.forest_conn)
+        pa = self.a["grid"]["pixel_area_ha"]
         values = dict(
-            sensor_basis=basis, updated_at_utc=now, before_acq_ids=sdb.dumps(before_ids), after_acq_id=acq["id"],
-            after_acq_history_json=sdb.dumps(history), first_after_time_utc=first_after,
-            last_after_time_utc=max(h["time"] for h in history),
+            sensor_basis=basis, confidence=conf, evidence_quality=eq, classification=cls, seasonal_caveat=caveat,
             changed_area_ha=stats["changed_area_ha"], changed_area_ha_inside=stats["changed_area_ha_inside"],
             changed_area_ha_buffer=stats["changed_area_ha_buffer"], pct_of_area_affected=stats["pct_of_area_affected"],
             max_distance_outside_boundary_m=stats["max_distance_outside_boundary_m"],
             n_changed_pixels=stats["n_changed_pixels"], largest_cluster_ha=stats["largest_cluster_ha"],
-            change_geojson=sdb.dumps(self._geojson(mask)), thresholds_json=sdb.dumps(config.thresholds_snapshot()),
-            confidence=conf, evidence_quality=eq, classification=cls, seasonal_caveat=caveat,
-            gps_context_json=sdb.dumps(ctx))
+            change_geojson=sdb.dumps(self._geojson(current)), thresholds_json=sdb.dumps(config.thresholds_snapshot()),
+            union_area_ha=round(int(union.sum()) * pa, 4),
+            max_area_ha=max(prev_max or 0.0, stats["changed_area_ha"]),
+            current_mask_json=sdb.dumps(cinfo))
+        return values, current
+
+    def _save_event_masks(self, eid, current, union):
+        p, u = self._mask_path(eid), self._union_path(eid)
+        self._save_mask(p, current)
+        self._save_mask(u, union)
+        return str(p), str(u)
+
+    def _apply_event(self, acq, baseline, mask, eq, target, old_union):
+        t_after = acq["sensing_time_utc"]
+        now = sdb.iso(sdb.utcnow())
+        before_ids = [b["id"] for b in baseline]
         if target:
-            self._save_mask(self._mask_path(target["id"]), mask)
+            union = mask | old_union
+            history = json.loads(target["after_acq_history_json"])
+            if acq["id"] not in [h["acq_id"] for h in history]:
+                history.append({"acq_id": acq["id"], "sensor": acq["sensor"], "time": t_after, "evidence_quality": eq})
+            before_ids = sorted(set(json.loads(target["before_acq_ids"])) | set(before_ids))
+            eq = max([h["evidence_quality"] for h in history], key=lambda q: det.EQ_ORDER[q])
+        else:
+            union = mask
+            history = [{"acq_id": acq["id"], "sensor": acq["sensor"], "time": t_after, "evidence_quality": eq}]
+        upto = max(getattr(self, "t_now", None) or t_after, t_after)
+        values, current = self._event_values(history, union, eq, upto, target["max_area_ha"] if target else None)
+        before_times = [r["sensing_time_utc"] for r in self.conn.execute(
+            f"SELECT sensing_time_utc FROM sat_acquisitions WHERE id IN ({','.join('?' * len(before_ids))})", before_ids)]
+        ctx = context.operational_context({"source": self.a["source"], "name": self.a["name"], "geometry": self.a["geometry"]},
+                                          min(before_times), max(h["time"] for h in history), self.a["buffer_m"],
+                                          forest_conn=self.r.forest_conn)
+        values.update(updated_at_utc=now, before_acq_ids=sdb.dumps(before_ids), after_acq_id=acq["id"],
+                      after_acq_history_json=sdb.dumps(history), first_after_time_utc=min(h["time"] for h in history),
+                      last_after_time_utc=max(h["time"] for h in history), gps_context_json=sdb.dumps(ctx))
+        if target:
+            values["change_mask_path"], values["union_mask_path"] = self._save_event_masks(target["id"], current, union)
             sets = ", ".join(f"{k}=?" for k in values)
             self.conn.execute(f"UPDATE sat_change_events SET {sets} WHERE id=?", (*values.values(), target["id"]))
             self.conn.commit()
             return target["id"], "EVENT_UPDATED"
-        values.update(monitored_area_id=self.a["id"], detected_at_utc=now, change_mask_path="", status="SUSPECTED")
+        values.update(monitored_area_id=self.a["id"], detected_at_utc=now, change_mask_path="", union_mask_path="",
+                      status="SUSPECTED")
         cols = ", ".join(values)
         cur = self.conn.execute(f"INSERT INTO sat_change_events ({cols}) VALUES ({','.join('?' * len(values))})",
                                 tuple(values.values()))
         eid = cur.lastrowid
-        p = self._mask_path(eid)
-        self._save_mask(p, mask)
-        self.conn.execute("UPDATE sat_change_events SET change_mask_path=? WHERE id=?", (str(p), eid))
+        p, u = self._save_event_masks(eid, current, union)
+        self.conn.execute("UPDATE sat_change_events SET change_mask_path=?, union_mask_path=? WHERE id=?", (p, u, eid))
         self.conn.commit()
         return eid, "EVENT_CREATED"
+
+    def _refresh_events(self, acq):
+        """F6: a new valid acquisition can let pixels recover (or confirm them): recompute the current mask of
+        every open event this sensor contributed to whose after-window (+ ongoing_max_gap_days) covers it."""
+        if acq["sensor"] == "S2" and acq["id"] in self._excluded_s2():
+            return
+        d = self.conn.execute("SELECT outcome FROM sat_detections WHERE acquisition_id=?", (acq["id"],)).fetchone()
+        if d is None or d[0] in ("NOT_USABLE", "UNIFORM_DROP_ATMOSPHERIC", "PENDING_CONFIRMATION"):
+            return
+        t = acq["sensing_time_utc"]
+        gap = timedelta(days=self.cfg["ongoing_max_gap_days"])
+        for ev in [dict(e) for e in self.conn.execute(
+                "SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN ('SUSPECTED',"
+                "'FIELD_CHECK_REQUESTED') ORDER BY id", (self.a["id"],))]:
+            history = json.loads(ev["after_acq_history_json"])
+            if acq["sensor"] not in {h["sensor"] for h in history} or acq["id"] in {h["acq_id"] for h in history}:
+                continue
+            if not (ev["first_after_time_utc"] < t <= sdb.iso(prov.parse_time(ev["last_after_time_utc"]) + gap)):
+                continue
+            union = self._union_of(ev)
+            values, current = self._event_values(history, union, ev["evidence_quality"], t, ev["max_area_ha"])
+            values["updated_at_utc"] = sdb.iso(sdb.utcnow())
+            values["change_mask_path"], values["union_mask_path"] = self._save_event_masks(ev["id"], current, union)
+            sets = ", ".join(f"{k}=?" for k in values)
+            self.conn.execute(f"UPDATE sat_change_events SET {sets} WHERE id=?", (*values.values(), ev["id"]))
+            self.conn.commit()
 
 
 def _prepare_area(a, cfg, conn=None):

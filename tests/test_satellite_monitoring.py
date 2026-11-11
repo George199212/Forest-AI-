@@ -471,6 +471,10 @@ def test_ongoing_change_updates_same_event(env):
     st = [r[0] for r in env["conn"].execute("SELECT status FROM sat_s2_candidates ORDER BY id")]
     assert st.count("CONFIRMED") >= 2 and "TRANSIENT" not in st
     assert {r[0] for r in env["conn"].execute("SELECT event_id FROM sat_s2_candidates WHERE status='CONFIRMED'")} == {evs[0]["id"]}
+    # F6 growth: the grown ring is changed in 2 of the last 3 images -> current = union = 196 px
+    e = evs[0]
+    assert np.load(e["change_mask_path"]).sum() == 196 and np.load(e["union_mask_path"]).sum() == 196
+    assert e["union_area_ha"] == pytest.approx(1.96) and e["max_area_ha"] == pytest.approx(1.96)
 
 
 def test_separate_change_is_a_separate_event(env):
@@ -1215,3 +1219,98 @@ def test_change_locations_merge_overlapping_masks():
     m[2][2:5, 2:5] = True                                # overlaps m0 by 4/9 >= 30 %
     m[3][8:10, 8:10] = True
     assert pc.change_locations(m) == [[0, 1, 2], [3]]
+
+
+# ── F6: current mask vs union (history) ─────────────────────────────────────
+def _s2_masks(area, plan):
+    """plan: [(date, mask or None)]"""
+    prods, rasters = [], {}
+    for t, m in plan:
+        pid = f"S2_{t}"
+        prods.append(P("S2", pid, t + "T09:50:00Z", scene_cloud_pct=5.0))
+        rasters[pid] = s2_arr(area["grid"], m)
+    return prods, rasters
+
+
+def _core_and_edge(a):
+    core = centre_block(a, 10)
+    edge = np.roll(core, 10, axis=1) & ~core
+    edge[:, :] &= np.roll(core, 10, axis=1)
+    edge &= np.cumsum(edge, axis=1) <= 4                              # 4 px wide strip right of the core
+    return core, edge
+
+
+def test_f6_recovered_pixels_drop_out_of_the_current_mask(env):
+    a = make_area(env["conn"])
+    core, edge = _core_and_edge(a)
+    assert edge.sum() == 40
+    prods, rasters = _s2_masks(a, [("2026-06-05", None), ("2026-06-15", None), ("2026-06-25", None),
+                                   ("2026-07-05", core | edge), ("2026-07-15", core | edge),
+                                   ("2026-07-25", core), ("2026-08-04", core)])
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    e = env["conn"].execute("SELECT * FROM sat_change_events").fetchone()
+    cur, uni = np.load(e["change_mask_path"]), np.load(e["union_mask_path"])
+    assert uni.sum() == 140 and (cur == core).all()                   # edge: changed only 1 of the last 3
+    assert e["changed_area_ha"] == pytest.approx(1.0) and e["n_changed_pixels"] == 100
+    assert e["union_area_ha"] == pytest.approx(1.4) and e["max_area_ha"] == pytest.approx(1.4)
+    info = json.loads(e["current_mask_json"])
+    assert info["S2"]["keep_px"] == 100 and info["S2"]["drop_px"] == 40
+    assert json.loads(e["change_geojson"])["features"][0]["properties"]["area_ha"] == pytest.approx(1.0)
+
+
+def test_f6_full_recovery_leaves_zero_current_area_but_keeps_history(env):
+    a = make_area(env["conn"])
+    core = centre_block(a, 10)
+    prods, rasters = _s2_masks(a, [("2026-06-05", None), ("2026-06-15", None), ("2026-06-25", None),
+                                   ("2026-07-05", core), ("2026-07-15", core),
+                                   ("2026-07-25", None), ("2026-08-04", None)])
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    e = env["conn"].execute("SELECT * FROM sat_change_events").fetchone()
+    assert e["changed_area_ha"] == 0 and e["n_changed_pixels"] == 0 and np.load(e["change_mask_path"]).sum() == 0
+    assert e["union_area_ha"] == pytest.approx(1.0) and e["max_area_ha"] == pytest.approx(1.0)
+    assert json.loads(e["current_mask_json"])["evaluated_up_to"].startswith("2026-08-04")
+
+
+def test_f6_pixels_without_enough_observations_are_kept(env):
+    # confirmed change, then only cloudy images: undecided pixels stay in the current mask (missing != recovered)
+    a = make_area(env["conn"])
+    core = centre_block(a, 10)
+    prods, rasters = _s2_masks(a, [("2026-06-05", None), ("2026-06-15", None), ("2026-06-25", None),
+                                   ("2026-07-05", core), ("2026-07-15", core)])
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    e = env["conn"].execute("SELECT * FROM sat_change_events").fetchone()
+    assert e["n_changed_pixels"] == 100
+
+
+def test_f6_mixed_sensors_radar_keeps_what_optics_call_recovered(env):
+    # S2: cut on the block 07-05/07-15, recovered 07-25/08-04 (e.g. green regrowth or a mown field).
+    # S1: persistent VH drop on the LEFT half 07-07/07-19/07-31 -> attached by rule a (S1+S2 event).
+    a = make_area(env["conn"])
+    blk = centre_block(a, 10)
+    left = blk & (np.cumsum(blk, axis=1) <= 5)
+    p2, r2 = _s2_masks(a, [("2026-06-05", None), ("2026-06-15", None), ("2026-06-25", None),
+                           ("2026-07-05", blk), ("2026-07-15", blk), ("2026-07-25", None), ("2026-08-04", None)])
+    p1, r1 = _s1_multi(a, {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1, 1])}, mask=left)
+    run(env, FakeProvider(p2 + p1, {**r2, **r1}), sensors=("S1", "S2"))
+    evs = env["conn"].execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1 and evs[0]["sensor_basis"] == "S1+S2"
+    cur = np.load(evs[0]["change_mask_path"])
+    right = blk & ~left
+    assert not (cur & right).any()                                    # right half: S1 never, S2 recovered -> out
+    assert not (cur & ~left).any() and (cur & left).sum() >= 40       # left half kept by S1 (speckle filter
+    info = json.loads(evs[0]["current_mask_json"])                    # softens the block edge by a few px)
+    assert info["S1"]["keep_px"] == int(cur.sum()) and info["S2"]["keep_px"] == 0 and info["S2"]["drop_px"] == 100
+
+
+def test_f6_columns_migrate_on_an_existing_db(tmp_path):
+    p = tmp_path / "old.db"
+    c = sdb.connect(p)
+    for col, _ in sdb.EVENT_F6_COLUMNS:
+        c.execute(f"ALTER TABLE sat_change_events DROP COLUMN {col}")
+    c.commit()
+    c.close()
+    c = sdb.connect(p)                                                # re-open: columns added back, idempotent
+    have = {r[1] for r in c.execute("PRAGMA table_info(sat_change_events)")}
+    assert {col for col, _ in sdb.EVENT_F6_COLUMNS} <= have
+    c.close()
+    sdb.connect(p).close()

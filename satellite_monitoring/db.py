@@ -114,7 +114,13 @@ CREATE TABLE IF NOT EXISTS sat_change_events (
     status TEXT NOT NULL DEFAULT 'SUSPECTED' CHECK (status IN ('SUSPECTED','REVIEW_CONFIRMED',
         'REVIEW_REJECTED','FIELD_CHECK_REQUESTED')),
     risk_id INTEGER,
-    reviewed_by TEXT, reviewed_at_utc TEXT, review_note TEXT
+    reviewed_by TEXT, reviewed_at_utc TEXT, review_note TEXT,
+    -- F6: change_mask_path / changed_area_* / change_geojson describe the CURRENT mask. The union of every
+    -- after-image's change is history only (matching + "where did it ever change").
+    union_mask_path TEXT,
+    union_area_ha REAL,
+    max_area_ha REAL,                        -- largest CURRENT area the event ever had (history)
+    current_mask_json TEXT                   -- per-sensor counts behind the current mask, evaluated up to ...
 );
 
 CREATE TABLE IF NOT EXISTS sat_s2_candidates (
@@ -296,6 +302,19 @@ def _migrate_area_source_check(conn):
         conn.execute("PRAGMA foreign_keys=ON")
 
 
+EVENT_F6_COLUMNS = (("union_mask_path", "TEXT"), ("union_area_ha", "REAL"), ("max_area_ha", "REAL"),
+                    ("current_mask_json", "TEXT"))
+
+
+def _add_columns(conn, table, cols):
+    """Idempotent ALTER TABLE ADD COLUMN (new nullable columns only; existing rows keep NULL)."""
+    have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+    for name, typ in cols:
+        if name not in have:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {typ}")
+    conn.commit()
+
+
 def connect(path=None):
     path = path or config.sat_db_path()
     from pathlib import Path
@@ -306,6 +325,7 @@ def connect(path=None):
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
     _migrate_area_source_check(conn)
+    _add_columns(conn, "sat_change_events", EVENT_F6_COLUMNS)
     for suffix in ("", "-wal", "-shm"):
         config.secure_file(str(path) + suffix)
     return conn

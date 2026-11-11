@@ -105,6 +105,10 @@ def render(conn, area):
                  f"buffer {e['changed_area_ha_buffer']:.2f} ha), {_f(e['pct_of_area_affected'], 1)} % of area, "
                  f"largest cluster {e['largest_cluster_ha']:.2f} ha, max distance outside boundary "
                  f"{_f(e['max_distance_outside_boundary_m'], 0)} m")
+        if e["union_area_ha"] is not None:
+            L.append(f"- Area history (F6): current {e['changed_area_ha']:.2f} ha = pixels still changed in >= 2 of "
+                     f"the last 3 valid images; union of all after-images {e['union_area_ha']:.2f} ha; largest "
+                     f"current area so far {_f(e['max_area_ha'], 2)} ha")
         if e["seasonal_caveat"]:
             L.append(f"- Seasonal caveat: {e['seasonal_caveat']}")
         L.append(f"- Operational context: {ctx.get('context_label', 'unavailable')} "
