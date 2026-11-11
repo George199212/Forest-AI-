@@ -1,4 +1,4 @@
-"""Raster I/O for the WORKER only (needs tifffile from /root/forest_ai_satellite_venv).
+"""Raster I/O for the WORKER only (needs tifffile from config.WORKER_VENV, /root/forest_ai_satellite_venv2).
 The API process never imports this module: it serves stored PNG quicklooks."""
 import hashlib
 import io

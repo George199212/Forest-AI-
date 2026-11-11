@@ -10,6 +10,7 @@ Layers kept apart on purpose:
   INTERPRETATION sat_change_events (classification, confidence, evidence quality)
   HUMAN DECISION sat_review_log / event status REVIEW_* (Stage 2)
 
-The worker (CLI, timer) runs in /root/forest_ai_satellite_venv (tifffile). The
+The worker (CLI, timer) runs in config.WORKER_VENV = /root/forest_ai_satellite_venv2
+(isolated, no system site-packages, built from requirements-satellite.lock). The
 API process never imports raster decoding (satellite_monitoring.raster).
 """

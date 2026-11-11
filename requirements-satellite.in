@@ -1,0 +1,10 @@
+# Satellite worker runtime (isolated venv: /root/forest_ai_satellite_venv2, no system site-packages).
+# Lock with hashes: see docs/SATELLITE_SPEC.md / requirements-satellite.lock
+numpy==2.5.2
+scipy==1.18.1
+pillow==12.3.0
+httpx==0.28.1
+tifffile==2026.11.8
+requests==2.32.5
+shapely==2.1.2
+pyproj==3.7.2

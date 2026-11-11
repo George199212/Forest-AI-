@@ -7,7 +7,8 @@
 --dry-run --discover Adds ONE Catalog search per sensor (counted in the request
                      log) and lists the products that would be fetched. No
                      Process request, nothing written except the request log.
-Run with /root/forest_ai_satellite_venv/bin/python (tifffile).
+Run with /root/forest_ai_satellite_venv2/bin/python (config.WORKER_VENV; isolated venv,
+requirements-satellite.lock). Any other interpreter gets a warning on stderr.
 """
 import argparse
 import os
@@ -127,6 +128,8 @@ def dry_run(args, sensors, cfg):
 
 def main(argv=None):
     os.umask(0o077)                         # data dir 700 / files 600
+    if os.path.realpath(sys.prefix) != os.path.realpath(config.WORKER_VENV):
+        print(f"WARNING: running in {sys.prefix}, expected worker venv {config.WORKER_VENV}", file=sys.stderr)
     ap = argparse.ArgumentParser(prog="satellite_monitoring.backfill")
     ap.add_argument("--area", required=True)
     ap.add_argument("--from", dest="from_", required=True)

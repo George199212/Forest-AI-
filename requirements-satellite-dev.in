@@ -1,0 +1,3 @@
+# Test-only additions for the satellite venv (installed on top of requirements-satellite.lock).
+-c requirements-satellite.lock
+pytest==9.1.1

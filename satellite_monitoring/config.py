@@ -5,6 +5,11 @@ numbers never silently re-labels history."""
 import os
 from pathlib import Path
 
+# Worker interpreter: isolated venv built from requirements-satellite.lock (hashed).
+# The old /root/forest_ai_satellite_venv (--system-site-packages) is kept until removal is approved.
+WORKER_VENV = os.environ.get("SAT_WORKER_VENV", "/root/forest_ai_satellite_venv2")
+
+
 # ── Paths (env overridable; relative paths resolve against the working dir,
 #    the same convention as database.DB_NAME) ─────────────────────────────────
 def data_dir() -> Path:
