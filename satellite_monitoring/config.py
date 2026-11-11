@@ -20,6 +20,23 @@ def sat_db_path() -> Path:
     return Path(os.environ.get("SAT_DB_PATH", str(data_dir() / "satellite.db")))
 
 
+def forest_db_source():
+    """VMD compartments index for the forest mask: SAT_FOREST_DB, else the ACTIVE nationwide release
+    (data/geodata/nationwide/active.json -> forest_db). Returns (path, version) or (None, reason)."""
+    import json
+    p = os.environ.get("SAT_FOREST_DB")
+    if p:
+        return p, os.environ.get("SAT_FOREST_DB_VERSION", "env:" + os.path.basename(p))
+    active = Path(os.environ.get("SAT_GEODATA_ACTIVE", "/root/forest_ai/data/geodata/nationwide/active.json"))
+    try:
+        a = json.loads(active.read_text())
+    except (OSError, ValueError) as e:
+        return None, f"no active nationwide release ({type(e).__name__})"
+    if a.get("status") != "READY" or not a.get("forest_db"):
+        return None, "nationwide release not READY"
+    return a["forest_db"], a.get("version")
+
+
 def raster_root() -> Path:
     return Path(os.environ.get("SAT_RASTER_DIR", str(data_dir() / "satellite")))
 
@@ -101,7 +118,7 @@ DEFAULTS = {
     #      all anomalies within s1_promote_window_days.
     "s1_anomaly_s2_confirm_days": 24,
     "s1_promote_min_acq": 3,
-    "s1_promote_min_orbits": 2,
+    "s1_promote_min_orbits": 3,          # DISTINCT relative orbits (decided 2026-11-11, F3)
     "s1_promote_min_ha": 0.5,
     "s1_promote_window_days": 60,        # INITIAL; equals ongoing_max_gap_days
     "min_cluster_ha": 0.3,
@@ -123,7 +140,19 @@ DEFAULTS = {
     "uniform_drop_min_fraction": 0.60,
     "uniform_drop_max_std_dndvi": 0.10,
 
-    # Classification
+    # F3 forest mask (decided 2026-11-11): only pixels inside VMD forest-register compartments (nationwide
+    # release, read-only, WGS84 from the verified forestry_io converter) of the area + buffer are analysed.
+    # forest_mask_zkat: None = every compartment (incl. clear-cut land, zkat 14); or a list of zkat codes.
+    "forest_mask": True,
+    "forest_mask_zkat": None,
+
+    # F4 evaluation (positive control only): spring images use an absolute bare-soil test, because a
+    # leaf-off reference forest makes "stand minus reference" unreliable in spring.
+    "eval_spring_months": [3, 4, 5],
+    "eval_bare_ndvi_max": 0.5,
+    "eval_bare_nbr_max": 0.2,
+
+    # Classification (F2: decided on the ONSET month = first after-image; latest month -> seasonal_caveat)
     "seasonal_months": [10, 11, 12, 1, 2, 3, 4],   # Oct–Apr (leaf fall/leaf-off, frost, snow, spring thaw)
     "snow_max_pct": 10.0,                # S2: SCL=11 share of the INSIDE zone
 
@@ -158,5 +187,5 @@ def thresholds_snapshot():
             "buffer_m", "pixel_m", "s2_cloud_scl", "s2_cloud_dilate_px", "candidate_min_comparable_fraction",
             "candidate_persist_fraction", "uniform_drop_min_fraction", "uniform_drop_max_std_dndvi",
             "s1_anomaly_s2_confirm_days", "s1_promote_min_acq", "s1_promote_min_orbits", "s1_promote_min_ha",
-            "s1_promote_window_days"]
+            "s1_promote_window_days", "forest_mask", "forest_mask_zkat"]
     return {k: DEFAULTS[k] for k in keys}

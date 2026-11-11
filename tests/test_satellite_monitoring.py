@@ -39,9 +39,32 @@ def env(tmp_path, monkeypatch):
     c.commit()
     c.close()
     monkeypatch.setenv("FOREST_DB_PATH", str(forest))
+    # F3 forest mask: by default one VMD compartment covers the whole test area + buffer (all pixels analysed)
+    vmd = tmp_path / "compartments.sqlite"
+    make_vmd(vmd, [{"type": "Polygon", "coordinates": [[[LON - 0.05, LAT - 0.05], [LON + 0.05, LAT - 0.05],
+                                                         [LON + 0.05, LAT + 0.05], [LON - 0.05, LAT + 0.05],
+                                                         [LON - 0.05, LAT - 0.05]]]}])
+    monkeypatch.setenv("SAT_FOREST_DB", str(vmd))
+    monkeypatch.setenv("SAT_FOREST_DB_VERSION", "test-vmd")
     conn = sdb.connect(tmp_path / "sat" / "satellite.db")
     yield {"conn": conn, "forest": forest, "tmp": tmp_path}
     conn.close()
+
+
+def make_vmd(path, polygons, zkat="10"):
+    """Minimal stand-in for the nationwide VMD index (compartments + rtree), WGS84 WKB geometries."""
+    import shapely
+    from shapely.geometry import shape
+    c = sqlite3.connect(path)
+    c.executescript("CREATE TABLE compartments (id INTEGER PRIMARY KEY, geometry BLOB NOT NULL, properties TEXT);"
+                    "CREATE VIRTUAL TABLE spatial_index USING rtree(id, min_lon, max_lon, min_lat, max_lat);")
+    for i, p in enumerate(polygons, 1):
+        g = shape(p)
+        w, s, e, n = g.bounds
+        c.execute("INSERT INTO compartments VALUES (?,?,?)", (i, shapely.to_wkb(g), json.dumps({"zkat": zkat})))
+        c.execute("INSERT INTO spatial_index VALUES (?,?,?,?,?)", (i, w, e, s, n))
+    c.commit()
+    c.close()
 
 
 def make_area(conn, geometry=SQUARE, name="TST-001", ref="1"):
@@ -583,10 +606,14 @@ def _s1_multi(a, plan, mask=None):
     return prods, rasters
 
 
-def test_s1_promoted_when_persistent_in_3_acquisitions_on_2_orbits(env):
+THREE_ORBITS = {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1]),       # anomaly 07-19
+                ("DESCENDING", 80): ("2026-06-04", [0, 0, 0, 1, 1]),      # anomaly 07-22
+                ("ASCENDING", 131): ("2026-06-07", [0, 0, 0, 1, 1])}      # anomaly 07-25 -> rule b met
+
+
+def test_s1_promoted_when_persistent_in_3_acquisitions_on_3_distinct_orbits(env):
     a = make_area(env["conn"])                       # 10x10 px block = 1 ha >= 0.5 ha
-    prods, rasters = _s1_multi(a, {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1, 1]),     # anomalies 07-19, 07-31
-                                   ("DESCENDING", 80): ("2026-06-04", [0, 0, 0, 1, 1])})      # anomaly 07-22
+    prods, rasters = _s1_multi(a, THREE_ORBITS)
     run(env, FakeProvider(prods, rasters), sensors=("S1",))
     c = env["conn"]
     evs = c.execute("SELECT * FROM sat_change_events").fetchall()
@@ -598,6 +625,49 @@ def test_s1_promoted_when_persistent_in_3_acquisitions_on_2_orbits(env):
     last = c.execute("SELECT d.outcome, d.event_id FROM sat_detections d JOIN sat_acquisitions s ON "
                      "s.id=d.acquisition_id WHERE s.sensor='S1' ORDER BY s.sensing_time_utc DESC").fetchone()
     assert tuple(last) == ("EVENT_UPDATED", evs[0]["id"])      # the 3rd anomaly promotes; event built oldest-first
+
+
+def test_s1_not_promoted_on_only_2_distinct_orbits(env):
+    # F3: 3 anomalies within 60 d but on 2 relative orbits -> stays RADAR_ANOMALY (was promoted at min_orbits=2)
+    a = make_area(env["conn"])
+    prods, rasters = _s1_multi(a, {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1, 1]),     # anomalies 07-19, 07-31
+                                   ("DESCENDING", 80): ("2026-06-04", [0, 0, 0, 1, 1])})      # anomaly 07-22
+    run(env, FakeProvider(prods, rasters), sensors=("S1",))
+    c = env["conn"]
+    assert c.execute("SELECT COUNT(*) FROM sat_radar_anomalies WHERE status='RADAR_ANOMALY'").fetchone()[0] == 3
+    assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
+
+
+def test_rule_b_does_not_duplicate_an_event_from_already_promoted_anomalies(env):
+    # F1: after the event exists, a later anomaly elsewhere re-evaluates rule b over the window. The old code
+    # started a NEW event from the (already PROMOTED) contributors with the same mask.
+    a = make_area(env["conn"])
+    prods, rasters = _s1_multi(a, THREE_ORBITS)
+    far = block(a, a["grid"]["height"] // 2 - 4, 3, 8)   # 0.64 ha west of the centre block, disjoint
+    p4, r4 = _s1_multi(a, {("DESCENDING", 7): ("2026-06-10", [0, 0, 0, 1, 1])}, mask=far)   # anomaly 07-28
+    run(env, FakeProvider(prods + p4, {**rasters, **r4}), sensors=("S1",))
+    c = env["conn"]
+    evs = c.execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1
+    masks = {np.load(e["change_mask_path"]).tobytes() for e in evs}
+    assert len(masks) == len(evs)                    # no two events with the same mask
+    an = c.execute("SELECT relative_orbit, status FROM sat_radar_anomalies ORDER BY sensing_time_utc").fetchall()
+    assert [tuple(r) for r in an] == [(58, "PROMOTED"), (80, "PROMOTED"), (131, "PROMOTED"), (7, "RADAR_ANOMALY")]
+
+
+def test_rule_b_updates_an_open_s2_event_instead_of_creating_a_duplicate(env, monkeypatch):
+    # F1: rule-b mask overlapping an open S2 event (outside the 24-day rule-a window) must update that event.
+    monkeypatch.setitem(config.DEFAULTS, "s1_anomaly_s2_confirm_days", 1)
+    a = make_area(env["conn"])
+    p2, r2 = s2_series(a, n=5)                       # S2 event 07-05 / 07-15 on the centre block
+    p1, r1 = _s1_multi(a, THREE_ORBITS)
+    run(env, FakeProvider(p2 + p1, {**r2, **r1}), sensors=("S1", "S2"))
+    c = env["conn"]
+    evs = c.execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1 and evs[0]["sensor_basis"] == "S1+S2"
+    rules = [r[0] for r in c.execute("SELECT promotion_rule FROM sat_radar_anomalies WHERE status='PROMOTED'")]
+    assert "S1_PERSISTENT_MULTI_ORBIT" in rules
+    assert {r[0] for r in c.execute("SELECT event_id FROM sat_radar_anomalies")} == {evs[0]["id"]}
 
 
 def test_s1_not_promoted_on_one_orbit(env, monkeypatch):
@@ -615,8 +685,7 @@ def test_s1_not_promoted_on_one_orbit(env, monkeypatch):
 def test_s1_not_promoted_below_min_area(env):
     a = make_area(env["conn"])
     small = centre_block(a, 6)                       # 36 px = 0.36 ha: >= min_cluster_ha 0.3, < 0.5 ha
-    prods, rasters = _s1_multi(a, {("ASCENDING", 58): ("2026-06-01", [0, 0, 0, 1, 1, 1]),
-                                   ("DESCENDING", 80): ("2026-06-04", [0, 0, 0, 1, 1])}, mask=small)
+    prods, rasters = _s1_multi(a, THREE_ORBITS, mask=small)
     run(env, FakeProvider(prods, rasters), sensors=("S1",))
     c = env["conn"]
     assert c.execute("SELECT COUNT(*) FROM sat_radar_anomalies WHERE status='RADAR_ANOMALY'").fetchone()[0] == 3
@@ -1012,3 +1081,137 @@ def test_positive_control_helpers():
     g = geo.make_grid(SQUARE, 0, 10.0)
     r = pc._raster(SQUARE, g)
     assert r.dtype == bool and 0.8 < r.mean() <= 1.0
+
+
+# ── F2: classification on the onset month ─────────────────────────────────
+def _s2_dates(area, dates, cut_from):
+    prods, rasters = [], {}
+    for i, t in enumerate(dates):
+        pid = f"S2_{t}"
+        prods.append(P("S2", pid, t + "T09:50:00Z", scene_cloud_pct=5.0))
+        rasters[pid] = s2_arr(area["grid"], centre_block(area) if i >= cut_from else None)
+    return prods, rasters
+
+
+def test_class_from_onset_month_latest_month_only_a_caveat(env):
+    a = make_area(env["conn"])
+    prods, rasters = _s2_dates(a, ["2026-08-26", "2026-09-05", "2026-09-15", "2026-09-25", "2026-10-05"], 3)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    evs = env["conn"].execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1
+    e = evs[0]
+    assert e["first_after_time_utc"].startswith("2026-09-25") and e["last_after_time_utc"].startswith("2026-10-05")
+    assert e["classification"] == "POTENTIAL_FOREST_LOSS"          # was POSSIBLE_SEASONAL (latest month = Oct)
+    assert e["seasonal_caveat"].startswith("Latest after-image 2026-10-05 (not used for the class)")
+
+
+def test_onset_in_october_is_seasonal(env):
+    a = make_area(env["conn"])
+    prods, rasters = _s2_dates(a, ["2026-09-05", "2026-09-15", "2026-09-25", "2026-10-05", "2026-10-15"], 3)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    e = env["conn"].execute("SELECT * FROM sat_change_events").fetchone()
+    assert e["classification"] == "POSSIBLE_SEASONAL_OR_ENVIRONMENTAL"
+    assert e["seasonal_caveat"].startswith("After-image is from Oct")
+    assert "Latest after-image" in e["seasonal_caveat"]            # 10-15 also seasonal, noted separately
+
+
+# ── F3: forest mask ─────────────────────────────────────────────────────────
+def _west_half_vmd(env, monkeypatch, a):
+    w, s, e, n = a["grid"]["bbox"]
+    mid = (w + e) / 2
+    p = env["tmp"] / "vmd_west.sqlite"
+    make_vmd(p, [{"type": "Polygon", "coordinates": [[[w - 0.01, s - 0.01], [mid, s - 0.01], [mid, n + 0.01],
+                                                      [w - 0.01, n + 0.01], [w - 0.01, s - 0.01]]]}])
+    monkeypatch.setenv("SAT_FOREST_DB", str(p))
+    monkeypatch.setenv("SAT_FOREST_DB_VERSION", "test-vmd-west")
+
+
+def test_forest_mask_excludes_non_forest_pixels_and_stores_share(env, monkeypatch):
+    a = make_area(env["conn"])
+    _west_half_vmd(env, monkeypatch, a)
+    g = a["grid"]
+    east = block(a, g["height"] // 2 - 5, g["width"] - 14, 10)        # cut on non-forest land (east half)
+    prods, rasters = s2_series(a, n=5, cut=east)
+    res = run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    c = env["conn"]
+    assert res["status"] == "OK"
+    assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 0
+    m = c.execute("SELECT * FROM sat_area_masks").fetchone()
+    assert m["kind"] == "VMD_FOREST" and m["n_compartments"] == 1
+    assert 0.35 < m["non_forest_share_zone"] < 0.65                   # about half of INSIDE+BUFFER is not forest
+    assert m["pixels_analysed"] > 0 and m["source_version"].startswith("test-vmd-west")
+    assert res["forest_mask"][a["id"]]["non_forest_share_zone"] == m["non_forest_share_zone"]
+
+
+def test_forest_mask_keeps_changes_inside_forest(env, monkeypatch):
+    a = make_area(env["conn"])
+    _west_half_vmd(env, monkeypatch, a)
+    g = a["grid"]
+    west = block(a, g["height"] // 2 - 5, 4, 10)
+    prods, rasters = s2_series(a, n=5, cut=west)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    assert env["conn"].execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 1
+
+
+def test_forest_mask_unavailable_area_not_analysed(env, monkeypatch):
+    monkeypatch.setenv("SAT_FOREST_DB", str(env["tmp"] / "missing.sqlite"))
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=5)
+    res = run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    c = env["conn"]
+    assert res["status"] == "PARTIAL"
+    assert any("forest mask unavailable" in e["error"] for e in res["errors"])
+    assert c.execute("SELECT COUNT(*) FROM sat_detections").fetchone()[0] == 0     # never "all pixels"
+    assert c.execute("SELECT COUNT(*) FROM sat_acquisitions WHERE status='OK'").fetchone()[0] == 5
+
+
+def test_forest_mask_is_config_driven(env, monkeypatch):
+    monkeypatch.setitem(config.DEFAULTS, "forest_mask", False)
+    a = make_area(env["conn"])
+    _west_half_vmd(env, monkeypatch, a)
+    g = a["grid"]
+    east = block(a, g["height"] // 2 - 5, g["width"] - 14, 10)
+    prods, rasters = s2_series(a, n=5, cut=east)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    c = env["conn"]
+    assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 1
+    assert c.execute("SELECT COUNT(*) FROM sat_area_masks").fetchone()[0] == 0
+
+
+def test_forest_mask_cached_and_sha_checked(env, monkeypatch):
+    a = make_area(env["conn"])
+    _west_half_vmd(env, monkeypatch, a)
+    inside, buffer, _ = geo.masks(a["geometry"], a["grid"], a["buffer_m"])
+    from satellite_monitoring import forest_mask
+    m1, meta1 = forest_mask.get(env["conn"], a, inside, buffer)
+    m2, meta2 = forest_mask.get(env["conn"], a, inside, buffer)
+    assert (m1 == m2).all() and meta1["mask_sha256"] == meta2["mask_sha256"]
+    assert env["conn"].execute("SELECT COUNT(*) FROM sat_area_masks").fetchone()[0] == 1
+
+
+# ── F4: positive-control spring test ────────────────────────────────────────
+def test_eval_spring_uses_absolute_bare_soil_test():
+    from satellite_monitoring import positive_control as pc
+    cfg = config.DEFAULTS
+    v = np.ones((5, 5), bool)
+    ref = np.ones((5, 5), bool)
+    bare = {"NDVI": np.full((5, 5), 0.35), "NBR": np.full((5, 5), 0.05)}
+    rec = {"valid_pct": 100.0}
+    assert pc.cut_test(bare, v, ref, rec, True, cfg) is True and rec["cut_test"] == "ABSOLUTE_BARE_SOIL"
+    forest = {"NDVI": np.full((5, 5), 0.75), "NBR": np.full((5, 5), 0.45)}
+    rec = {"valid_pct": 100.0}
+    assert pc.cut_test(forest, v, ref, rec, True, cfg) is False
+    # summer: the same bare stand vs a (here identical) reference is NOT cut -> relative test is used
+    rec = {"valid_pct": 100.0}
+    assert pc.cut_test(bare, v, ref, rec, False, cfg) is False and rec["cut_test"] == "STAND_MINUS_REFERENCE"
+    rec = {"valid_pct": 10.0}
+    assert pc.cut_test(bare, v, ref, rec, True, cfg) is None
+
+
+def test_change_locations_merge_overlapping_masks():
+    from satellite_monitoring import positive_control as pc
+    m = [np.zeros((10, 10), bool) for _ in range(4)]
+    m[0][0:4, 0:4] = m[1][0:4, 0:4] = True               # identical
+    m[2][2:5, 2:5] = True                                # overlaps m0 by 4/9 >= 30 %
+    m[3][8:10, 8:10] = True
+    assert pc.change_locations(m) == [[0, 1, 2], [3]]

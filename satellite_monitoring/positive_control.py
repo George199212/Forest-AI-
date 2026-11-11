@@ -12,7 +12,9 @@ Per stand (interior = stand raster eroded by 1 px):
   NOT_DETECTED       otherwise
 "Cut" in an S2 image = interior median minus reference-forest median (intact VMD forest, zkat 10, no felling
 recorded since 2024, age >= 20, within 1 km) is <= s2_dndvi_threshold for NDVI AND <= s2_dnbr_threshold for
-NBR. T_cut = first usable image that is cut and still cut in the next usable image.
+NBR. Spring images (eval_spring_months, F4) instead use an absolute bare-soil test on the interior median:
+NDVI < eval_bare_ndvi_max AND NBR < eval_bare_nbr_max (see cut_test).
+T_cut = first usable image that is cut and still cut in the next usable image.
 Events with < 0.1 ha overlap with every stand interior are listed for visual review (quicklooks), with a
 pre-tag (not a verdict) when they overlap other VMD fellings of 2025-2026.
 This is INTERPRETATION for calibration; it writes only review PNGs and the report files, never the DB.
@@ -83,6 +85,49 @@ def _reference_and_other(grid, ref_db, exclude_ids):
     return _erode(ref_m), oth_m, len(ref), len(other)
 
 
+def cut_test(L, v, rv, rec, spring, cfg):
+    """Is the stand interior "cut" in this S2 image? Fills rec with the medians; None = not decidable.
+    F4 (2026-11-11): spring images (eval_spring_months) use an ABSOLUTE bare-soil test, interior median
+    NDVI < eval_bare_ndvi_max AND NBR < eval_bare_nbr_max, because the leaf-off deciduous reference forest makes
+    "stand minus reference" unreliable then. Other months: stand minus reference <= s2_dndvi/dnbr_threshold."""
+    if rec["valid_pct"] < cfg["min_valid_pct"]:
+        return None
+    for k in ("NDVI", "NBR"):
+        rec[k] = round(float(np.nanmedian(L[k][v])), 3)
+    if spring:
+        rec["cut_test"] = "ABSOLUTE_BARE_SOIL"
+        return bool(rec["NDVI"] < cfg["eval_bare_ndvi_max"] and rec["NBR"] < cfg["eval_bare_nbr_max"])
+    if rv.sum() < 20:
+        return None
+    for k in ("NDVI", "NBR"):
+        rec["ref_" + k] = round(float(np.nanmedian(L[k][rv])), 3)
+        rec["d" + k] = round(rec[k] - rec["ref_" + k], 3)
+    rec["cut_test"] = "STAND_MINUS_REFERENCE"
+    return bool(rec["dNDVI"] <= cfg["s2_dndvi_threshold"] and rec["dNBR"] <= cfg["s2_dnbr_threshold"])
+
+
+def change_locations(masks, min_overlap=0.30):
+    """Distinct change locations: events whose masks overlap by >= min_overlap (of the smaller mask) are joined
+    (transitively). Returns a list of groups of indices into masks."""
+    n = len(masks)
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    for i in range(n):
+        for j in range(i + 1, n):
+            small = min(int(masks[i].sum()), int(masks[j].sum()))
+            if small and int((masks[i] & masks[j]).sum()) / small >= min_overlap:
+                parent[find(i)] = find(j)
+    groups = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(i)
+    return sorted(groups.values())
+
+
 def evaluate(conn, area, truth_fc, ref_db, out_dir, cfg=None):
     cfg = cfg or config.DEFAULTS
     g = area["grid"]
@@ -106,19 +151,15 @@ def evaluate(conn, area, truth_fc, ref_db, out_dir, cfg=None):
         s["series"] = []
     for a in acqs:
         L = met.s2_layers(evidence._arr(a, g), cfg)
+        spring = int(a["sensing_time_utc"][5:7]) in cfg["eval_spring_months"]
         for s in stands:
             m, n = s["interior"], int(s["interior"].sum())
-            rec = {"acq_id": a["id"], "time": a["sensing_time_utc"], "valid_pct": None, "cut": None}
+            rec = {"acq_id": a["id"], "time": a["sensing_time_utc"], "valid_pct": None, "cut": None,
+                   "cut_test": None}
             if n:
                 v = L["valid"] & m
                 rec["valid_pct"] = round(100.0 * v.sum() / n, 1)
-                rv = L["valid"] & s["ref"]
-                if rec["valid_pct"] >= cfg["min_valid_pct"] and rv.sum() >= 20:
-                    for k in ("NDVI", "NBR"):
-                        rec[k] = round(float(np.nanmedian(L[k][v])), 3)
-                        rec["ref_" + k] = round(float(np.nanmedian(L[k][rv])), 3)
-                        rec["d" + k] = round(rec[k] - rec["ref_" + k], 3)
-                    rec["cut"] = bool(rec["dNDVI"] <= cfg["s2_dndvi_threshold"] and rec["dNBR"] <= cfg["s2_dnbr_threshold"])
+                rec["cut"] = cut_test(L, v, L["valid"] & s["ref"], rec, spring, cfg)
             s["series"].append(rec)
 
     events = [dict(e) for e in conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? ORDER BY id",
@@ -214,6 +255,12 @@ def evaluate(conn, area, truth_fc, ref_db, out_dir, cfg=None):
             "reference": {"intact_forest_stands": n_ref, "other_fellings_2025_2026": n_other,
                           "radius_m": REF_RADIUS_M},
             "s2_usable_images": len(acqs), "stands": rows, "outside_events": outside,
+            "events_total": len(events),
+            "distinct_event_masks": len({e["_mask"].tobytes() for e in events}),
+            "change_locations": [[events[i]["id"] for i in grp]
+                                 for grp in change_locations([e["_mask"] for e in events])],
+            "classifications": {c: sum(1 for e in events if e["classification"] == c)
+                                for c in sorted({e["classification"] for e in events})},
             "radar_anomalies_total": len(anomalies),
             "radar_anomalies_promoted": sum(1 for r in anomalies if r["status"] == "PROMOTED"),
             "metrics_all": metrics(False), "metrics_excl_oct_apr": metrics(True)}

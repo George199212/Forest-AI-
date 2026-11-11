@@ -263,6 +263,11 @@ class Runner:
         # Both sensors in ONE chronological pass, so an S1 and an S2 detection of the
         # same change meet in the same event regardless of which sensor came first.
         for a in area_list:
+            if a.get("_forest_error"):
+                # F3: no forest mask -> the area is NOT analysed (never silently "all pixels").
+                self.errors.append({"phase": "detect", "area_id": a["id"],
+                                    "error": f"forest mask unavailable: {a['_forest_error']}"})
+                continue
             rows = self.conn.execute(
                 "SELECT a.* FROM sat_acquisitions a LEFT JOIN sat_detections d ON d.acquisition_id=a.id "
                 f"WHERE a.monitored_area_id=? AND a.sensor IN ({','.join('?' * len(sensors))}) AND a.status='OK' "
@@ -281,6 +286,10 @@ class Detector:
         self.conn = runner.conn
         self.cfg = runner.cfg
         self.a = area
+        # F3: analysed pixels = INSIDE + BUFFER, restricted to VMD forest when the forest mask is on.
+        self.zone = area.get("_zone")
+        if self.zone is None:
+            self.zone = area["_inside"] | area["_buffer"]
 
     def _layers(self, acq):
         from . import raster
@@ -334,7 +343,7 @@ class Detector:
         self.conn.commit()
 
     def run(self, acq):
-        zone = self.a["_inside"] | self.a["_buffer"]
+        zone = self.zone
         if not self._usable(acq):
             return self._record(acq, "NOT_USABLE", details={"valid_pct_inside": acq["valid_pct_inside"],
                                                             "min_valid_pct": self.cfg["min_valid_pct"]})
@@ -475,12 +484,15 @@ class Detector:
             return None, []
         masks = [np.load(r["mask_path"]).astype(bool) for r in rows]
         count = np.sum(masks, axis=0)
-        per_geom = {}
+        per_orbit = {}
         for r, m in zip(rows, masks):
-            k = (r["orbit_direction"], r["relative_orbit"])
-            per_geom[k] = per_geom.get(k, np.zeros_like(m)) | m
-        n_geom = np.sum(list(per_geom.values()), axis=0)
-        ok = (count >= self.cfg["s1_promote_min_acq"]) & (n_geom >= self.cfg["s1_promote_min_orbits"])
+            # F3: DISTINCT relative orbits (S1A/S1C/S1D share the track numbering, so two platforms on the
+            # same relative orbit count once).
+            k = r["relative_orbit"]
+            per_orbit[k] = per_orbit.get(k, np.zeros_like(m)) | m
+        n_orbits = np.sum(list(per_orbit.values()), axis=0)
+        ok = (count >= self.cfg["s1_promote_min_acq"]) & (n_orbits >= self.cfg["s1_promote_min_orbits"])
+        ok &= self.zone
         keep = det.keep_large_clusters(ok, self.a["grid"], self.cfg["s1_promote_min_ha"])
         if not keep.any():
             return None, []
@@ -498,20 +510,22 @@ class Detector:
         keep, contrib = self._persistent_multi_orbit_mask(an[0])
         if keep is None:
             return [], None
-        eid, results = None, []
-        for r in contrib:                                   # oldest first: one event, full S1 history
+        # F1 (2026-11-11): contributors already PROMOTED are in an event already -> skipped. Every remaining
+        # contributor (oldest first) goes through _upsert_events, i.e. each cluster of the rule-b mask is first
+        # matched against the open events by mask overlap; only unmatched clusters start a new event. The first
+        # contributor may create the event, the following ones then match it (no duplicate masks).
+        results = []
+        for r in contrib:
+            if r["status"] != "RADAR_ANOMALY":
+                continue
             _, acq, base, _ = self._anomaly(r["id"])
-            target = old = None
-            if eid is not None:
-                target = dict(self.conn.execute("SELECT * FROM sat_change_events WHERE id=?", (eid,)).fetchone())
-                old = np.load(target["change_mask_path"]).astype(bool)
-            e, o = self._apply_event(acq, base, keep, r["evidence_quality"], target, old)
-            eid = e
-            if r["status"] == "RADAR_ANOMALY":
-                self._mark_promoted(r["id"], "S1_PERSISTENT_MULTI_ORBIT", e)
+            res = self._upsert_events(acq, base, keep, r["evidence_quality"], {})
+            self._mark_promoted(r["id"], "S1_PERSISTENT_MULTI_ORBIT", res[0][0])
             if r["id"] == aid:
-                results.append((e, o))
-        return results or [(eid, "EVENT_CREATED")], "S1_PERSISTENT_MULTI_ORBIT"
+                results = res
+        # The new anomaly itself may not overlap the rule-b mask: it then stays an anomaly ([]), even though
+        # older contributors were promoted above.
+        return (results, "S1_PERSISTENT_MULTI_ORBIT") if results else ([], None)
 
     def _attach_anomalies_after_s2(self):
         """Rule a, other direction: an S2-confirmed event promotes earlier/later radar anomalies that overlap it
@@ -700,8 +714,20 @@ class Detector:
         basis = "S1+S2" if sensors == {"S1", "S2"} else next(iter(sensors))
         conf = det.confidence({s: [h["time"] for h in history if h["sensor"] == s] for s in ("S1", "S2")})
         stats = det.event_stats(mask, self.a["_inside"], self.a["_buffer"], self.a["_dist"], self.a["grid"], self.a["area_ha"])
-        snow = self._snow_pct(acq["id"]) if acq["sensor"] == "S2" else None
-        cls, caveat = det.classify(eq, prov.parse_time(t_after).month, snow, stats["changed_area_ha_buffer"], self.cfg)
+        # F2 (2026-11-11): the class is decided on the ONSET (first after-image) month; the latest after-image
+        # only adds a caveat (seasonal_caveat), it never re-classifies an event that started in summer.
+        onset = min(history, key=lambda h: h["time"])
+        latest = max(history, key=lambda h: h["time"])
+        snow_on = self._snow_pct(onset["acq_id"]) if onset["sensor"] == "S2" else None
+        cls, cav_on = det.classify(eq, prov.parse_time(onset["time"]).month, snow_on,
+                                   stats["changed_area_ha_buffer"], self.cfg)
+        caveat = cav_on
+        if latest["acq_id"] != onset["acq_id"]:
+            snow_last = self._snow_pct(latest["acq_id"]) if latest["sensor"] == "S2" else None
+            _, cav_last = det.classify(eq, prov.parse_time(latest["time"]).month, snow_last, None, self.cfg)
+            if cav_last:
+                note = f"Latest after-image {latest['time'][:10]} (not used for the class): {cav_last}"
+                caveat = f"{cav_on} | {note}" if cav_on else note
         before_times = [r["sensing_time_utc"] for r in self.conn.execute(
             f"SELECT sensing_time_utc FROM sat_acquisitions WHERE id IN ({','.join('?' * len(before_ids))})", before_ids)]
         first_after = min(h["time"] for h in history)
@@ -737,9 +763,21 @@ class Detector:
         return eid, "EVENT_CREATED"
 
 
-def _prepare_area(a, cfg):
+def _prepare_area(a, cfg, conn=None):
     inside, buffer, dist = geo.masks(a["geometry"], a["grid"], a["buffer_m"])
-    a.update(_inside=inside, _buffer=buffer, _dist=dist, _n_inside=int(inside.sum()), _n_buffer=int(buffer.sum()))
+    a.update(_inside=inside, _buffer=buffer, _dist=dist, _n_inside=int(inside.sum()), _n_buffer=int(buffer.sum()),
+             _forest=None, _forest_meta=None, _forest_error=None)
+    zone = inside | buffer
+    if cfg.get("forest_mask"):
+        from . import forest_mask
+        if conn is None:
+            a["_forest_error"] = "no satellite.db connection for the mask cache"
+        else:
+            try:
+                a["_forest"], a["_forest_meta"] = forest_mask.get(conn, a, inside, buffer, cfg)
+            except forest_mask.ForestMaskUnavailable as e:
+                a["_forest_error"] = str(e)
+    a["_zone"] = zone & a["_forest"] if a["_forest"] is not None else zone
     return a
 
 
@@ -762,7 +800,7 @@ def run(trigger, conn=None, provider=None, area_ids=None, date_from=None, date_t
     try:
         with RunLock(lock_file or lock_path()):
             r = Runner(conn, provider, trigger, cfg, decoder, now, forest_conn)
-            area_list = [_prepare_area(a, cfg) for a in areas_mod.active(conn, area_ids)]
+            area_list = [_prepare_area(a, cfg, conn) for a in areas_mod.active(conn, area_ids)]
             cur = conn.execute("INSERT INTO sat_runs (trigger, started_at, status, areas, date_from, date_to, sensors)"
                                " VALUES (?,?,?,?,?,?,?)", (trigger, sdb.iso(sdb.utcnow()), "RUNNING",
                                                           sdb.dumps([a["id"] for a in area_list]), date_from, date_to,
@@ -789,7 +827,10 @@ def run(trigger, conn=None, provider=None, area_ids=None, date_from=None, date_t
             conn.commit()
             return {"run_id": r.run_id, "status": status, "stop_reason": stop, "areas": [a["id"] for a in area_list],
                     "new_acquisitions": r.new_acq, "requests": r.requests, "pu": round(r.pu, 4),
-                    "pu_includes_estimates": r.pu_est, "errors": r.errors}
+                    "pu_includes_estimates": r.pu_est, "errors": r.errors,
+                    "forest_mask": {a["id"]: ({k: a["_forest_meta"].get(k) for k in (
+                        "source_version", "n_compartments", "pixels_analysed", "non_forest_share_zone")}
+                        if a["_forest_meta"] else {"error": a["_forest_error"]}) for a in area_list}}
     finally:
         if own_conn:
             conn.close()

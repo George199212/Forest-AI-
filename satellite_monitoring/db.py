@@ -187,6 +187,25 @@ CREATE TABLE IF NOT EXISTS sat_provider_status (
     last_ok_utc TEXT, last_error_utc TEXT, last_error TEXT
 );
 
+CREATE TABLE IF NOT EXISTS sat_area_masks (
+    -- PROCESSED: F3 forest mask per area and dataset version (VMD compartments, read-only source).
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitored_area_id INTEGER NOT NULL REFERENCES sat_monitored_areas(id),
+    kind TEXT NOT NULL CHECK (kind IN ('VMD_FOREST')),
+    source_path TEXT NOT NULL,
+    source_version TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL,
+    mask_path TEXT NOT NULL,
+    mask_sha256 TEXT NOT NULL,
+    n_compartments INTEGER NOT NULL,
+    pixels_analysed INTEGER NOT NULL,         -- INSIDE+BUFFER pixels inside the mask
+    forest_share_inside REAL,                 -- NULL when the zone is empty
+    forest_share_buffer REAL,
+    non_forest_share_zone REAL,               -- share of INSIDE+BUFFER NOT analysed
+    details_json TEXT,
+    UNIQUE (monitored_area_id, kind, source_version)
+);
+
 CREATE TABLE IF NOT EXISTS sat_radar_anomalies (
     -- INTERPRETATION: S1-only persistent VH drop (same geometry, two consecutive passes).
     -- Shown in the timeline; NOT an event and never a risk unless promoted (rules a/b in config).
