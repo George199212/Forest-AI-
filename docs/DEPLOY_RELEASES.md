@@ -18,7 +18,7 @@ change + restart) only after an explicit human OK in the chat.
 | 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-lvm-geo-lv-ui-20261110T0858Z` (via drop-in `95-lvm-geo-lv-ui-release.conf`; `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `release/2026-11-10-lvm-geo-lv-ui` @ `beb09d0` (runtime), dashboard version `geo-1ae5a85bfd23`, backend `552c46ae547b`. **Live-only content kept**: the manual nav edit and the `fd3d2c6` `assets/lvm-geodata.js` (see the activation record below) |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
-| 8003 | `forest-review-api` (DEMO) | `/root/forest_ai_review` (copy of `84cb00b` + review layer = `feature/review-integration-layer` `b781eaa`). Prepared, NOT active: `/root/forest_ai/releases/forest-review-geo-20261113T1023Z` (see "Demo :8003 release" below) | 84cb00b |
+| 8003 | `forest-review-api` (DEMO) | `/root/forest_ai/releases/forest-review-geo-20261113T1023Z` (drop-in `50-review-geo-release.conf`, ACTIVE since 2026-11-13 13:05 UTC). Rollback target: `/root/forest_ai_review` | `feature/review-geo-release` @ `bd36ce2` (runtime `b6d3769`) |
 | 8004 | `forest-ai-ingka` | `/root/forest_ai_ingka` (574bd97 + local changes) | not in git |
 
 The root of `/root/forest_ai` is **not** what :8000 serves.
@@ -149,7 +149,15 @@ readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd          # �
 `forest-api-lvm-geo-finish-20261110T0825Z` is an earlier, superseded candidate (no LV UI change). Do not
 activate it and do not install its `95-lvm-geo-finish-release.conf` next to the one above.
 
-## Demo :8003 release: forest-review-geo-20261113T1023Z (PREPARED, NOT ACTIVE)
+## Demo :8003 release: forest-review-geo-20261113T1023Z (ACTIVE since 2026-11-13 13:05 UTC)
+
+Activation record:
+- 10:59 UTC first activation (runtime `8a81fb5`): smoke test failed the no-writes check (`GET /api/john-deere/status`
+  inserted `john_deere_sessions`), rolled back 11:01 with the rollback command below.
+- Fix `b6d3769`; release DB rebuilt 13:02 from `demo-db-before-geo-20261113T1023Z/forest_ai.db.raw` (the bad copy is kept as
+  `/root/backups/forest-review/release-db-with-jd-sessions-*.db`); two starts: second start content-identical.
+- 13:05 UTC activation: only `forest-review-api` restarted (PID 3059127 → 3063874); all others unchanged. Smoke test on
+  :8003 passed; DB content hash `cf4d9ee7…` and the 53 files under `data/` unchanged by the smoke test.
 
 Location `/root/forest_ai/releases/forest-review-geo-20261113T1023Z`. This is a new folder in `releases/`; nothing under `/root/forest_ai_review` was modified.
 - Code: `git archive` of `feature/review-geo-release` (runtime files only). `release-manifest.json` lists commit,

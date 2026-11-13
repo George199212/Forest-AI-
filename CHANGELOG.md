@@ -2,7 +2,7 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
-## 2026-11-13 — DEMO release `forest-review-geo-20261113T1023Z` (prepared, NOT active on :8003)
+## 2026-11-13 — DEMO release `forest-review-geo-20261113T1023Z` (deployed on :8003 2026-11-13 13:05 UTC)
 
 Branches (none merged to master): `feature/review-integration-layer` (`b781eaa`, the demo's review layer as
 deployed since 2026-10-21, now in git), `feature/live-vmd-ui-texts` (`50f6daf`, the two live-only :8000 VMD UI
@@ -19,6 +19,13 @@ files), `feature/review-geo-release` (66572fa + both + the demo changes below).
   Forest Map, with official Latvian registry terms in parentheses and source values never rewritten.
   Forest Map defaults to EN only when the EN overlay is loaded.
 - Fix found during verification: a review-UI MutationObserver write loop that froze AI Inspector (`f3165b4`).
+- Fix found by the first activation's smoke test (rolled back): `GET /api/john-deere/status` created a
+  `john_deere_sessions` row on every cookie-less call. In review mode it now creates no session and sets no cookie
+  (`b6d3769`); production unchanged (see KNOWN_BUGS.md).
+- `tests/test_review_no_writes.py` + `tests/review_no_writes.py`: walks every GET route (incl. routers added with
+  `include_router`, which FastAPI 0.136 wraps in `_IncludedRouter`) with real demo IDs, lists skipped routes, and fails
+  on any change of DB content (per-table row count + row hash after WAL checkpoint) or of files under `data/`.
+  Fails on `8e14c05` (John Deere), passes from `b6d3769`.
 
 ## 2026-11-10 — `feature/forest-map-basemap-contrast` (not deployed)
 

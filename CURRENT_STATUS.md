@@ -7,7 +7,7 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
-## Update 2026-11-13 — DEMO :8003 gets LVM GEO + Meža karte (release PREPARED, NOT active)
+## Update 2026-11-13 — DEMO :8003 runs LVM GEO + Meža karte (ACTIVE since 13:05 UTC)
 
 Deployment topology, verified on the VPS on 2026-11-13 10:07 UTC (`systemctl show`, `/proc/<pid>/cwd`):
 
@@ -15,10 +15,13 @@ Deployment topology, verified on the VPS on 2026-11-13 10:07 UTC (`systemctl sho
 |---|---|---|---|
 | 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-forest-map-contrast-20261110T0949Z` (drop-in `96-`) | `66572fa` + 3 live-only files (`index.html` nav edit; `lvm-geodata.js` and `vmd-production.js`, now versioned as `feature/live-vmd-ui-texts` `50f6daf`) |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` | `574bd97` copy (unchanged) |
-| 8003 | `forest-review-api` (DEMO) | `/root/forest_ai_review` | **active:** `84cb00b` copy + review layer, now versioned as `feature/review-integration-layer` `b781eaa`. **Prepared, not active:** `/root/forest_ai/releases/forest-review-geo-20261113T1023Z` = `feature/review-geo-release` (see `docs/DEPLOY_RELEASES.md`) |
+| 8003 | `forest-review-api` (DEMO) | `/root/forest_ai/releases/forest-review-geo-20261113T1023Z` (drop-in `50-review-geo-release.conf`, active since 2026-11-13 13:05 UTC) | `feature/review-geo-release` @ `bd36ce2` (runtime = `b6d3769`). Own DB copy `data/forest_ai.db` (rebuilt from the untouched demo DB). Sandbox: `ProtectSystem=strict`, `ProtectHome=read-only`, writable only `data/`; `/root/forest_ai/data` = tmpfs + read-only `geodata/nationwide`; prod `.env`, `_rm`, `_ingka`, `_telegram`, old demo `data/` inaccessible. Rollback: `rm -f /etc/systemd/system/forest-review-api.service.d/50-review-geo-release.conf && systemctl daemon-reload && systemctl restart forest-review-api` → `/root/forest_ai_review` |
 | 8004 | `forest-ai-ingka` | `/root/forest_ai_ingka` | not in git (unchanged) |
 
 The demo release adds the LVM GEO and Meža karte (Forest Map) sections to the read-only demo:
+- First activation (10:59 UTC) was rolled back at 11:01: the smoke test found that `GET /api/john-deere/status`
+  wrote a `john_deere_sessions` row (the only GET writer of 101). Fixed for review mode (`b6d3769`); release DB rebuilt;
+  `tests/test_review_no_writes.py` now walks every GET route and compares DB content + `data/` files.
 - Every non-GET is still 403. Registration, including its dry-run preview dialog, and "Izveidot incidentu" return
   an explicit bilingual 403 and are refused by the route handlers too. LVM GEO steps 1–2 are GETs.
 - FIELD-TEST-01 (real field test) is hidden from Meža karte and LVM GEO with `REVIEW_MAP_EXCLUDED_SECTORS`

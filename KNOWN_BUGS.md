@@ -42,3 +42,27 @@
   grey GPS transition line were weak on white. Satellite was fine and is unchanged.
 - No GPS session in the production DB has transitions or gaps yet (only session #32 has track points), so the
   white-casing style for them was checked with a clearly labelled synthetic sample only. Found 2026-11-10.
+
+## Found 2026-11-13 (demo geo release)
+- **Forest Map tile sizes (production :8000, pre-existing).** Same 108 tile requests gave byte-identical results on
+  :8000 and the demo. Over the 600-feature / 400 KB target: Riga z14 VZD parcels 1290 features / 524,841 B; Riga z15
+  parcels 644 / 285,423 B; Jelgava z14 parcels 960 / 372,022 B; DEMO-001 area z13 VMD compartments 702 / 346,243 B.
+  Presence cells (z≤12) ≤ 37 KB. Code limits are `MAX_FEATURES=2000`, `MAX_TILE_BYTES=1_500_000`. Not fixed.
+- **`GET /api/john-deere/status` writes on production :8000.** Every call without a valid session cookie inserts a
+  `john_deere_sessions` row (and deletes expired ones first, so the table stays small). Read-only SELECT on the
+  production DB, 2026-11-13 11:05 UTC: 1 row (created 2026-11-12 09:40 UTC, expired, no oauth_state); growth ≈ one
+  row per browser per hour of Integrations use, one per call for cookie-less clients. Fixed only for review mode
+  (`b6d3769`); production fix needs a separate OK.
+- **Test environment:** `py7zr` is not installed (ingest-only dependency, `requirements-geodata-ingest.txt`), so all
+  10 tests in `tests/test_nationwide_geodata.py` error at import. `tests/test_vmd_production.py` (8–9 tests) needs the
+  regional VMD catalogue and `data/cadastre` at the repo-relative path. `tests/test_john_deere_sync.py::
+  test_map_objects_and_protected_sync_routes` fails (no such table / unable to open database file).
+- **30 order-dependent errors in `tests/test_integrations.py`** in the full suite; the file passes alone (30 passed).
+  Same set on the base commit `66572fa`.
+- **Route walking in tests:** FastAPI 0.136 wraps included routers in `_IncludedRouter`, so iterating `app.routes` for
+  `APIRoute` misses them. `tests/test_review_mode.py::test_every_non_get_route_is_403` has that blind spot (non-GETs are
+  still refused because the middleware is path-agnostic); `tests/review_no_writes.get_routes` recurses correctly.
+- **:8003 is publicly reachable** (also 8000/8002/8004): uvicorn on 0.0.0.0, plain HTTP with Basic Auth, no reverse proxy,
+  ufw inactive, iptables INPUT ACCEPT. The DigitalOcean cloud firewall is not visible from the server (no `doctl`);
+  the demo journal shows external clients and scanners reaching :8003. Fix (TLS proxy, loopback bind, firewall) needs a
+  separate OK.
