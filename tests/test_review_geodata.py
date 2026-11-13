@@ -137,3 +137,9 @@ def test_nothing_changes_outside_review_mode(mods, monkeypatch):
     assert c.execute("SELECT count(*) FROM sectors").fetchone()[0] == 2
     t = gps_map.track(1, "worker", 1, datetime(2026, 11, 12, tzinfo=timezone.utc), datetime(2026, 11, 13, tzinfo=timezone.utc))
     assert t["origins"] == ["REAL"]  # production behaviour unchanged
+
+
+def test_geodata_review_ui_and_english_overlay():
+    import subprocess
+    from pathlib import Path
+    subprocess.run(["node", str(Path(__file__).with_name("review_geo_ui_checks.cjs"))], check=True, capture_output=True, text=True)

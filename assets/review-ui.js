@@ -11,7 +11,36 @@
     'showVehicleRoute','trkLoad','trkShow','trkOpenOnMap','pcSetFilter','pcRender','pcViewerOpen',
     'pcViewerShow','pcViewerStep','pcViewerClose','pcHi','openIntegration','setIntCategoryFilter',
     'rcGoReview','_toggleInspBox','closeSnapshotRisksModal','renderPhotos','Math.max','Math.min']);
+  // LVM GEO and Meža karte: every control issues GET requests only (server middleware refuses the rest),
+  // except these registration / incident actions, which stay visible, disabled and explained.
+  const GEO_SECTIONS='#sec-lvm-geodata,#sec-forest-map';
+  const DEMO_BLOCKED={'#lvm-import,#vmd-go-3,#fm-import,#fm-confirm':'registration','.fm-create-incident':'incident'};
+  const DEMO_TEXT={registration:{lv:'Demo režīmā reģistrācija ir izslēgta',en:'Registration is disabled in demo mode (Demo režīmā reģistrācija ir izslēgta)'},
+    incident:{lv:'Demo režīmā incidentu izveide ir izslēgta',en:'Incident creation is disabled in demo mode (Demo režīmā incidentu izveide ir izslēgta)'}};
+  const STEP3_INPUTS='#vmd-sector-name,#vmd-responsible-first-name,#vmd-responsible-last-name';
+  function demoText(kind) { return DEMO_TEXT[kind][(document.documentElement.lang||'').startsWith('lv')?'lv':'en']; }
+  function demoBlocked(el) { return Object.keys(DEMO_BLOCKED).find(sel=>el.matches?.(sel)); }
+  function demoApiBlocked(path) {
+    if (/^\/api\/geodata\/forest-map\/gps\/violations\/incident\/?$/.test(path)) return 'incident';
+    if (/^\/api\/geodata\/(vmd\/(import-selected|import|territories)|lvm\/(preview|import|apply|sectors\/))/.test(path)) return 'registration';
+    return null;
+  }
+  function blockDemoAction(el, selector) {
+    const kind=DEMO_BLOCKED[selector], text=demoText(kind);
+    el.setAttribute('data-review-read','');            // keep it visible (review CSS hides unknown actions)
+    el.setAttribute('data-review-demo-blocked',kind);
+    if ('disabled' in el && !el.disabled) el.disabled=true;
+    if (el.getAttribute('aria-disabled')!=='true') el.setAttribute('aria-disabled','true');
+    if (el.title!==text) el.title=text;
+    const next=el.nextElementSibling;
+    if (!(next && next.classList.contains('review-demo-note'))) {
+      const note=document.createElement('span');note.className='review-demo-note';note.textContent=text;note.setAttribute('role','note');
+      el.after(note);
+    }
+  }
   function allowed(el) {
+    if (demoBlocked(el)) return false;
+    if (el.closest?.(GEO_SECTIONS)) return true;
     const handler=el.getAttribute('onclick') || '';
     if (!handler) return el.matches('select,input[type=search],input[type=date],input[type=range],.leaflet-control-zoom-in,.leaflet-control-zoom-out');
     // Inline event housekeeping is allowed; every actual call must be a known read.
@@ -45,7 +74,7 @@
   if (readOnly) {
     document.documentElement.classList.add('forest-review');
     const style=document.createElement('style');
-    style.textContent='.forest-review [data-review-action],.forest-review input[type=file],.forest-review label:has(input[type=file]),.forest-review a[href*="/api/report/pdf/"],.forest-review button:not([data-review-read]),.forest-review input[type=submit]{display:none!important}.forest-review body{padding-top:44px}.forest-review-banner{position:fixed;top:0;left:0;right:0;z-index:10000;padding:12px 16px;background:#22382c;color:#fff;border-bottom:1px solid #55745e;font:12px/20px system-ui}.forest-review .sidebar{top:44px;height:calc(100vh - 44px)}';
+    style.textContent='.forest-review [data-review-action],.forest-review input[type=file],.forest-review label:has(input[type=file]),.forest-review a[href*="/api/report/pdf/"],.forest-review button:not([data-review-read]),.forest-review input[type=submit]{display:none!important}.forest-review body{padding-top:44px}.forest-review-banner{position:fixed;top:0;left:0;right:0;z-index:10000;padding:12px 16px;background:#22382c;color:#fff;border-bottom:1px solid #55745e;font:12px/20px system-ui}.forest-review .sidebar{top:44px;height:calc(100vh - 44px)}.forest-review [data-review-demo-blocked]{opacity:.55;cursor:not-allowed}.review-demo-note{display:block;margin-top:4px;font-size:12px;color:var(--text3,#6b7a70)}';
     document.head.appendChild(style);
     const originalFetch=window.fetch;
     window.fetch=async function(input,init) {
@@ -53,7 +82,8 @@
       const method=String(init?.method || req?.method || 'GET').toUpperCase();
       const url=new URL(req ? req.url : String(input),location.href);
       const forbidden=!['GET','HEAD'].includes(method) || /^\/api\/(report\/pdf\/|inspector\/analyze|satellite\/token-check)/.test(url.pathname);
-      if (forbidden) return new Response(JSON.stringify({detail:'This action is disabled in the read-only review environment.'}),{status:403,headers:{'Content-Type':'application/json'}});
+      const demoKind=!['GET','HEAD'].includes(method) && demoApiBlocked(url.pathname);
+      if (forbidden) return new Response(JSON.stringify({detail:demoKind?demoText(demoKind):'This action is disabled in the read-only review environment.'}),{status:403,headers:{'Content-Type':'application/json'}});
       const response=await originalFetch.call(this,input,init);
       if (url.origin===location.origin && /^\/api\/integrations(?:\/|$)/.test(url.pathname) && response.ok && response.headers.get('content-type')?.includes('application/json')) {
         const headers=new Headers(response.headers);
@@ -68,6 +98,13 @@
     const elements=[root,...root.querySelectorAll('button,[onclick],[role=button],input,textarea,[contenteditable]')];
     for (const el of elements) {
       if (!readOnly) continue;
+      const blocked=demoBlocked(el);
+      if (blocked) { blockDemoAction(el, blocked); continue; }
+      if (el.closest?.(GEO_SECTIONS)) {
+        if (el.matches(STEP3_INPUTS)) el.readOnly=true;
+        else if (el.matches('button,[role=button],[onclick],input[type=button],input[type=submit]') && !el.hasAttribute('data-review-read')) el.setAttribute('data-review-read','');
+        continue;
+      }
       if (el.matches('textarea')) { el.readOnly=true; continue; }
       if (el.hasAttribute('contenteditable')) el.setAttribute('contenteditable','false');
       if (el.matches('button,[role=button],[onclick],input[type=button],input[type=submit],input[type=file]')) {
@@ -99,16 +136,17 @@
       const el=event.target.closest('button,[onclick],[role=button],input[type=submit],input[type=file]');
       if (el && !allowed(el)) {event.preventDefault();event.stopImmediatePropagation();}
     },true);
-    document.addEventListener('submit',event=>{event.preventDefault();event.stopImmediatePropagation();},true);
+    // Forms are refused, except the LVM GEO cadastral search (it issues a GET).
+    document.addEventListener('submit',event=>{if(event.target.closest?.('#sec-lvm-geodata')&&!event.target.querySelector(STEP3_INPUTS))return;event.preventDefault();event.stopImmediatePropagation();},true);
     new MutationObserver(list=>{
       for (const mutation of list) {
         if(mutation.type==='childList') mutation.addedNodes.forEach(process);
         else if(mutation.target.nodeType===1) process(mutation.target);
       }
-    }).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['onclick']});
+    }).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['onclick','disabled']});
     // The current PDF generator embeds untranslated labels. Hide and refuse it in review.
     window.downloadPDF=()=>undefined;
   }
-  window.ForestReview={allowed,displayText};
+  window.ForestReview={allowed,displayText,demoApiBlocked};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start);else start();
 })();

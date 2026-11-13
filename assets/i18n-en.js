@@ -18,6 +18,7 @@
   "MONITORINGS": "MONITOR",
   "Operācijas": "Operations",
   "OPERĀCIJAS": "OPERATIONS",
+  "Slāņi": "LVM GEO",
   "Administrēšana": "Admin",
   "ADMINISTRĒŠANA": "ADMIN",
   "Atjaunot": "Refresh",
@@ -821,6 +822,200 @@
     [/\bvispirms jāizskata (\d+) izmaiņas/g, 'first review $1 changes'],
     [/\b(\d+) h (\d+) min\b/g, '$1 h $2 min'],
   ];
+  // ── LVM GEO and Meža karte (Forest Map) ────────────────────────────────────────────────────
+  // Applied ONLY inside GEO_SCOPE, by whole-text match and the anchored GEO_TEMPLATES below; the
+  // phrase pass never runs there, so VMD/VZD source values (attributes, cadastral numbers, names)
+  // are never altered. Official Latvian registry terms are kept in parentheses.
+  const GEO_SCOPE = '#sec-lvm-geodata,#sec-forest-map,.vmd-dialog,.forest-map-review,#fm-review,#fm-result';
+  const GEO_EXACT = {
+  // Forest Map's own English dictionary: add registry terms
+  "Forest compartment": "Forest compartment (nogabals)",
+  "Cadastral designation": "Cadastral designation (kadastra apzīmējums)",
+  "Quarter": "Quarter (kvartāls)",
+  "Compartment": "Compartment (nogabals)",
+  "Compartment details": "Forest compartment details (nogabals)",
+  "VMD forest compartments": "VMD forest compartments (meža nogabali)",
+  "VZD cadastral parcels · zoom 14+": "VZD land units (zemes vienības) · zoom 14+",
+  "VZD cadastral boundaries": "VZD cadastral boundaries (kadastra robežas)",
+  "Find land unit": "Find land unit (zemes vienība)",
+  "11-digit cadastral identifier": "11-digit cadastral designation (kadastra apzīmējums)",
+  // LVM GEO page: static text
+  "Slāņi": "LVM GEO",
+  "Reģistrēt meža nogabalus": "Register forest compartments (meža nogabali)",
+  "Atrodiet īstos nogabalus un pievienojiet tos Forest AI uzraudzībai.": "Find the actual forest compartments (nogabali) and add them to Forest AI monitoring.",
+  "Ievadiet kadastra apzīmējumu un atrodiet īstos VMD nogabalus.": "Enter a cadastral designation (kadastra apzīmējums) and find the actual VMD forest compartments (nogabali).",
+  "Ievadiet precīzu 11 ciparu zemes vienības apzīmējumu. Vienai zemes vienībai var būt vairāki nogabali.": "Enter the exact 11-digit land unit (zemes vienība) designation. One land unit can contain several forest compartments (nogabali).",
+  "Kadastra apzīmējums": "Cadastral designation (kadastra apzīmējums)",
+  "Piemēram, 40940020002": "For example, 40940020002",
+  "Atrast nogabalus": "Find compartments",
+  "Atcelt meklēšanu": "Cancel search",
+  "Pamatkarte": "Basemap",
+  "Satelīts": "Satellite",
+  "Satelīts — pārbaude": "Satellite — check",
+  "Iepriekšējā lapa": "Previous page",
+  "Nākamā lapa": "Next page",
+  "Atpakaļ uz meklēšanu": "Back to search",
+  "Mēģināt vēlreiz": "Try again",
+  "Iepriekšējie kandidāti": "Previous candidates",
+  "Nākamie kandidāti": "Next candidates",
+  "Noņemt atlasi": "Clear selection",
+  "Nogabalu rezultāti": "Compartment results",
+  "Sektoru reģistrācija": "Sector registration",
+  "Sektoru reģistrācijas soļi": "Sector registration steps",
+  "Reģistrējiet sektorus": "Register sectors",
+  "Pārbaudiet atlasi": "Review selection",
+  "Kvartāls": "Quarter (kvartāls)",
+  "Platība (ha)": "Area (ha)",
+  "Platība": "Area",
+  "Pārklājums": "Overlap",
+  "Saistība": "Association",
+  "Stāvoklis": "Status",
+  "Pārbaude": "Check",
+  "Ģeometrija": "Geometry",
+  "Atlasīt": "Select",
+  "Atribūti": "Attributes",
+  "Avota ID": "Source ID",
+  "Uzvārds": "Last name",
+  "Vārds": "First name",
+  "Sektora nosaukums": "Sector name",
+  "Atbildīgās personas vārds": "Responsible person first name",
+  "Atbildīgās personas uzvārds": "Responsible person last name",
+  "Notiek VMD datu kopas ielāde…": "Loading the VMD dataset…",
+  "VMD atvērtie dati · Indeksētie nogabali:": "VMD open data · Indexed compartments:",
+  "VMD datu avots": "VMD data source",
+  "VMD meža nogabali": "VMD forest compartments (meža nogabali)",
+  "Telpiskie kandidāti — nepieciešama pārbaude": "Spatial candidates — review required",
+  "Oranžas robežas ir atsevišķi aprēķināti telpiski kandidāti, nevis apstiprināta piederība kadastra zemes vienībai. Tie nav automātiski reģistrējami.": "Orange boundaries are separately computed spatial candidates, not a confirmed membership of the cadastral land unit (zemes vienība). They cannot be registered automatically.",
+  "Pieejami Centra reģiona VMD dati; datu kopa neaptver visu Latviju.": "VMD data for the Central region is available; the dataset does not cover all of Latvia.",
+  "Robežu avots: VMD. Pamatkartes attēli neaizstāj avota ģeometriju.": "Boundary source: VMD. Basemap imagery does not replace the source geometry.",
+  "VMD nogabala robeža nav automātiski juridiski apstiprināta kadastra robeža.": "A VMD compartment boundary is not automatically a legally confirmed cadastral boundary.",
+  "Izvēles rūtiņa kolonnas “Atlasīt” virsrakstā atlasa vai noņem šīs lapas reģistrējamos nogabalus. “Noņemt atlasi” notīra visas lapas. Atlase saglabājas, pāršķirot lapas; vienā reizē līdz 100 nogabaliem.": "The checkbox in the “Select” column header selects or clears the registrable compartments on this page. “Clear selection” clears all pages. The selection is kept across pages; up to 100 compartments at a time.",
+  "Vairāku nogabalu sektoru nosaukumiem pievienos avota identifikatoru — precīzus nosaukumus redzēsiet priekšskatījumā.": "For several compartments the source identifier is appended to sector names — the exact names are shown in the preview.",
+  "📷 Foto nav pieejams": "📷 Photo not available",
+  // steps
+  "1. Ievadiet precīzu kadastra apzīmējumu. Iepriekšējie rezultāti un atlase saglabājas.": "1. Enter the exact cadastral designation (kadastra apzīmējums). Previous results and selection are kept.",
+  "2. Pārbaudiet avota identifikatorus, platību un robežas; atlasiet reģistrējamos nogabalus.": "2. Check source identifiers, area and boundaries; select the compartments to register.",
+  "3. Pārbaudiet nosaukumu, atbildīgo personu un reģistrācijas kopsavilkumu.": "3. Check the name, responsible person and registration summary.",
+  // dynamic labels / statuses
+  "Gatavs": "Ready", "Jau reģistrēts": "Already registered", "Reģistrēts": "Registered", "Derīga": "Valid",
+  "Nav apstiprināta": "Not confirmed", "Nav pārbaudīts": "Not verified", "Jāpārbauda": "Review required",
+  "Jau importēts": "Already imported", "Importēts": "Imported", "Nav pieejams": "Not available", "Jā": "Yes", "Nē": "No",
+  "Meža nogabals": "Forest compartment (nogabals)", "Datu avots": "Data source", "Kadastra saistība": "Cadastral association",
+  "Avota kadastra apzīmējums": "Source cadastral designation (kadastra apzīmējums)",
+  "Pārbaudīts VMD atribūts": "Verified VMD attribute", "Atvasināta saistība": "Derived association",
+  "Saistība nav pārbaudīta": "Association not verified", "VMD + VZD pārbaudīts": "VMD + VZD verified",
+  "VMD atribūts sakrīt": "VMD attribute matches", "VMD atribūts nav pārbaudīts": "VMD attribute not verified",
+  "VMD atribūts pārbaudīts": "VMD attribute verified", "Avota identitātes konflikts": "Source identity conflict",
+  "Avota ģeometrija nav derīga": "Source geometry is not valid", "Attēlojuma ģeometrijai nepieciešama pārbaude": "Display geometry requires review",
+  "Normalizējot labota": "Repaired during normalisation", "Normalizējot labota ģeometrija — pārbaudiet pirms reģistrācijas.": "Geometry repaired during normalisation — review before registration.",
+  "Telpiski atvasināts — nav reģistrējams": "Spatially derived — not registrable",
+  "Telpisks kandidāts. Kadastra saistība nav apstiprināta; reģistrācija bloķēta.": "Spatial candidate. Cadastral association not confirmed; registration blocked.",
+  "Kadastra dati nav pārbaudīti": "Cadastral data not verified",
+  "Kadastra dati nav pārbaudīti. Redzamas VMD nogabalu robežas, nevis VZD zemes vienības robeža. Reģistrācija bloķēta līdz VZD ģeometrijas un saistības pārbaudei.": "Cadastral data not verified. VMD compartment boundaries are shown, not the VZD land unit (zemes vienība) boundary. Registration is blocked until the VZD geometry and association are verified.",
+  "VZD zemes vienības robeža": "VZD land unit (zemes vienība) boundary",
+  "Reģistrējamo nogabalu precīzās robežas": "Exact boundaries of registrable compartments",
+  "VMD nogabali: zaļas robežas. VZD zemes vienība: zila pārtraukta robeža. Reģistrācijai pieejami tikai pārbaudīti nogabali bez robežu neatbilstības.": "VMD compartments: green boundaries. VZD land unit (zemes vienība): blue dashed boundary. Only verified compartments without boundary discrepancy can be registered.",
+  "Atlasīts citā lapā": "Selected on another page", "Noņemt no atlases": "Remove from selection",
+  "Atlasīt visus reģistrējamos nogabalus šajā lapā": "Select all registrable compartments on this page",
+  "Šajā lapā nav reģistrējamu nogabalu": "No registrable compartments on this page",
+  "Šim kadastra apzīmējumam nogabali nav atrasti.": "No forest compartments found for this cadastral designation.",
+  "Ievadiet 11 ciparu kadastra apzīmējumu un atrodiet nogabalus.": "Enter an 11-digit cadastral designation (kadastra apzīmējums) and find compartments.",
+  "Ievadiet 11 ciparu kadastra apzīmējumu.": "Enter an 11-digit cadastral designation (kadastra apzīmējums).",
+  "Ievadiet precīzu 11 ciparu zemes vienības kadastra apzīmējumu.": "Enter the exact 11-digit land unit cadastral designation (kadastra apzīmējums).",
+  "Ievadiet precīzu 11 ciparu kadastra apzīmējumu": "Enter the exact 11-digit cadastral designation (kadastra apzīmējums)",
+  "Notiek VMD nogabalu meklēšana…": "Searching VMD compartments…", "Notiek pārbaude…": "Checking…",
+  "Meklēšana atcelta.": "Search cancelled.", "Meklēšana atcelta vai beidzies tās laiks.": "Search cancelled or timed out.",
+  "Meklēšana ir mainīta — atkārtojiet “Atrast nogabalus”.": "The search has changed — repeat “Find compartments”.",
+  "Nederīga VMD atbilde.": "Invalid VMD response.", "VMD datu kopa nav pieejama": "VMD dataset not available",
+  "VMD datu kopa pieejama": "VMD dataset available", "Valsts dati nav gatavi": "National data not ready",
+  "Vispirms atlasiet pārbaudītus nogabalus.": "Select verified compartments first.",
+  "Vispirms atrodiet nogabalus pēc precīza kadastra apzīmējuma.": "First find compartments by an exact cadastral designation.",
+  "Vienā reizē var reģistrēt līdz 100 nogabaliem.": "Up to 100 compartments can be registered at a time.",
+  "Ģeodatu pieprasījums neizdevās.": "Geodata request failed.", "Ģeodatu pieprasījums neizdevās": "Geodata request failed",
+  "Konta saistība nav pieejama; reģistrācija bloķēta. Nogabalu meklēšana ir pieejama, ja datu kopa ielādēta.": "Account association not available; registration blocked. Compartment search is available when the dataset is loaded.",
+  "Reģistrācijas konteksts nav pieejams (organizācijas konts) — izmantojiet “Mēģināt vēlreiz”.": "Registration context not available (organisation account) — use “Try again”.",
+  "Ievadiet atbildīgās personas vārdu un uzvārdu.": "Enter the responsible person's first and last name.",
+  "Norādiet atbildīgās personas vārdu un uzvārdu.": "Enter the responsible person's first and last name.",
+  "Norādiet sektora nosaukumu (1–120 rakstzīmes, bez slīpsvītrām un vadības rakstzīmēm)": "Enter a sector name (1–120 characters, no slashes or control characters)",
+  "Atkārtojiet precīzu meklēšanu pirms reģistrācijas.": "Repeat the exact search before registration.",
+  "Neviens sektors netika reģistrēts.": "No sector was registered.",
+  "Nogabalu reģistrācijas priekšskatījums": "Compartment registration preview",
+  "Sektoru reģistrācijas priekšskatījums": "Sector registration preview",
+  "Tiks saglabāta avota ģeometrija un izcelsmes informācija. Esošie sektori netiks pārrakstīti.": "The source geometry and provenance will be stored. Existing sectors will not be overwritten.",
+  "Atpakaļ uz atlasi": "Back to selection", "nogabali": "compartments", "kopējā platība": "total area",
+  "derīgas ģeometrijas": "valid geometries", "jau reģistrēti": "already registered", "platība nav zināma": "area unknown",
+  "VMD atbildes kadastra apzīmējums neatbilst precīzajam pieprasījumam.": "The cadastral designation in the VMD response does not match the exact request.",
+  "Kadastra saistība nav pārbaudīta; reģistrācija nav atļauta": "Cadastral association not verified; registration not allowed",
+  "Kadastra saistība nav pārbaudīta; reģistrācija nav atļauta.": "Cadastral association not verified; registration not allowed.",
+  "Datu kopas versija ir mainījusies; atkārtojiet meklēšanu.": "The dataset version has changed; repeat the search.",
+  "VMD datu kopas metadati nav pieejami.": "VMD dataset metadata not available.",
+  "VMD datu kopa nav pieejama; nepieciešama indeksēšana.": "VMD dataset not available; indexing required.",
+  "Neizdevās sasniegt serveri.": "Could not reach the server.",
+  "Satelītattēli nav pieejami. Karte un īstās VMD robežas paliek pieejamas.": "Satellite imagery not available. The map and actual VMD boundaries remain available.",
+  "Esri satelītattēli un aerofotogrāfijas; uzņemšanas laiks atšķiras. Nogabalu robežas: VMD.": "Esri satellite and aerial imagery; capture dates vary. Compartment boundaries: VMD.",
+  "Nogabals nav datu kopā.": "The compartment is not in the dataset.",
+  "Sektors ar šādu nosaukumu jau pastāv; dati netika pārrakstīti.": "A sector with this name already exists; nothing was overwritten.",
+  // server messages (nationwide / cadastral authority / registration identity)
+  "Atrasti VMD nogabali. Zaļas robežas — pārbaudīti nogabali; zila robeža — VZD zemes vienība.": "VMD compartments found. Green boundaries — verified compartments; blue boundary — VZD land unit (zemes vienība).",
+  "Atrasti ieraksti pārbaudei. Oranži telpiskie kandidāti nav apstiprināta kadastra saistība un nav reģistrējami.": "Records found for review. Orange spatial candidates are not a confirmed cadastral association and cannot be registered.",
+  "Kadastra zemes vienība nav atrasta": "Cadastral land unit (zemes vienība) not found",
+  "Zemes vienība nav atrasta valsts VZD indeksā.": "Land unit (zemes vienība) not found in the national VZD index.",
+  "VZD zemes vienība atrasta; valsts VMD atvērto datu indeksā tai nav atrasti precīzi nogabali vai telpiski kandidāti. Tas neapliecina meža neesamību.": "VZD land unit (zemes vienība) found; the national VMD open-data index has no exact compartments or spatial candidates for it. This does not prove the absence of forest.",
+  "Robežu neatbilstība — nepieciešama pārbaude": "Boundary discrepancy — review required",
+  "VMD un VZD saistība pārbaudīta": "VMD and VZD association verified",
+  "VZD zemes vienība pārbaudīta": "VZD land unit (zemes vienība) verified",
+  "Precīzi sakrīt VMD kadastrs un VZD CODE; nogabals pilnībā atrodas zemes vienībā.": "VMD cadastral attribute and VZD CODE match exactly; the compartment lies entirely within the land unit (zemes vienība).",
+  "Precīzs VZD KKParcel.CODE; netiek apliecinātas īpašumtiesības vai mērniecības precizitāte.": "Exact VZD KKParcel.CODE; ownership and survey accuracy are not certified.",
+  "Precīzs VZD KKParcel.CODE; netiek apstiprinātas īpašumtiesības vai mērniecības precizitāte.": "Exact VZD KKParcel.CODE; ownership and survey accuracy are not confirmed.",
+  "Nav iegūta VZD zemes vienības precīzā ģeometrija. VMD atribūts pats par sevi nav neatkarīga Kadastra pārbaude.": "The exact VZD land unit geometry was not obtained. The VMD attribute alone is not an independent cadastral check.",
+  "Identifikatori sakrīt, bet avota robežas pilnībā nesakrīt. Bez pielaides, bufera vai robežu labošanas reģistrācija bloķēta.": "Identifiers match, but the source boundaries do not fully match. Without tolerance, buffer or boundary repair, registration is blocked.",
+  "Sākotnējais DBF atribūts un avota integritāte validēta valsts indeksa izveidē.": "Original DBF attribute and source integrity validated when the national index was built.",
+  "Telpiskās meklēšanas laiks pārsniegts; mēģiniet vēlreiz.": "Spatial search timed out; try again.",
+  "Valsts VZD un VMD avoti validēti": "National VZD and VMD sources validated",
+  "Visa Latvija: validēti 5 VMD reģionu un 42 VZD pašvaldību avoti.": "All of Latvia: 5 VMD regional and 42 VZD municipal sources validated.",
+  "Valsts datu indekss nav aktivizēts": "National data index not activated",
+  "Valsts datu indekss vēl nav gatavs": "National data index not ready yet",
+  "Individuāla lietotāja profils šajā kontā nav pieejams. Norādiet atbildīgo personu; kontaktinformācija nepiešķir piekļuves tiesības.": "No individual user profile is available for this account. Name a responsible person; contact details do not grant access rights.",
+  "Organizācijas saistība nav pārbaudīta: nepieciešama servera lietotāju un organizāciju autorizācija": "Organisation association not verified: server-side user and organisation authorisation required"
+  };
+  // Anchored templates for LVM GEO strings built by concatenation (vmd-production.js). Values are kept verbatim.
+  const GEO_TEMPLATES = [
+    [/^Atlasīti: (\d+) nogabal(?:s|i) · (.+)$/, (_,n,a) => `Selected: ${n} compartment${n==='1'?'':'s'} · ${a==='platība nav zināma'?'area unknown':a}`],
+    [/^Atlasīti: 0 nogabali$/, 'Selected: 0 compartments'],
+    [/^Reģistrēt sektorus \((\d+)\)$/, 'Register sectors ($1)'],
+    [/^Apstiprināt un reģistrēt \((\d+)\)$/, 'Confirm and register ($1)'],
+    [/^Kandidāti: (\d+) · Lapā: (\d+)$/, 'Candidates: $1 · On page: $2'],
+    [/^Šajā lapā atlasīti (\d+) no (\d+) reģistrējamiem nogabaliem$/, 'Selected $1 of $2 registrable compartments on this page'],
+    [/^Atlasīt (.+)$/, 'Select $1'],
+    [/^Robežu neatbilstība · ([\d.]+)% sakritība$/, 'Boundary discrepancy · $1% overlap'],
+    [/^Kadastra dati nav pārbaudīti · VMD atribūts (sakrīt|nav pārbaudīts)$/, (_,v) => `Cadastral data not verified · VMD attribute ${v==='sakrīt'?'matches':'not verified'}`],
+    [/^Pārbaude: gatavi (\d+) · jau pastāv: (\d+) · neizdevās: (\d+)$/, 'Check: ready $1 · already exist: $2 · failed: $3'],
+    [/^Organizācija: (.*)$/, 'Organisation: $1'],
+    [/^Atbildīgā persona: (.*)$/, 'Responsible person: $1'],
+    [/^Avots: VMD Meža valsts reģistrs · (.*)$/, 'Source: VMD State Forest Register (Meža valsts reģistrs) · $1'],
+    [/^Ievadītais sektora nosaukums: (.*) · Tabulā — sektoru nosaukumi tieši tā, kā tos saglabās serveris\.$/, 'Entered sector name: $1 · The table shows sector names exactly as the server will store them.'],
+    [/^Nav reģistrējams: (.*)$/, (_,r) => 'Not registrable: ' + r.split(' · ').map(x => GEO_EXACT[x] || x).join(' · ')],
+    // results summary: "Pieprasītais apzīmējums: X · Atrasti: N nogabali · Šajā lapā: M · Kopējā platība: A ha[ · ...]"
+    [/^Pieprasītais apzīmējums: (\d{11}) · Atrasti: (\d+) nogabali · Šajā lapā: (\d+) · Kopējā platība: ([\d.]+) ha/, 'Requested designation (apzīmējums): $1 · Found: $2 compartments · On this page: $3 · Total area: $4 ha'],
+    [/ · VMD atribūts pārbaudīts: (\d+) · Nepārbaudīti: (\d+)/g, ' · VMD attribute verified: $1 · Not verified: $2'],
+    [/ · VZD zemes vienība: (\d{11}) · Platība: ([\d.]+) ha/g, ' · VZD land unit (zemes vienība): $1 · Area: $2 ha'],
+    [/ · Pārbaudīti: (\d+) · Telpiski kandidāti: (\d+)/g, ' · Verified: $1 · Spatial candidates: $2'],
+    [/^Ielāde neizdevās: (.*) Izmantojiet “Mēģināt vēlreiz”\.$/, 'Loading failed: $1 Use “Try again”.'],
+  ];
+  function inGeo(node) {
+    const el = node.nodeType === 1 ? node : node.parentElement;
+    return !!el?.closest?.(GEO_SCOPE);
+  }
+  function trGeo(value) {
+    if (value == null) return value;
+    const original = String(value), normalized = original.replace(/\s+/g, ' ').trim();
+    const pad = (v) => original.match(/^\s*/)[0] + v + original.match(/\s*$/)[0];
+    if (Object.prototype.hasOwnProperty.call(GEO_EXACT, normalized)) return pad(GEO_EXACT[normalized]);
+    if (Object.prototype.hasOwnProperty.call(EXACT, normalized)) return pad(EXACT[normalized]);
+    let text = normalized, changed = false;
+    GEO_TEMPLATES.forEach(([pattern, replacement]) => { const next = text.replace(pattern, replacement); if (next !== text) { text = next; changed = true; } });
+    return changed ? pad(text) : original;
+  }
   function tr(value) {
     if (value == null) return value;
     const original = String(value), normalized = original.replace(/\s+/g, ' ').trim();
@@ -842,11 +1037,12 @@
   const skip = el => !el || !!el.closest('script,style,noscript,[contenteditable="true"],[data-no-i18n]');
   const attrs = ['title', 'placeholder', 'aria-label', 'alt'];
   function translateNode(node) {
+    const t = inGeo(node) ? trGeo : tr;   // geodata areas: exact + anchored templates only
     if (node.nodeType === 3) {
-      if (!skip(node.parentElement)) { const v = tr(node.nodeValue); if (v !== node.nodeValue) node.nodeValue = v; }
+      if (!skip(node.parentElement)) { const v = t(node.nodeValue); if (v !== node.nodeValue) node.nodeValue = v; }
     } else if (node.nodeType === 1 && !skip(node)) {
-      attrs.forEach(a => { const v = node.getAttribute(a); if (v && tr(v) !== v) node.setAttribute(a,tr(v)); });
-      if (node.matches('input[type=button],input[type=submit]')) node.value = tr(node.value);
+      attrs.forEach(a => { const v = node.getAttribute(a); if (v && t(v) !== v) node.setAttribute(a,t(v)); });
+      if (node.matches('input[type=button],input[type=submit]')) node.value = t(node.value);
       // Read-only conclusion textareas contain stored text, not editable user input.
       if (node.matches('textarea[readonly]')) { const v = tr(node.value); if (v !== node.value) node.value = v; }
     }
@@ -904,7 +1100,7 @@
     const Chart=function(ctx,config) { return new Original(ctx,chartConfig(config)); };
     Object.setPrototypeOf(Chart,Original);Chart.prototype=Original.prototype;window.Chart=Chart;
   }
-  window.ForestI18n={tr,trMessage:tr,lang:'en',translateTree};
+  window.ForestI18n={tr,trGeo,trMessage:tr,lang:'en',translateTree};
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',start);
   else start();
 })();
