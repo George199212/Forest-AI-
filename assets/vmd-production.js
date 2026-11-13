@@ -14,12 +14,13 @@ async function request(path,body,signal){
   const data=await r.json();if(!r.ok)throw Error(typeof data.detail==='string'?data.detail:'Ģeodatu pieprasījums neizdevās.');return data;
  }finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
 }
+function sectorNameError(value){const name=typeof value==='string'?value.trim():'';const chars=Array.from(name);return !name||chars.length>120||chars.some(ch=>ch.charCodeAt(0)<32||ch==='/'||ch==='\\')?'Norādiet sektora nosaukumu (1–120 rakstzīmes, bez slīpsvītrām un vadības rakstzīmēm)':'';}
 /* Why "Reģistrēt sektorus" is disabled — shown inline next to the button. */
 function blockers(current){const r=[];
  if(!s.identity)r.push('Reģistrācijas konteksts nav pieejams (organizācijas konts) — izmantojiet “Mēģināt vēlreiz”.');
  if(s.cadastre&&!current)r.push('Meklēšana ir mainīta — atkārtojiet “Atrast nogabalus”.');
  if(!s.selected.size)r.push('Atlasiet vismaz vienu nogabalu.');
- if(!dom('vmd-sector-name').value.trim())r.push('Ievadiet sektora nosaukumu.');
+ const nameError=sectorNameError(dom('vmd-sector-name').value);if(nameError)r.push(nameError);
  if(!dom('vmd-responsible-first-name').value.trim()||!dom('vmd-responsible-last-name').value.trim())r.push('Ievadiet atbildīgās personas vārdu un uzvārdu.');
  return r;}
 /* Missing area is never shown as 0. */
@@ -142,7 +143,7 @@ function report(result){
  failed.forEach(r=>el('div',r.external_id+': '+lvmError(r.reason),box));
  if(result.imported||result.already_exists){const link=el('a',' Atvērt sadaļu “Sektori”',box);link.href='#sectors';link.onclick=event=>{event.preventDefault?.();if(typeof nav==='function')nav('sectors');};}
 }
-function intent(){return {...(s.metadata?.regions_covered===5?{cadastral_designation:s.cadastre}:{}),feature_ids:Array.from(s.selected.keys()),dataset_version:s.version,sector_name:dom('vmd-sector-name').value.trim(),responsible_first_name:dom('vmd-responsible-first-name').value.trim(),responsible_last_name:dom('vmd-responsible-last-name').value.trim()};}
+function intent(){return {...(/^[0-9]{11}$/.test(s.cadastre||'')?{cadastral_designation:s.cadastre}:{}),feature_ids:Array.from(s.selected.keys()),dataset_version:s.version,sector_name:dom('vmd-sector-name').value.trim(),responsible_first_name:dom('vmd-responsible-first-name').value.trim(),responsible_last_name:dom('vmd-responsible-last-name').value.trim()};}
 async function executeImport(dryRun,body){
  if(s.busy||!body.feature_ids.length)return;s.busy=true;syncRows();buttons();
  try{
@@ -152,7 +153,7 @@ async function executeImport(dryRun,body){
  }catch(error){message(lvmError(error.message));}finally{s.busy=false;paint();selectionOverlay();syncRows();buttons();}
 }
 async function importSelected(dryRun=false){
- if(!s.selected.size||s.busy||!s.identity||s.review)return;if(dom('vmd-kadastrs').value.trim()!==s.cadastre||s.lastFailed){message('Atkārtojiet precīzu meklēšanu pirms reģistrācijas.');return;}const body=intent();if(!body.sector_name){message('Norādiet sektora nosaukumu.');dom('vmd-sector-name').focus();return;}if(!body.responsible_first_name||!body.responsible_last_name){message('Norādiet atbildīgās personas vārdu un uzvārdu.');return;}const result=await executeImport(true,body);if(!result||dryRun)return result;
+ if(!s.selected.size||s.busy||!s.identity||s.review)return;if(dom('vmd-kadastrs').value.trim()!==s.cadastre||s.lastFailed){message('Atkārtojiet precīzu meklēšanu pirms reģistrācijas.');return;}const body=intent(),nameError=sectorNameError(body.sector_name);if(nameError){message(nameError);dom('vmd-sector-name').focus();return;}if(!body.responsible_first_name||!body.responsible_last_name){message('Norādiet atbildīgās personas vārdu un uzvārdu.');return;}const result=await executeImport(true,body);if(!result||dryRun)return result;
  const dialog=el('dialog');dialog.className='vmd-dialog';dialog.setAttribute('aria-label','Nogabalu reģistrācijas priekšskatījums');progress(3);
  s.review=dialog;s.step=3;buttons();el('h3','Sektoru reģistrācijas priekšskatījums',dialog);el('p','Ievadītais sektora nosaukums: '+result.sector_name+' · Tabulā — sektoru nosaukumi tieši tā, kā tos saglabās serveris.',dialog);el('p','Organizācija: '+result.registration_identity.organization_name,dialog);el('p','Atbildīgā persona: '+result.responsible_person.first_name+' '+result.responsible_person.last_name,dialog);el('p','Avots: VMD Meža valsts reģistrs · '+body.dataset_version,dialog);
  const metrics=el('div',undefined,dialog);metrics.className='vmd-preview-metrics';[[result.requested,'nogabali'],[result.total_area_ha.toFixed(2)+' ha','kopējā platība'],[result.valid_geometry_count,'derīgas ģeometrijas'],[result.already_exists,'jau reģistrēti']].forEach(([value,label])=>{const box=el('div',undefined,metrics);el('strong',value,box);el('span',label,box);});

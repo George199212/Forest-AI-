@@ -20,7 +20,20 @@ function lvmError(value) {
  'Current sectors require one simple Polygon ring; MultiPolygon/holes are not flattened':'Sektoriem nepieciešams viens vienkāršs daudzstūris; daudzdaļu ģeometrija un caurumi netiek pārveidoti.',
  'Compartment is not in the production dataset':'Nogabals nav datu kopā.',
  'A sector with this name already exists; no overwrite allowed':'Sektors ar šādu nosaukumu jau pastāv; pārrakstīšana nav atļauta.',
- 'Source identity conflict; nothing overwritten':'Avota identifikatoru konflikts; dati nav pārrakstīti.'};
+ 'Source identity conflict; nothing overwritten':'Avota identifikatoru konflikts; dati nav pārrakstīti.',
+ 'VMD dataset metadata is unavailable':'VMD datu kopas metadati nav pieejami.',
+ 'Select 1–100 distinct compartments per import':'Atlasiet 1–100 atšķirīgus nogabalus reģistrēšanai.',
+ 'Select 1–100 compartments per import':'Atlasiet 1–100 nogabalus reģistrēšanai.',
+ 'Sektoru nosaukumi neatbilst atlasītajiem nogabaliem':'Sektoru nosaukumi neatbilst atlasītajiem nogabaliem.',
+ 'Katram nogabalam piešķiriet atšķirīgu sektora nosaukumu':'Katram nogabalam piešķiriet atšķirīgu sektora nosaukumu.',
+ 'Katram atlasītajam nogabalam norādiet derīgu sektora nosaukumu (1–120 rakstzīmes)':'Katram atlasītajam nogabalam norādiet derīgu nosaukumu (1–120 rakstzīmes).',
+ 'The selected compartment import must be explicitly confirmed':'Apstipriniet izvēlēto nogabalu reģistrāciju.',
+ 'Nogabala avota kadastra apzīmējums neatbilst pārbaudītajai atlasei':'Nogabala avota kadastra apzīmējums neatbilst pārbaudītajai atlasei.',
+ 'Kadastra saistība nav pārbaudīta; reģistrācija nav atļauta':'Kadastra saistība nav pārbaudīta; reģistrācija nav atļauta.',
+ 'Avota vai attēlojuma ģeometrijai nepieciešama manuāla pārbaude':'Avota vai attēlojuma ģeometrijai nepieciešama manuāla pārbaude.',
+ 'Current sectors require one simple Polygon ring; MultiPolygon/holes are not flattened':'Sektoriem nepieciešams viens vienkāršs daudzstūris. Daudzdaļu ģeometrija un caurumi netiek saplacināti.',
+ 'Confirm the selected compartment import explicitly':'Apstipriniet izvēlēto nogabalu reģistrāciju.',
+ 'A sector with this name already exists; no overwrite allowed':'Sektors ar šādu nosaukumu jau pastāv; dati netika pārrakstīti.'};
  if(known[text])return known[text];
  if(/[āčēģīķļņšūžĀČĒĢĪĶĻŅŠŪŽ]/.test(text))return text;
  if(/^LVM GEO returned HTTP \d+$/.test(text))return 'LVM GEO atbilde: HTTP '+text.match(/\d+$/)[0];
