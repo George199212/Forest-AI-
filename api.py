@@ -23,6 +23,7 @@ from services import risk_ai_worker
 from services import photo_compare
 from services import risk_conclusion
 from services import session_track
+from services import review_mode
 from services.satellite_intelligence import collect_satellite_inspector_fields
 from services.satellite_intelligence.providers import ALL_PROVIDERS
 from services.satellite_intelligence.models import TIER_LABELS
@@ -46,6 +47,24 @@ PLANS_DIR.mkdir(parents=True, exist_ok=True)
 OBJECT_SATELLITE_DIR.mkdir(parents=True, exist_ok=True)
 SECTOR_SATELLITE_DIR.mkdir(parents=True, exist_ok=True)
 SECTOR_SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = Path("data")
+ASSETS_DIR = Path("assets")
+
+
+def _contained_file(path, base):
+    """Resolved path of an existing regular file inside `base`, else None.
+    Rejects "..", "." and other directories, paths outside `base` and symlinks
+    that point outside it, so a file route can never serve .env, the DB or code."""
+    if not path:
+        return None
+    try:
+        p = Path(path).resolve()
+        root = Path(base).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    if not p.is_relative_to(root) or not p.is_file():
+        return None
+    return p
 
 _basic_auth = HTTPBasic()
 
@@ -65,6 +84,9 @@ def verify_credentials(credentials: HTTPBasicCredentials = Depends(_basic_auth))
 
 
 app = FastAPI(title="Forest AI API", dependencies=[Depends(verify_credentials)])
+if review_mode.ENABLED:
+    # Read-only review instance: see services/review_mode.py. Not installed otherwise.
+    app.add_middleware(review_mode.ReviewModeMiddleware)
 
 # Uses the same HTTP Basic authentication as every dashboard route.
 from services.integrations.john_deere_routes import router as deere_router, CallbackPrivacyMiddleware
@@ -118,7 +140,8 @@ def vmd_local_import(body: LocalImportRequest, actor: str = Depends(verify_crede
 @app.on_event("startup")
 def _init_db_on_startup():
     init_db()
-    risk_ai_worker.start()
+    if not review_mode.ENABLED:  # review instances must never make paid AI calls
+        risk_ai_worker.start()
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -604,6 +627,15 @@ def serve_index():
     if ui_lang and ui_lang.isalpha() and Path(f"assets/i18n-{ui_lang}.js").exists():
         html = html.replace('<html lang="en">', f'<html lang="{ui_lang}">', 1)
         html = html.replace("</head>", f'<script src="/assets/i18n-{ui_lang}.js"></script>\n</head>', 1)
+    display_name = os.environ.get("INSTANCE_DISPLAY_NAME", "").strip()
+    if review_mode.ENABLED or display_name:
+        # Configuration is presentation-only; escape '<' so env text cannot close the script.
+        config = json.dumps({"readOnly": review_mode.ENABLED,
+                             "displayName": display_name}, ensure_ascii=True).replace("<", "\\u003c")
+        html = html.replace("</head>", '<script>window.ForestInstance=' + config + '</script>\n'
+                            '<script src="/assets/review-ui.js"></script>\n</head>', 1)
+    if review_mode.ENABLED:
+        html = html.replace("</head>", '<script src="/assets/review-satellite.js"></script>\n</head>', 1)
     deployment = frontend_deployment()
     html = html.replace('</head>', '<meta name="forest-deployment" content="'+deployment['version']+'">\n</head>', 1)
     html = re.sub(r'(<(?:p|span) id="geodata-build"[^>]*>)', lambda match: match.group(1)+'Versija: '+deployment['version'], html, count=1)
@@ -621,15 +653,15 @@ def serve_index():
 
 @app.get("/photos/file/{filename}")
 def serve_photo_file(filename: str):
-    path = PHOTOS_DIR / filename
-    if path.exists():
+    path = _contained_file(PHOTOS_DIR / filename, PHOTOS_DIR)
+    if path:
         return FileResponse(str(path))
     return Response(status_code=404)
 
 @app.get("/assets/{filename}")
 def serve_asset(filename: str):
-    path = Path("assets") / filename
-    if path.exists():
+    path = _contained_file(ASSETS_DIR / filename, ASSETS_DIR)
+    if path:
         headers = {'Cache-Control':'private, no-cache, must-revalidate'} if path.suffix in {'.js','.css'} else None
         return FileResponse(str(path), headers=headers)
     return Response(status_code=404)
@@ -847,7 +879,7 @@ def get_boundary_plan_scan(plan_id: int):
     can display the source document next to the sectors created from it."""
     row = db1("SELECT file_path FROM boundary_plans WHERE id=?", (plan_id,))
     file_path = row.get("file_path")
-    if not file_path or not Path(file_path).exists():
+    if not _contained_file(file_path, DATA_DIR):
         return Response(status_code=404)
     return FileResponse(file_path)
 
@@ -919,7 +951,7 @@ def get_object_satellite_image(plan_id: int):
     present, otherwise fall back to the live Sentinel-2 fetch."""
     row = db1("SELECT satellite_file_path FROM boundary_plans WHERE id=?", (plan_id,))
     file_path = row.get("satellite_file_path")
-    if file_path and Path(file_path).exists():
+    if _contained_file(file_path, DATA_DIR):
         return FileResponse(file_path)
     return RedirectResponse(url=f"/api/satellite/object/{plan_id}")
 
@@ -949,7 +981,7 @@ def get_sector_satellite_image(name: str):
     present, otherwise fall back to the live Sentinel-2 fetch."""
     row = db1("SELECT satellite_file_path FROM sectors WHERE name=?", (name,))
     file_path = row.get("satellite_file_path")
-    if file_path and Path(file_path).exists():
+    if _contained_file(file_path, DATA_DIR):
         return FileResponse(file_path)
     return RedirectResponse(url=f"/api/satellite/image/{name}")
 
@@ -999,7 +1031,7 @@ def get_sector_snapshots_route(name: str):
 def get_sector_snapshot_image(id: int):
     row = db1("SELECT image_path FROM sector_snapshots WHERE id=?", (id,))
     file_path = row.get("image_path")
-    if not file_path or not Path(file_path).exists():
+    if not _contained_file(file_path, DATA_DIR):
         return Response(status_code=404)
     return FileResponse(file_path)
 
@@ -1238,7 +1270,7 @@ def get_boundary_plan_annotated(plan_id: int):
                         media_type="application/json", status_code=500)
     row = db1("SELECT file_path FROM boundary_plans WHERE id=?", (plan_id,))
     file_path = row.get("file_path")
-    if not file_path or not Path(file_path).exists():
+    if not _contained_file(file_path, DATA_DIR):
         return Response(status_code=404)
 
     sectors = db("SELECT name, pixel_boundary_json FROM sectors WHERE boundary_plan_id=?", (plan_id,))
@@ -1276,7 +1308,7 @@ def get_sector_plan_crop(name: str):
 
     plan_row = db1("SELECT file_path FROM boundary_plans WHERE id=?", (plan_id,))
     file_path = plan_row.get("file_path")
-    if not file_path or not Path(file_path).exists():
+    if not _contained_file(file_path, DATA_DIR):
         return Response(status_code=404)
 
     try:
@@ -1686,7 +1718,7 @@ def risk_conclusion_undo(risk_id: int, conclusion_id: int, body: RiskConclusionU
 def get_risk_photo(risk_id: int):
     row = db1("SELECT photo_path FROM risks WHERE id=?", (risk_id,))
     file_path = row.get("photo_path")
-    if not file_path or not Path(file_path).exists():
+    if not _contained_file(file_path, DATA_DIR):
         return Response(status_code=404)
     return FileResponse(file_path)
 
@@ -1695,7 +1727,7 @@ def get_risk_photo(risk_id: int):
 def get_risk_photo2(risk_id: int):
     row = db1("SELECT photo_path_2 FROM risks WHERE id=?", (risk_id,))
     file_path = row.get("photo_path_2")
-    if not file_path or not Path(file_path).exists():
+    if not _contained_file(file_path, DATA_DIR):
         return Response(status_code=404)
     return FileResponse(file_path)
 
@@ -2275,6 +2307,8 @@ import time as _time
 _token_cache = {"token": None, "expires": 0}
 
 def get_sentinel_token():
+    if review_mode.ENABLED:  # review instances never contact Copernicus (token or process API)
+        return None
     if _token_cache["token"] and _time.time() < _token_cache["expires"]:
         return _token_cache["token"]
     data = urllib.parse.urlencode({
@@ -2345,6 +2379,32 @@ function evaluatePixel(sample) {
         return None
 
 
+def _review_satellite(kind, key, date_from=None, date_to=None):
+    """Review mode: serve a cached satellite JPEG, never call Sentinel."""
+    path = review_mode.cached_satellite_file(kind, key)
+    if date_from is not None or date_to is not None:
+        metadata = review_mode.cached_satellite_metadata(kind, key)
+        if not metadata or metadata["date_window"] != {"from": date_from, "to": date_to}:
+            path = None
+    if path:
+        return FileResponse(str(path), media_type="image/jpeg")
+    return Response(content=review_mode.satellite_not_cached_body(kind, key),
+                    media_type="application/json", status_code=404)
+
+
+def review_satellite_metadata(kind: str, key: str):
+    if not review_mode.ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    metadata = review_mode.cached_satellite_metadata(kind, key)
+    if not metadata:
+        return {"available": False, "message": "Satellite image not available in review mode"}
+    return {"available": True, **metadata}
+
+
+if review_mode.ENABLED:
+    app.get("/api/review/satellite-cache/{kind}/{key}")(review_satellite_metadata)
+
+
 @app.get("/api/satellite/token-check")
 def satellite_token_check():
     token = get_sentinel_token()
@@ -2393,8 +2453,11 @@ def satellite_sectors():
 
 
 @app.get("/api/satellite/image/{sector_name}")
-def satellite_image(sector_name: str, date_from: str = "2024-06-01", date_to: str = "2024-06-30"):
+def satellite_image(request: Request, sector_name: str, date_from: str = "2024-06-01", date_to: str = "2024-06-30"):
     """Fetch Sentinel-2 true color image for a sector."""
+    if review_mode.ENABLED:
+        supplied = "date_from" in request.query_params or "date_to" in request.query_params
+        return _review_satellite("image", sector_name, date_from if supplied else None, date_to if supplied else None)
     token = get_sentinel_token()
     if not token:
         return Response(content='{"error":"Cannot get Sentinel token"}', media_type="application/json", status_code=500)
@@ -2455,6 +2518,8 @@ def satellite_object(plan_id: int, date_from: str = "2024-06-01", date_to: str =
     """Fetch a single Sentinel-2 true color image covering ALL sectors that
     belong to this object/plan, for a whole-object satellite view (as
     opposed to per-sector satellite images, which already exist)."""
+    if review_mode.ENABLED:
+        return _review_satellite("object", plan_id)
     token = get_sentinel_token()
     if not token:
         return Response(content='{"error":"Cannot get Sentinel token"}', media_type="application/json", status_code=500)
@@ -2509,8 +2574,11 @@ function evaluatePixel(sample) {
 
 
 @app.get("/api/satellite/ndvi/{sector_name}")
-def satellite_ndvi(sector_name: str, date_from: str = "2024-06-01", date_to: str = "2024-06-30"):
+def satellite_ndvi(request: Request, sector_name: str, date_from: str = "2024-06-01", date_to: str = "2024-06-30"):
     """Fetch Sentinel-2 NDVI (vegetation index) image."""
+    if review_mode.ENABLED:
+        supplied = "date_from" in request.query_params or "date_to" in request.query_params
+        return _review_satellite("ndvi", sector_name, date_from if supplied else None, date_to if supplied else None)
     token = get_sentinel_token()
     if not token:
         return Response(content='{"error":"Cannot get Sentinel token"}', media_type="application/json", status_code=500)
