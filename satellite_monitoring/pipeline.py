@@ -187,7 +187,7 @@ class Runner:
         """Areas with open suspected events first, then the longest without a valid S2."""
         def key(a):
             open_ev = self.conn.execute("SELECT COUNT(*) FROM sat_change_events WHERE monitored_area_id=? "
-                                        "AND status IN ('SUSPECTED','FIELD_CHECK_REQUESTED')", (a["id"],)).fetchone()[0]
+                                        "AND superseded_at_utc IS NULL AND status IN ('SUSPECTED','FIELD_CHECK_REQUESTED')", (a["id"],)).fetchone()[0]
             last = self.conn.execute("SELECT MAX(sensing_time_utc) FROM sat_acquisitions WHERE monitored_area_id=? "
                                      "AND sensor='S2' AND status='OK' AND valid_pct_inside>=?",
                                      (a["id"], self.cfg["min_valid_pct"])).fetchone()[0]
@@ -272,6 +272,7 @@ class Runner:
                 continue
             rows = self.conn.execute(
                 "SELECT a.* FROM sat_acquisitions a LEFT JOIN sat_detections d ON d.acquisition_id=a.id "
+                "AND d.superseded_at_utc IS NULL "
                 f"WHERE a.monitored_area_id=? AND a.sensor IN ({','.join('?' * len(sensors))}) AND a.status='OK' "
                 "AND d.acquisition_id IS NULL ORDER BY a.sensing_time_utc, a.sensor", (a["id"], *sensors)).fetchall()
             for r in rows:
@@ -337,22 +338,30 @@ class Detector:
     def _excluded_s2(self):
         ids = {r[0] for r in self.conn.execute(
             f"SELECT acquisition_id FROM sat_detections WHERE monitored_area_id=? AND sensor='S2' "
+            f"AND superseded_at_utc IS NULL "
             f"AND outcome IN ({','.join('?' * len(self.EXCLUDED_OUTCOMES))})", (self.a["id"], *self.EXCLUDED_OUTCOMES))}
         ids |= {r[0] for r in self.conn.execute(
-            "SELECT acquisition_id FROM sat_s2_candidates WHERE monitored_area_id=? "
+            "SELECT acquisition_id FROM sat_s2_candidates WHERE monitored_area_id=? AND superseded_at_utc IS NULL "
             "AND status IN ('PENDING_CONFIRMATION','TRANSIENT')", (self.a["id"],))}
         return ids
 
     def _record(self, acq, outcome, baseline=None, stats=None, persisted=None, event_id=None, details=None):
         stats = stats or {}
-        self.conn.execute(
-            "INSERT OR REPLACE INTO sat_detections (acquisition_id, monitored_area_id, sensor, ran_at_utc, outcome,"
-            " baseline_acq_ids, n_changed_pixels, changed_area_ha, largest_cluster_ha, persisted, event_id,"
-            " details_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (acq["id"], self.a["id"], acq["sensor"], sdb.iso(sdb.utcnow()), outcome,
-             sdb.dumps([b["id"] for b in baseline]) if baseline is not None else None,
-             stats.get("n_changed_pixels"), stats.get("changed_area_ha"), stats.get("largest_cluster_ha"),
-             persisted, event_id, sdb.dumps(details) if details else None))
+        vals = dict(acquisition_id=acq["id"], monitored_area_id=self.a["id"], sensor=acq["sensor"],
+                    ran_at_utc=sdb.iso(sdb.utcnow()), outcome=outcome,
+                    baseline_acq_ids=sdb.dumps([b["id"] for b in baseline]) if baseline is not None else None,
+                    n_changed_pixels=stats.get("n_changed_pixels"), changed_area_ha=stats.get("changed_area_ha"),
+                    largest_cluster_ha=stats.get("largest_cluster_ha"), persisted=persisted, event_id=event_id,
+                    details_json=sdb.dumps(details) if details else None)
+        # one CURRENT row per acquisition: update it in place, never delete (superseded rows stay frozen)
+        row = self.conn.execute("SELECT id FROM sat_detections WHERE acquisition_id=? AND superseded_at_utc IS NULL",
+                                (acq["id"],)).fetchone()
+        if row:
+            self.conn.execute(f"UPDATE sat_detections SET {', '.join(k + '=?' for k in vals)} WHERE id=?",
+                              (*vals.values(), row[0]))
+        else:
+            self.conn.execute(f"INSERT INTO sat_detections ({', '.join(vals)}) VALUES ({','.join('?' * len(vals))})",
+                              tuple(vals.values()))
         self.conn.commit()
 
     def run(self, acq):
@@ -467,8 +476,9 @@ class Detector:
         ongoing = timedelta(days=self.cfg["ongoing_max_gap_days"])
         labels, sizes = det.clusters(mask, self.a["grid"]["pixel_area_ha"])
         out = []
-        for ev in self.conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN "
-                                    "('SUSPECTED','FIELD_CHECK_REQUESTED') ORDER BY id", (self.a["id"],)).fetchall():
+        for ev in self.conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? AND superseded_at_utc"
+                                    " IS NULL AND status IN ('SUSPECTED','FIELD_CHECK_REQUESTED') ORDER BY id",
+                                    (self.a["id"],)).fetchall():
             ev = dict(ev)
             hist = json.loads(ev["after_acq_history_json"])
             s2_times = [prov.parse_time(h["time"]) for h in hist if h["sensor"] == "S2"]
@@ -497,7 +507,7 @@ class Detector:
             "%Y-%m-%dT%H:%M:%SZ")
         rows = [dict(r) for r in self.conn.execute(
             "SELECT * FROM sat_radar_anomalies WHERE monitored_area_id=? AND sensing_time_utc>=? AND sensing_time_utc<=?"
-            " ORDER BY sensing_time_utc", (self.a["id"], since, t_iso))]
+            " AND superseded_at_utc IS NULL ORDER BY sensing_time_utc", (self.a["id"], since, t_iso))]
         if len(rows) < self.cfg["s1_promote_min_acq"]:
             return None, []
         masks = [np.load(r["mask_path"]).astype(bool) for r in rows]
@@ -549,7 +559,7 @@ class Detector:
         """Rule a, other direction: an S2-confirmed event promotes earlier/later radar anomalies that overlap it
         within s1_anomaly_s2_confirm_days."""
         for (aid,) in self.conn.execute("SELECT id FROM sat_radar_anomalies WHERE monitored_area_id=? AND "
-                                        "status='RADAR_ANOMALY' ORDER BY sensing_time_utc", (self.a["id"],)).fetchall():
+                                        "superseded_at_utc IS NULL AND status='RADAR_ANOMALY' ORDER BY sensing_time_utc", (self.a["id"],)).fetchall():
             res = self._attach_to_events(aid, s2_only=True)
             if res:
                 self._mark_promoted(aid, "S2_CONFIRMED", res[0][0])
@@ -621,6 +631,7 @@ class Detector:
         for c in [dict(x) for x in self.conn.execute(
                 "SELECT c.*, a.sensing_time_utc AS cand_time FROM sat_s2_candidates c JOIN sat_acquisitions a "
                 "ON a.id=c.acquisition_id WHERE c.monitored_area_id=? AND c.status='PENDING_CONFIRMATION' "
+                "AND c.superseded_at_utc IS NULL "
                 "ORDER BY c.id", (self.a["id"],))]:
             if c["cand_time"] >= t:
                 continue
@@ -694,7 +705,7 @@ class Detector:
         candidates = []
         for ev in self.conn.execute(
                 "SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN ('SUSPECTED','FIELD_CHECK_REQUESTED')"
-                " ORDER BY id DESC", (self.a["id"],)).fetchall():
+                " AND superseded_at_utc IS NULL ORDER BY id DESC", (self.a["id"],)).fetchall():
             if prov.parse_time(ev["first_after_time_utc"]) - gap <= t <= prov.parse_time(ev["last_after_time_utc"]) + gap:
                 old = self._union_of(dict(ev))
                 candidates.append((dict(ev), old, det.dilate1(old)))
@@ -864,14 +875,15 @@ class Detector:
         every open event this sensor contributed to whose after-window (+ ongoing_max_gap_days) covers it."""
         if acq["sensor"] == "S2" and acq["id"] in self._excluded_s2():
             return
-        d = self.conn.execute("SELECT outcome FROM sat_detections WHERE acquisition_id=?", (acq["id"],)).fetchone()
+        d = self.conn.execute("SELECT outcome FROM sat_detections WHERE acquisition_id=? AND superseded_at_utc IS NULL",
+                              (acq["id"],)).fetchone()
         if d is None or d[0] in ("NOT_USABLE", "UNIFORM_DROP_ATMOSPHERIC", "PENDING_CONFIRMATION"):
             return
         t = acq["sensing_time_utc"]
         gap = timedelta(days=self.cfg["ongoing_max_gap_days"])
         for ev in [dict(e) for e in self.conn.execute(
                 "SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN ('SUSPECTED',"
-                "'FIELD_CHECK_REQUESTED') ORDER BY id", (self.a["id"],))]:
+                "'FIELD_CHECK_REQUESTED') AND superseded_at_utc IS NULL ORDER BY id", (self.a["id"],))]:
             history = json.loads(ev["after_acq_history_json"])
             if acq["sensor"] not in {h["sensor"] for h in history} or acq["id"] in {h["acq_id"] for h in history}:
                 continue

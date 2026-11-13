@@ -69,8 +69,10 @@ CREATE TABLE IF NOT EXISTS sat_area_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS sat_detections (
-    -- one row per (acquisition) once change detection ran on it; idempotency key
-    acquisition_id INTEGER PRIMARY KEY REFERENCES sat_acquisitions(id),
+    -- one CURRENT row per acquisition once change detection ran on it (idempotency key = partial unique index
+    -- ux_sat_det_current). Rows of an earlier detection generation are kept, marked superseded_*.
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    acquisition_id INTEGER NOT NULL REFERENCES sat_acquisitions(id),
     monitored_area_id INTEGER NOT NULL,
     sensor TEXT NOT NULL,
     ran_at_utc TEXT NOT NULL,
@@ -81,7 +83,9 @@ CREATE TABLE IF NOT EXISTS sat_detections (
     largest_cluster_ha REAL,
     persisted INTEGER,                       -- S1: drop confirmed by the previous same-geometry acquisition
     event_id INTEGER,
-    details_json TEXT
+    details_json TEXT,
+    superseded_at_utc TEXT,
+    superseded_by_generation INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS sat_change_events (
@@ -120,7 +124,9 @@ CREATE TABLE IF NOT EXISTS sat_change_events (
     union_mask_path TEXT,
     union_area_ha REAL,
     max_area_ha REAL,                        -- largest CURRENT area the event ever had (history)
-    current_mask_json TEXT                   -- per-sensor counts behind the current mask, evaluated up to ...
+    current_mask_json TEXT,                  -- per-sensor counts behind the current mask, evaluated up to ...
+    superseded_at_utc TEXT,                  -- set when a later detection generation replaced this row
+    superseded_by_generation INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS sat_s2_candidates (
@@ -140,14 +146,13 @@ CREATE TABLE IF NOT EXISTS sat_s2_candidates (
     resolved_by_acq_id INTEGER REFERENCES sat_acquisitions(id),
     resolved_at_utc TEXT,
     event_id INTEGER REFERENCES sat_change_events(id),
-    details_json TEXT
+    details_json TEXT,
+    superseded_at_utc TEXT,
+    superseded_by_generation INTEGER
 );
 CREATE INDEX IF NOT EXISTS ix_sat_cand_area ON sat_s2_candidates (monitored_area_id, status);
 CREATE TRIGGER IF NOT EXISTS trg_cand_no_delete BEFORE DELETE ON sat_s2_candidates
 BEGIN SELECT RAISE(ABORT, 'sat_s2_candidates is append-only'); END;
-CREATE TRIGGER IF NOT EXISTS trg_cand_update_only_pending BEFORE UPDATE ON sat_s2_candidates
-WHEN OLD.status <> 'PENDING_CONFIRMATION'
-BEGIN SELECT RAISE(ABORT, 'sat_s2_candidates: only PENDING_CONFIRMATION rows may change'); END;
 
 CREATE TABLE IF NOT EXISTS sat_review_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,7 +222,7 @@ CREATE TABLE IF NOT EXISTS sat_radar_anomalies (
     -- Shown in the timeline; NOT an event and never a risk unless promoted (rules a/b in config).
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     monitored_area_id INTEGER NOT NULL REFERENCES sat_monitored_areas(id),
-    acquisition_id INTEGER NOT NULL UNIQUE REFERENCES sat_acquisitions(id),
+    acquisition_id INTEGER NOT NULL REFERENCES sat_acquisitions(id),   -- unique among CURRENT rows
     sensing_time_utc TEXT NOT NULL,
     orbit_direction TEXT NOT NULL,
     relative_orbit INTEGER NOT NULL,
@@ -232,14 +237,13 @@ CREATE TABLE IF NOT EXISTS sat_radar_anomalies (
     promotion_rule TEXT CHECK (promotion_rule IN ('S2_CONFIRMED','S1_PERSISTENT_MULTI_ORBIT')),
     promoted_at_utc TEXT,
     event_id INTEGER REFERENCES sat_change_events(id),
-    details_json TEXT
+    details_json TEXT,
+    superseded_at_utc TEXT,
+    superseded_by_generation INTEGER
 );
 CREATE INDEX IF NOT EXISTS ix_sat_radar_area ON sat_radar_anomalies (monitored_area_id, sensing_time_utc);
 CREATE TRIGGER IF NOT EXISTS trg_radar_no_delete BEFORE DELETE ON sat_radar_anomalies
 BEGIN SELECT RAISE(ABORT, 'sat_radar_anomalies is append-only'); END;
-CREATE TRIGGER IF NOT EXISTS trg_radar_update_only_anomaly BEFORE UPDATE ON sat_radar_anomalies
-WHEN OLD.status <> 'RADAR_ANOMALY'
-BEGIN SELECT RAISE(ABORT, 'sat_radar_anomalies: only RADAR_ANOMALY rows may change'); END;
 
 CREATE TRIGGER IF NOT EXISTS trg_acq_no_delete BEFORE DELETE ON sat_acquisitions
 BEGIN SELECT RAISE(ABORT, 'sat_acquisitions is append-only'); END;
@@ -302,6 +306,121 @@ def _migrate_area_source_check(conn):
         conn.execute("PRAGMA foreign_keys=ON")
 
 
+SUPERSEDE_COLUMNS = (("superseded_at_utc", "TEXT"), ("superseded_by_generation", "INTEGER"))
+DETECTION_TABLES = ("sat_detections", "sat_change_events", "sat_s2_candidates", "sat_radar_anomalies")
+
+# Applied after the migrations (they reference the superseded_* columns).
+POST_SCHEMA = """
+CREATE TABLE IF NOT EXISTS sat_detection_generations (
+    -- one row per re-run of change detection over stored acquisitions (0 PU); the rows it replaced keep
+    -- superseded_by_generation = id. Append-only.
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at_utc TEXT NOT NULL,
+    finished_at_utc TEXT,
+    run_id INTEGER REFERENCES sat_runs(id),
+    area_ids TEXT NOT NULL,
+    code_version TEXT,
+    reason TEXT NOT NULL,
+    superseded_counts_json TEXT,
+    status TEXT NOT NULL DEFAULT 'RUNNING' CHECK (status IN ('RUNNING','OK','FAILED'))
+);
+CREATE TRIGGER IF NOT EXISTS trg_gen_no_delete BEFORE DELETE ON sat_detection_generations
+BEGIN SELECT RAISE(ABORT, 'sat_detection_generations is append-only'); END;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_sat_det_current ON sat_detections (acquisition_id) WHERE superseded_at_utc IS NULL;
+CREATE INDEX IF NOT EXISTS ix_sat_det_area ON sat_detections (monitored_area_id, superseded_at_utc);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_sat_radar_current ON sat_radar_anomalies (acquisition_id)
+    WHERE superseded_at_utc IS NULL;
+CREATE TRIGGER IF NOT EXISTS trg_det_no_delete BEFORE DELETE ON sat_detections
+BEGIN SELECT RAISE(ABORT, 'sat_detections is append-only (supersede, do not delete)'); END;
+CREATE TRIGGER IF NOT EXISTS trg_events_no_delete BEFORE DELETE ON sat_change_events
+BEGIN SELECT RAISE(ABORT, 'sat_change_events is append-only (supersede, do not delete)'); END;
+"""
+
+
+def _supersede_only(conn, table):
+    """SQL condition: this UPDATE only sets superseded_* on a current row; every other column unchanged."""
+    cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})") if r[1] not in dict(SUPERSEDE_COLUMNS)]
+    same = " AND ".join(f"NEW.{c} IS OLD.{c}" for c in cols)
+    return (f"(OLD.superseded_at_utc IS NULL AND NEW.superseded_at_utc IS NOT NULL "
+            f"AND NEW.superseded_by_generation IS NOT NULL AND {same})")
+
+
+def _supersede_triggers(conn):
+    """Superseded rows are frozen (all four tables). Candidates/anomalies keep their append-only rule, with the
+    single exception of the supersede-only update. Re-created when the definition (column list) changed."""
+    want = {}
+    for t in DETECTION_TABLES:
+        want[f"trg_{t}_frozen_when_superseded"] = (
+            f"CREATE TRIGGER trg_{t}_frozen_when_superseded BEFORE UPDATE ON {t} "
+            f"WHEN OLD.superseded_at_utc IS NOT NULL "
+            f"BEGIN SELECT RAISE(ABORT, '{t}: superseded rows are frozen'); END")
+    want["trg_cand_update_only_pending_v2"] = (
+        "CREATE TRIGGER trg_cand_update_only_pending_v2 BEFORE UPDATE ON sat_s2_candidates "
+        f"WHEN OLD.status <> 'PENDING_CONFIRMATION' AND NOT {_supersede_only(conn, 'sat_s2_candidates')} "
+        "BEGIN SELECT RAISE(ABORT, 'sat_s2_candidates: only PENDING_CONFIRMATION rows may change'); END")
+    want["trg_radar_update_only_anomaly_v2"] = (
+        "CREATE TRIGGER trg_radar_update_only_anomaly_v2 BEFORE UPDATE ON sat_radar_anomalies "
+        f"WHEN OLD.status <> 'RADAR_ANOMALY' AND NOT {_supersede_only(conn, 'sat_radar_anomalies')} "
+        "BEGIN SELECT RAISE(ABORT, 'sat_radar_anomalies: only RADAR_ANOMALY rows may change'); END")
+    have = dict(conn.execute("SELECT name, sql FROM sqlite_master WHERE type='trigger'").fetchall())
+    for name, sql in want.items():
+        if have.get(name) != sql:
+            conn.execute(f"DROP TRIGGER IF EXISTS {name}")
+            conn.execute(sql)
+    conn.commit()
+
+
+def _rebuild(conn, table, create_sql, cols):
+    """Rebuild a table with a new definition, copying `cols` (documented SQLite 12-step procedure)."""
+    n = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    conn.execute("PRAGMA foreign_keys=OFF")
+    try:
+        conn.execute("BEGIN")
+        conn.execute(create_sql.replace(f"CREATE TABLE IF NOT EXISTS {table} (", f"CREATE TABLE {table}_new (", 1))
+        c = ", ".join(cols)
+        conn.execute(f"INSERT INTO {table}_new ({c}) SELECT {c} FROM {table} ORDER BY rowid")
+        conn.execute(f"DROP TABLE {table}")                  # drops its triggers and indexes too
+        conn.execute(f"ALTER TABLE {table}_new RENAME TO {table}")
+        if conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] != n:
+            raise RuntimeError(f"{table}: row count changed")
+        if conn.execute("PRAGMA foreign_key_check").fetchall():
+            raise RuntimeError("foreign key check failed")
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys=ON")
+
+
+def _table_sql(table):
+    i = SCHEMA.index(f"CREATE TABLE IF NOT EXISTS {table} (")
+    return SCHEMA[i:SCHEMA.index("\n);", i) + 3]
+
+
+def _migrate_supersede(conn):
+    """2026-11-11: detection generations. sat_detections (PK was acquisition_id) and sat_radar_anomalies
+    (acquisition_id was UNIQUE) are rebuilt so that a superseded row and the current row of one acquisition
+    can coexist; uniqueness now holds among CURRENT rows (partial unique indexes). Idempotent."""
+    _add_columns(conn, "sat_s2_candidates", SUPERSEDE_COLUMNS)
+    _add_columns(conn, "sat_change_events", SUPERSEDE_COLUMNS)
+    conn.execute("DROP TRIGGER IF EXISTS trg_cand_update_only_pending")
+    for table in ("sat_detections", "sat_radar_anomalies"):
+        sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()[0]
+        if "superseded_at_utc" in sql:
+            continue
+        old_cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
+        _rebuild(conn, table, _table_sql(table), old_cols)
+        if table == "sat_radar_anomalies":
+            conn.execute("CREATE INDEX IF NOT EXISTS ix_sat_radar_area ON sat_radar_anomalies "
+                         "(monitored_area_id, sensing_time_utc)")
+            conn.execute("CREATE TRIGGER IF NOT EXISTS trg_radar_no_delete BEFORE DELETE ON sat_radar_anomalies "
+                         "BEGIN SELECT RAISE(ABORT, 'sat_radar_anomalies is append-only'); END")
+    conn.execute("DROP TRIGGER IF EXISTS trg_radar_update_only_anomaly")
+    conn.executescript(POST_SCHEMA)
+    _supersede_triggers(conn)
+
+
 EVENT_F6_COLUMNS = (("union_mask_path", "TEXT"), ("union_area_ha", "REAL"), ("max_area_ha", "REAL"),
                     ("current_mask_json", "TEXT"))
 
@@ -326,9 +445,18 @@ def connect(path=None):
     conn.executescript(SCHEMA)
     _migrate_area_source_check(conn)
     _add_columns(conn, "sat_change_events", EVENT_F6_COLUMNS)
+    _migrate_supersede(conn)
     for suffix in ("", "-wal", "-shm"):
         config.secure_file(str(path) + suffix)
     return conn
+
+
+def current_only(conn, table, alias=""):
+    """SQL fragment selecting CURRENT rows (not superseded). Empty on a DB opened read-only before the
+    supersede migration (no such column yet: every row is current)."""
+    if "superseded_at_utc" not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
+        return ""
+    return f" AND {alias + '.' if alias else ''}superseded_at_utc IS NULL"
 
 
 def connect_ro(path=None):

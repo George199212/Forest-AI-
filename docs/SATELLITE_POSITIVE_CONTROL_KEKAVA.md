@@ -242,3 +242,79 @@ These areas are an upper bound and have not been reviewed.
 - The masking can split clusters at the forest edge below `min_cluster_ha` (seen on BIK-001, Stage 1 report
   §10). Its effect on fellings at stand edges is not measured.
 - The stand-level result rests on 3 eligible stands.
+
+## 8. F6: event area = current mask (offline re-run, 2026-11-11)
+
+**Decision applied** (`a6079d3`): an event's **current mask** = pixels of its union mask that are still changed
+vs the pre-onset baseline in **≥ 2 of the last 3 valid acquisitions** of a contributing sensor
+(`event_current_min_changed` / `event_current_last_n`).
+- Per sensor a pixel is KEEP, DROP or UNDECIDED. It is kept if any sensor keeps it, or if no sensor drops it.
+  Too few observations is UNDECIDED and is kept, because missing data is not "recovered".
+- Reported areas, the inside/buffer split, `change_geojson`, the class and `change_mask_path` come from the
+  current mask.
+- `union_mask_path`, `union_area_ha` and `max_area_ha` are history only. Matching to open events still uses
+  the union.
+- The current mask is recomputed on every event update and on each later valid acquisition within the event
+  window.
+
+**How:** same copy and method as §7. **before** = `4853cc0` (the §7 "after" run), **after** = `a6079d3`.
+0 requests, 0 PU, 0 errors; 16 min wall clock (F6 re-reads recent rasters).
+JSON: `/root/forest_ai_satellite_data/eval/rerun_f6_20261111.json`.
+
+| | before (`4853cc0`) | after F6 (`a6079d3`) |
+|---|---|---|
+| events / distinct locations | 9 / 9 | 9 / 9 |
+| classification | FOREST_LOSS 5, OUTSIDE_BOUNDARY 2, SEASONAL 2 | FOREST_LOSS 6, OUTSIDE_BOUNDARY 1, SEASONAL 2 |
+| detected / eligible | 3 / 3 | **3 / 3** (Wilson 0.44–1.00) |
+| median delay (range) | 6 d (−3 … 7) | 6 d (−3 … 7) |
+| outside events (unreviewed) | **4** = 1.09 / 1,000 ha | **5** = 1.36 / 1,000 ha |
+| outside events without a VMD-felling pre-tag | **0** | **2** = 0.54 / 1,000 ha |
+| outside events, Oct–Apr onsets excluded | 2 | 3 |
+| summed area of the outside events | 112.8 ha | 105.2 ha |
+
+**Event areas** (INTERPRETATION; "current" = reported area after F6):
+
+| id | basis | class after (before) | first … last after | area before | **current** (in / buffer) | union | max current |
+|---|---|---|---|---|---|---|---|
+| 1 | S1 | FOREST_LOSS (same) | 05-15 … 08-03 | 5.14 | **0.08** (0.08 / 0) | 5.14 | 1.30 |
+| 2 | S1+S2 | FOREST_LOSS (OUTSIDE_BOUNDARY) | 06-01 … 11-08 | 29.89 | **1.04** (1.04 / 0) | 29.89 | 3.60 |
+| 3 | S1+S2 | FOREST_LOSS (same) | 08-01 … 08-21 | 6.04 | **5.97** (5.97 / 0) | 6.04 | 5.97 |
+| 4 | S1+S2 | FOREST_LOSS (same) | 08-11 … 08-21 | 3.77 | **3.51** (3.51 / 0) | 3.77 | 3.59 |
+| 5 | S1+S2 | FOREST_LOSS (same) | 07-29 … 08-21 | 7.90 | **6.78** (6.78 / 0) | 7.90 | 7.79 |
+| 6 | S1+S2 | FOREST_LOSS (same) | 09-15 … 11-06 | 57.90 | **55.73** (55.73 / 0) | 57.90 | 55.90 |
+| 7 | S1+S2 | OUTSIDE_BOUNDARY (same) | 09-18 … 11-08 | 127.54 | **123.71** (116.97 / 6.74) | 127.54 | 123.71 |
+| 8 | S1+S2 | SEASONAL (same) | 10-01 … 11-08 | 70.08 | **68.70** (63.91 / 4.79) | 70.08 | 68.76 |
+| 9 | S1+S2 | SEASONAL (same) | 10-02 … 11-08 | 29.66 | **28.59** (28.27 / 0.32) | 29.66 | 28.59 |
+
+**Per stand:** status and detection are unchanged for all 19 stands (3 DETECTED_IN_WINDOW, 15 CUT_BEFORE_WINDOW,
+1 TOO_SMALL; table in §7). Two overlaps disappear, both on stands felled before May:
+- 68-37 no longer overlaps event 2 (was 0.47 ha);
+- 1-5 (144097771) no longer overlaps event 7 (was 0.10 ha).
+
+**Outside events after F6:**
+- 1 (0.08 ha, no pre-tag)
+- 2 (1.04 ha, no pre-tag)
+- 5 (6.78 ha, pre-tag, 0.11 ha on other fellings)
+- 8 (68.70 ha, pre-tag)
+- 9 (28.59 ha, pre-tag)
+
+Sheets: `/root/forest_ai_satellite_data/satellite/2/events/review_rerun_20261111_f6/` (yellow = current mask,
+cyan = union).
+
+**Reading (INTERPRETATION):**
+- F6 does what it was meant to do where the change recovers. Event 1 (S1-only) and event 2 shrink by 98 % and
+  97 %.
+- Exactly that shrinking moves them **outside** the stands and VMD fellings they overlapped before, so the
+  outside count rises from 4 to 5. The untagged count rises from 0 to 2, although the outside area falls.
+- The large autumn events (6, 7, 8, 9) shrink only 2–5 %. Their pixels stay changed against the summer
+  baseline through Oct–Nov, so F6 cannot separate them from a felling.
+- Event 1's current mask (0.08 ha) is below `min_cluster_ha`. Whether such a residual should close the event is
+  a separate decision; nothing was changed.
+
+**Gate for the live database (owner condition: not worse on recall 3/3 and on outside events): NOT MET**
+(outside events 4 → 5). The live `satellite.db` was **not** modified, and no final review folder was made.
+
+**Not verified:**
+- No visual or human review.
+- Sheets of long events are very wide (event 2: 25 after-images, 14,871 px). They are readable only at full
+  resolution.

@@ -25,8 +25,8 @@ def render(conn, area):
     for m in conn.execute("SELECT m.* FROM sat_area_metrics m JOIN sat_acquisitions a ON a.id=m.acquisition_id "
                           "WHERE a.monitored_area_id=?", (area["id"],)):
         met[(m["acquisition_id"], m["metric"], m["zone"])] = m
-    det = {d["acquisition_id"]: d for d in conn.execute("SELECT * FROM sat_detections WHERE monitored_area_id=?",
-                                                        (area["id"],))}
+    det = {d["acquisition_id"]: d for d in conn.execute("SELECT * FROM sat_detections WHERE monitored_area_id=?"
+                                                        + sdb.current_only(conn, "sat_detections"), (area["id"],))}
     for sensor in ("S2", "S1"):
         sub = [r for r in rows if r["sensor"] == sensor]
         L.append(f"\n## {sensor} timeline ({len(sub)} acquisitions) — PROCESSED\n")
@@ -53,7 +53,8 @@ def render(conn, area):
                          f"{_f(r['relative_orbit'])} | {vp} | {med('VV_DB')} | {med('VH_DB')} | {dtxt} |")
     try:
         cands = conn.execute("SELECT c.*, a.sensing_time_utc AS t FROM sat_s2_candidates c JOIN sat_acquisitions a "
-                             "ON a.id=c.acquisition_id WHERE c.monitored_area_id=? ORDER BY c.id", (area["id"],)).fetchall()
+                             "ON a.id=c.acquisition_id WHERE c.monitored_area_id=?" + sdb.current_only(conn, "sat_s2_candidates", "c")
+                             + " ORDER BY c.id", (area["id"],)).fetchall()
     except Exception:                      # read-only handle on a DB created before the table existed
         cands = []
     L.append(f"\n## Optical change candidates ({len(cands)}) — INTERPRETATION\n")
@@ -72,7 +73,8 @@ def render(conn, area):
                      f"{' / '.join(_f(md.get(k)) for k in ('dNDVI', 'dNBR', 'dNDMI')) if md else 'NULL'} | "
                      f"{_f(c['event_id'])} |")
     try:
-        rads = conn.execute("SELECT * FROM sat_radar_anomalies WHERE monitored_area_id=? ORDER BY sensing_time_utc",
+        rads = conn.execute("SELECT * FROM sat_radar_anomalies WHERE monitored_area_id=?"
+                            + sdb.current_only(conn, "sat_radar_anomalies") + " ORDER BY sensing_time_utc",
                             (area["id"],)).fetchall()
     except Exception:                      # read-only handle on a DB created before the table existed
         rads = []
@@ -89,7 +91,8 @@ def render(conn, area):
             L.append(f"| {r['id']} | {r['sensing_time_utc']} | {r['orbit_direction']}/{r['relative_orbit']} | "
                      f"{r['changed_area_ha']:.2f} | {r['evidence_quality']} | {r['status']} | "
                      f"{r['promotion_rule'] or '—'} | {_f(r['event_id'])} |")
-    evs = conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? ORDER BY id", (area["id"],)).fetchall()
+    evs = conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=?"
+                       + sdb.current_only(conn, "sat_change_events") + " ORDER BY id", (area["id"],)).fetchall()
     L.append(f"\n## Suspected change events ({len(evs)}) — INTERPRETATION\n")
     if not evs:
         L.append("No change event.\n")

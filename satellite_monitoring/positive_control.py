@@ -162,11 +162,13 @@ def evaluate(conn, area, truth_fc, ref_db, out_dir, cfg=None):
                 rec["cut"] = cut_test(L, v, L["valid"] & s["ref"], rec, spring, cfg)
             s["series"].append(rec)
 
-    events = [dict(e) for e in conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? ORDER BY id",
+    events = [dict(e) for e in conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=?"
+                                            + sdb.current_only(conn, "sat_change_events") + " ORDER BY id",
                                             (area["id"],))]
     for e in events:
         e["_mask"] = np.load(e["change_mask_path"]).astype(bool)
     anomalies = [dict(r) for r in conn.execute("SELECT * FROM sat_radar_anomalies WHERE monitored_area_id=? "
+                                               + sdb.current_only(conn, "sat_radar_anomalies") + " "
                                                "ORDER BY sensing_time_utc", (area["id"],))]
     for r in anomalies:
         r["_mask"] = np.load(r["mask_path"]).astype(bool)

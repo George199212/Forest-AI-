@@ -489,6 +489,22 @@ BIK-001 is the negative control (no felling expected), so 0 events is the expect
 - The masking cuts clusters at the forest edge. Here that removed small clusters (0.17 / 0.29 ha), and it
   could also hide a small felling at a stand edge. Not measured.
 
+## 11. F6 offline re-run (2026-11-11)
+
+Same copy and method as §10. **before** = `4853cc0`, **after** = `a6079d3` (F6: event area = current mask, see
+`docs/SATELLITE_POSITIVE_CONTROL_KEKAVA.md` §8). 0 requests, 0 PU, 0 errors.
+
+| | before (`4853cc0`) | after F6 (`a6079d3`) |
+|---|---|---|
+| events | 0 | 0 |
+| outside events | 0 | 0 |
+| radar anomalies (promoted) | 3 (0) | 3 (0) |
+| S2 candidates TRANSIENT | 6 | 6 |
+
+F6 changes only existing events, and BIK-001 has none after F3, so nothing changes here. There are no event
+areas and no per-stand table (no ground-truth stands). The live `satellite.db` was not modified: the Ķekava
+outside-event count is worse after F6, so the owner's condition for the live re-run is not met.
+
 ## Appendix A — product list (Catalog discovery 2026-08-01 … 2026-11-10, stored status)
 
 | acq | sensor | platform | sensing (UTC) | orbit / rel. orbit | scene cloud % | status |

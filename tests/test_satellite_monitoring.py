@@ -1314,3 +1314,120 @@ def test_f6_columns_migrate_on_an_existing_db(tmp_path):
     assert {col for col, _ in sdb.EVENT_F6_COLUMNS} <= have
     c.close()
     sdb.connect(p).close()
+
+
+# ── detection generations (redetect, supersede, append-only) ────────────────
+def _event_run(env):
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=5)
+    p1, r1 = _s1_series(a, [False, False, False, True, True])
+    run(env, FakeProvider(prods + p1, {**rasters, **r1}), sensors=("S1", "S2"))
+    return a
+
+
+def test_redetect_supersedes_old_rows_and_creates_a_new_generation(env):
+    from satellite_monitoring import redetect, report
+    a = _event_run(env)
+    c = env["conn"]
+    before = {t: c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in sdb.DETECTION_TABLES}
+    acq_before = c.execute("SELECT COUNT(*), SUM(attempts) FROM sat_acquisitions").fetchone()
+    req_before = c.execute("SELECT COUNT(*) FROM sat_request_log").fetchone()[0]
+    res = redetect.redetect(c, [a["id"]], "test", "abc123", decoder=decoder, lock_file=env["tmp"] / "lock")
+    assert res["status"] == "OK" and res["requests"] == 0 and res["pu"] == 0
+    assert res["superseded"] == before
+    for t in sdb.DETECTION_TABLES:                                    # old rows kept, new rows added
+        old = c.execute(f"SELECT COUNT(*) FROM {t} WHERE superseded_by_generation=?", (res["generation"],)).fetchone()[0]
+        cur = c.execute(f"SELECT COUNT(*) FROM {t} WHERE superseded_at_utc IS NULL").fetchone()[0]
+        assert old == before[t] and cur == before[t], t              # same inputs -> same number of rows
+    assert c.execute("SELECT COUNT(*), SUM(attempts) FROM sat_acquisitions").fetchone() == acq_before
+    assert c.execute("SELECT COUNT(*) FROM sat_request_log").fetchone()[0] == req_before
+    g = c.execute("SELECT * FROM sat_detection_generations").fetchone()
+    assert g["status"] == "OK" and g["code_version"] == "abc123" and json.loads(g["superseded_counts_json"]) == before
+    md = report.render(c, areas.load(c, a["id"]))
+    assert md.count("### Event #") == 1                               # only the current generation is reported
+    # idempotent detection: a normal run afterwards does not re-detect anything
+    n = c.execute("SELECT COUNT(*) FROM sat_detections").fetchone()[0]
+    run(env, FakeProvider([], {}), sensors=("S1", "S2"))
+    assert c.execute("SELECT COUNT(*) FROM sat_detections").fetchone()[0] == n
+
+
+def test_superseded_rows_are_frozen_and_nothing_can_be_deleted(env):
+    from satellite_monitoring import redetect
+    a = _event_run(env)
+    c = env["conn"]
+    redetect.redetect(c, [a["id"]], "test", decoder=decoder, lock_file=env["tmp"] / "lock")
+    for t in sdb.DETECTION_TABLES:
+        rid = c.execute(f"SELECT {'id'} FROM {t} WHERE superseded_at_utc IS NOT NULL LIMIT 1").fetchone()
+        if rid is None:
+            continue
+        with pytest.raises(sqlite3.IntegrityError, match="frozen|only PENDING|only RADAR_ANOMALY"):
+            c.execute(f"UPDATE {t} SET monitored_area_id=monitored_area_id WHERE id=?", (rid[0],))
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            c.execute(f"DELETE FROM {t} WHERE id=?", (rid[0],))
+    # a CONFIRMED candidate still cannot be edited (only superseded)
+    cid = c.execute("SELECT id FROM sat_s2_candidates WHERE status='CONFIRMED' AND superseded_at_utc IS NULL").fetchone()[0]
+    with pytest.raises(sqlite3.IntegrityError, match="only PENDING"):
+        c.execute("UPDATE sat_s2_candidates SET event_id=NULL WHERE id=?", (cid,))
+
+
+def test_redetect_refuses_when_a_human_decided(env):
+    from satellite_monitoring import redetect
+    a = _event_run(env)
+    c = env["conn"]
+    c.execute("UPDATE sat_change_events SET status='REVIEW_CONFIRMED', reviewed_by='owner'")
+    c.commit()
+    with pytest.raises(redetect.Refused, match="human decision"):
+        redetect.redetect(c, [a["id"]], "test", decoder=decoder, lock_file=env["tmp"] / "lock")
+    assert c.execute("SELECT COUNT(*) FROM sat_change_events WHERE superseded_at_utc IS NOT NULL").fetchone()[0] == 0
+    assert c.execute("SELECT COUNT(*) FROM sat_detection_generations").fetchone()[0] == 0
+
+
+def test_redetect_cli_needs_yes():
+    from satellite_monitoring import redetect
+    assert redetect.main(["--area", "1", "--reason", "x"]) == 2
+
+
+OLD_DET = """CREATE TABLE sat_detections (acquisition_id INTEGER PRIMARY KEY REFERENCES sat_acquisitions(id),
+    monitored_area_id INTEGER NOT NULL, sensor TEXT NOT NULL, ran_at_utc TEXT NOT NULL, outcome TEXT NOT NULL,
+    baseline_acq_ids TEXT, n_changed_pixels INTEGER, changed_area_ha REAL, largest_cluster_ha REAL, persisted INTEGER,
+    event_id INTEGER, details_json TEXT)"""
+
+
+def test_supersede_migration_on_an_old_schema_db(env):
+    # Build the pre-2026-11-11 shape (sat_detections PK acquisition_id, radar acquisition_id UNIQUE, old triggers),
+    # with real rows, then re-open: tables rebuilt, rows and ids kept, partial unique indexes + triggers in place.
+    _event_run(env)
+    p = env["tmp"] / "sat" / "satellite.db"
+    c = env["conn"]
+    det_rows = [tuple(r) for r in c.execute("SELECT acquisition_id, outcome, event_id FROM sat_detections ORDER BY 1")]
+    rad = [tuple(r) for r in c.execute("SELECT id, acquisition_id, status FROM sat_radar_anomalies ORDER BY id")]
+    cols = "acquisition_id, monitored_area_id, sensor, ran_at_utc, outcome, baseline_acq_ids, n_changed_pixels, " \
+           "changed_area_ha, largest_cluster_ha, persisted, event_id, details_json"
+    c.execute("PRAGMA foreign_keys=OFF")
+    c.executescript(f"""
+      DROP TRIGGER trg_det_no_delete;
+      CREATE TABLE d_old AS SELECT {cols} FROM sat_detections; DROP TABLE sat_detections;
+      {OLD_DET}; INSERT INTO sat_detections SELECT * FROM d_old; DROP TABLE d_old;
+      CREATE TRIGGER trg_cand_update_only_pending BEFORE UPDATE ON sat_s2_candidates
+      WHEN OLD.status <> 'PENDING_CONFIRMATION' BEGIN SELECT RAISE(ABORT, 'old'); END;""")
+    old_radar = sdb._table_sql("sat_radar_anomalies").replace(
+        "acquisition_id INTEGER NOT NULL REFERENCES", "acquisition_id INTEGER NOT NULL UNIQUE REFERENCES").replace(
+        ",\n    superseded_at_utc TEXT,\n    superseded_by_generation INTEGER\n)", "\n)")
+    assert "superseded" not in old_radar and "UNIQUE" in old_radar
+    rcols = [r[1] for r in c.execute("PRAGMA table_info(sat_radar_anomalies)") if not r[1].startswith("superseded")]
+    c.executescript(f"""
+      DROP TABLE IF EXISTS r_old; CREATE TABLE r_old AS SELECT {', '.join(rcols)} FROM sat_radar_anomalies;
+      DROP TABLE sat_radar_anomalies; {old_radar.replace('IF NOT EXISTS ', '')};
+      INSERT INTO sat_radar_anomalies SELECT * FROM r_old; DROP TABLE r_old;""")
+    c.commit()
+    c.close()
+    c = sdb.connect(p)
+    env["conn"] = c
+    assert [tuple(r) for r in c.execute("SELECT acquisition_id, outcome, event_id FROM sat_detections ORDER BY 1")] == det_rows
+    assert [tuple(r) for r in c.execute("SELECT id, acquisition_id, status FROM sat_radar_anomalies ORDER BY id")] == rad
+    idx = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type IN ('index','trigger')")}
+    assert {"ux_sat_det_current", "ux_sat_radar_current", "trg_cand_update_only_pending_v2", "trg_det_no_delete",
+            "trg_radar_update_only_anomaly_v2", "trg_radar_no_delete", "ix_sat_radar_area"} <= idx
+    assert "trg_cand_update_only_pending" not in idx
+    assert c.execute("PRAGMA integrity_check").fetchone()[0] == "ok" and not c.execute("PRAGMA foreign_key_check").fetchall()
+    sdb.connect(p).close()                                            # idempotent
