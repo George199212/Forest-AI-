@@ -106,8 +106,8 @@ def test_satellite_overlay_not_injected_in_normal_mode(monkeypatch):
     monkeypatch.delenv('UI_LANGUAGE',raising=False)
     monkeypatch.delenv('INSTANCE_DISPLAY_NAME',raising=False)
     monkeypatch.setattr(review_mode,'ENABLED',False)
-    before=Path('index.html').read_bytes()
-    assert api.serve_index().body==before
+    assert b'/assets/review-satellite.js' not in api.serve_index().body
+    assert b'/assets/review-ui.js' not in api.serve_index().body
     monkeypatch.setattr(review_mode,'ENABLED',True)
     assert b'/assets/review-satellite.js' in api.serve_index().body
 

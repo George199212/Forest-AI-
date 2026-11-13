@@ -1,5 +1,7 @@
 """Instance presentation isolation and runtime English display checks (no live DB or APIs)."""
 import ast
+import hashlib
+import re
 import json
 import os
 from pathlib import Path
@@ -19,7 +21,8 @@ def page(monkeypatch, language, review=False, name=''):
     node = next(n for n in ast.parse((ROOT/'api.py').read_text()).body
                 if isinstance(n, ast.FunctionDef) and n.name == 'serve_index')
     node.decorator_list = []
-    namespace = {'Path': Path, 'os': os, 'json': json, 'HTMLResponse': HTMLResponse,
+    namespace = {'Path': Path, 'os': os, 'json': json, 'HTMLResponse': HTMLResponse, 're': re, 'hashlib': hashlib,
+                 'frontend_deployment': lambda: {'version': 'geo-test'},
                  'review_mode': SimpleNamespace(ENABLED=review)}
     exec(compile(ast.Module(body=[node], type_ignores=[]), 'serve_index', 'exec'), namespace)
     return namespace['serve_index']().body.decode()
@@ -28,9 +31,11 @@ def page(monkeypatch, language, review=False, name=''):
 @pytest.mark.parametrize('language', ['', 'lv', 'ru', 'en'])
 def test_english_overlay_only_in_english(monkeypatch, language):
     html = page(monkeypatch, language)
-    assert ('src="/assets/i18n-en.js"' in html) == (language == 'en')
+    assert ('src="/assets/i18n-en.js' in html) == (language == 'en')
     if language == '':
-        assert html == (ROOT/'index.html').read_text()
+        # Production serve_index fingerprints assets; the invariant is: no language or review injection.
+        assert 'src="/assets/i18n-' not in html
+        assert 'review-ui.js' not in html and 'review-satellite.js' not in html
     assert 'window.ForestInstance=' not in html
 
 
@@ -41,7 +46,7 @@ def test_review_banner_configuration_and_script_safety(monkeypatch):
     assert config['readOnly'] is True
     assert config['displayName'].endswith('bad()</script>')
     assert '<' not in raw
-    assert 'src="/assets/review-ui.js"' in html
+    assert 'src="/assets/review-ui.js' in html
 
 
 def test_pdf_is_review_only_restriction(monkeypatch):
