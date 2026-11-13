@@ -100,6 +100,9 @@ def demo_values(db_path):
     return v
 
 
+# Route-specific path parameters (same parameter name, different meaning).
+ROUTE_PATH = {'/assets/{filename}': {'filename': 'favicon.png'}}
+
 # Route-specific query parameters (the generic map above uses sector ids for "id").
 ROUTE_QUERY = {
     '/api/geodata/forest-map/gps/sessions': lambda v: {'kind': 'worker', 'id': v['employee_id']},
@@ -132,10 +135,11 @@ def walk(app, client, db_path, data_dir, auth):
     called, skipped, writers = [], [], []
     for path, route in get_routes(app):
         params = re.findall(r'\{(\w+)(?::\w+)?\}', path)
-        missing = [p for p in params if not values.get(p)]
+        pv = {**values, **ROUTE_PATH.get(path, {})}
+        missing = [p for p in params if not pv.get(p)]
         if missing:
-            skipped.append((path, f'no demo value for path parameter(s) {missing}')); continue
-        url = re.sub(r'\{(\w+)(?::\w+)?\}', lambda m: str(values[m.group(1)]), path)
+            skipped.append((path, f'no row in this DB to supply {missing}' if all(p in values for p in missing) else f'no demo value for path parameter(s) {missing}')); continue
+        url = re.sub(r'\{(\w+)(?::\w+)?\}', lambda m: str(pv[m.group(1)]), path)
         query = ROUTE_QUERY[path](values) if path in ROUTE_QUERY else {}
         for q in _required_query(route):
             if q not in query:
@@ -169,6 +173,12 @@ if __name__ == '__main__':
     assert Path(db).resolve().is_relative_to(root), 'DB_PATH must be inside the instance root (use a COPY)'
     os.environ.setdefault('DASHBOARD_USERNAME', 'walker'); os.environ.setdefault('DASHBOARD_PASSWORD', 'walker')
     sys.path.insert(0, os.getcwd())
+    import requests, urllib.request
+    def offline(*a, **k):
+        raise requests.ConnectionError('walker is offline by design')
+    requests.get = requests.post = requests.request = offline
+    requests.Session.request = offline
+    urllib.request.urlopen = offline
     import api
     from fastapi.testclient import TestClient
     with TestClient(api.app) as client:
