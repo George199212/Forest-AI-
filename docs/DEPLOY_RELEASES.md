@@ -7,6 +7,10 @@ live systemd files are in `deploy/systemd/` (the `70-`/`90-`/`95-` drop-ins belo
 modify or delete existing ones. Production never runs from a worktree path. Activation (drop-in
 change + restart) only after an explicit human OK in the chat.
 
+> **2026-11-13 10:07 UTC (verified):** :8000 runs `forest-api-forest-map-contrast-20261110T0949Z` through drop-in
+> `96-forest-map-contrast-release.conf` (commit `66572fa` + live-only `index.html`, `assets/lvm-geodata.js` and
+> `assets/vmd-production.js`; the latter two are now in `feature/live-vmd-ui-texts` `50f6daf`). The table below predates that.
+
 ## Which code runs on each port
 
 | port | unit | code location | git |
@@ -14,7 +18,7 @@ change + restart) only after an explicit human OK in the chat.
 | 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-lvm-geo-lv-ui-20261110T0858Z` (via drop-in `95-lvm-geo-lv-ui-release.conf`; `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `release/2026-11-10-lvm-geo-lv-ui` @ `beb09d0` (runtime), dashboard version `geo-1ae5a85bfd23`, backend `552c46ae547b`. **Live-only content kept**: the manual nav edit and the `fd3d2c6` `assets/lvm-geodata.js` (see the activation record below) |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
-| 8003 | `forest-review-api` | `/root/forest_ai_review` (copy of `84cb00b`) | 84cb00b |
+| 8003 | `forest-review-api` (DEMO) | `/root/forest_ai_review` (copy of `84cb00b` + review layer = `feature/review-integration-layer` `b781eaa`). Prepared, NOT active: `/root/forest_ai/releases/forest-review-geo-20261113T1023Z` (see "Demo :8003 release" below) | 84cb00b |
 | 8004 | `forest-ai-ingka` | `/root/forest_ai_ingka` (574bd97 + local changes) | not in git |
 
 The root of `/root/forest_ai` is **not** what :8000 serves.
@@ -144,6 +148,52 @@ readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd          # �
 
 `forest-api-lvm-geo-finish-20261110T0825Z` is an earlier, superseded candidate (no LV UI change). Do not
 activate it and do not install its `95-lvm-geo-finish-release.conf` next to the one above.
+
+## Demo :8003 release: forest-review-geo-20261113T1023Z (PREPARED, NOT ACTIVE)
+
+Location `/root/forest_ai/releases/forest-review-geo-20261113T1023Z`. This is a new folder in `releases/`; nothing under `/root/forest_ai_review` was modified.
+- Code: `git archive` of `feature/review-geo-release` (runtime files only). `release-manifest.json` lists commit,
+  source chain and SHA-256 of every file. `index.html` is git (keeps Photos, AI Inspector, Satellite and Map),
+  not the live :8000 nav edit.
+- `data/` is a **real directory** (no symlink): the demo DB copied with `sqlite3` backup, plus the demo photo and
+  satellite dirs and the 76 KB Forest Map overview. The startup migration is additive only (7 new tables, nullable
+  columns; existing rows verified identical). DB backup before the build:
+  `/root/backups/forest-review/demo-db-before-geo-20261113T1023Z/` (`forest_ai.db.raw` = byte copy, SHA-256
+  `6bb7971b…`, plus a `sqlite3` backup; unit file copy). The running demo DB is untouched.
+- Env: secrets stay in `/root/forest_ai_review/.env` (not copied). `demo.env` (non-secret) is loaded after it:
+  `DB_PATH` (release DB), `FOREST_GEODATA_MANIFEST` (national, read-only), `REVIEW_MAP_EXCLUDED_SECTORS=FIELD-TEST-01`,
+  `FOREST_GPS_COMPARTMENT_ALERTS=` (off), `FOREST_GPS_VIOLATIONS_DAYS=90`. The regional `data/vmd` and
+  `data/cadastre` are not used, because the national index is enabled.
+- Drop-in `50-review-geo-release.conf` (kept in the release folder) sets `WorkingDirectory`, the extra
+  `EnvironmentFile`, and a sandbox:
+  - `ProtectSystem=strict` + `ProtectHome=read-only`; only `data/` is writable, and `PrivateTmp`.
+  - `TemporaryFileSystem=/root/forest_ai/data:ro` with `BindReadOnlyPaths=` for only `geodata/nationwide`.
+  - The production `.env`, `/root/forest_ai_rm`, `/root/forest_ai_ingka`, `/root/forest_ai_telegram` and the old
+    demo `data/` are inaccessible.
+
+  This was verified from inside the process namespace (`nsenter -m -r -w`) on the spare port 8013.
+
+Read-only decisions:
+- Every non-GET stays 403 in the middleware; there is NO exception. LVM GEO steps 1–2 (cadastral lookup and preview)
+  are GETs. Step 3, including its dry-run preview dialog, gets a bilingual 403. The dry run would only read
+  (`mode=ro`), but it is part of the registration flow. `geodata_previews` is only written by the legacy `/lvm/preview`
+  → `/apply` flow, which is blocked, so nothing is persisted.
+- "Izveidot incidentu" gets a 403 in the middleware and in the handler. Compartment alerts stay off.
+- GPS, live positions, tracks and "Pārkāpumi" read only the release DB. FIELD-TEST-01 is hidden on the geodata
+  pages by `REVIEW_MAP_EXCLUDED_SECTORS` (display exclusion; rows unchanged). The seeded sessions show as SIMULATED.
+
+Activation (ONLY after explicit human OK):
+```sh
+install -m 644 /root/forest_ai/releases/forest-review-geo-20261113T1023Z/50-review-geo-release.conf /etc/systemd/system/forest-review-api.service.d/50-review-geo-release.conf
+systemctl daemon-reload && systemctl restart forest-review-api
+readlink /proc/$(systemctl show -p MainPID --value forest-review-api)/cwd   # -> /root/forest_ai/releases/forest-review-geo-20261113T1023Z
+```
+Rollback (back to the current demo folder; nothing to restore, because the old demo DB was never touched):
+```sh
+rm -f /etc/systemd/system/forest-review-api.service.d/50-review-geo-release.conf
+systemctl daemon-reload && systemctl restart forest-review-api
+readlink /proc/$(systemctl show -p MainPID --value forest-review-api)/cwd   # -> /root/forest_ai_review
+```
 
 ## Manifest format (`release-manifest.json` in the release folder)
 

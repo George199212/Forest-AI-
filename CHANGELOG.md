@@ -2,6 +2,24 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-13 — DEMO release `forest-review-geo-20261113T1023Z` (prepared, NOT active on :8003)
+
+Branches (none merged to master): `feature/review-integration-layer` (`b781eaa`, the demo's review layer as
+deployed since 2026-10-21, now in git), `feature/live-vmd-ui-texts` (`50f6daf`, the two live-only :8000 VMD UI
+files), `feature/review-geo-release` (66572fa + both + the demo changes below).
+
+### Demo (ACCESS_MODE=review only; production behaviour unchanged, tested)
+- LVM GEO + Meža karte in the demo sidebar (Admin group). The standalone Map item is kept for the demo.
+- Server-side blocks with a bilingual 403 (`registration_disabled_in_demo`, `incident_creation_disabled_in_demo`)
+  for `/api/geodata/vmd/import-selected|import|territories`, `/api/geodata/lvm/preview|import|apply|sectors/*`
+  and `/api/geodata/forest-map/gps/violations/incident`, plus handler-level guards.
+- `REVIEW_MAP_EXCLUDED_SECTORS`: display-only exclusion of listed sectors on the geodata read connections.
+- Seeded worker sessions inherit the sector's `data_origin` (SIMULATED) on Forest Map instead of REAL.
+- UI: visible disabled register / incident buttons with an LV/EN note. English overlay for LVM GEO and
+  Forest Map, with official Latvian registry terms in parentheses and source values never rewritten.
+  Forest Map defaults to EN only when the EN overlay is loaded.
+- Fix found during verification: a review-UI MutationObserver write loop that froze AI Inspector (`f3165b4`).
+
 ## 2026-11-10 — `feature/forest-map-basemap-contrast` (not deployed)
 
 ### Forest Map

@@ -7,6 +7,34 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-13 — DEMO :8003 gets LVM GEO + Meža karte (release PREPARED, NOT active)
+
+Deployment topology, verified on the VPS on 2026-11-13 10:07 UTC (`systemctl show`, `/proc/<pid>/cwd`):
+
+| port | unit | runs from | code version |
+|---|---|---|---|
+| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-forest-map-contrast-20261110T0949Z` (drop-in `96-`) | `66572fa` + 3 live-only files (`index.html` nav edit; `lvm-geodata.js` and `vmd-production.js`, now versioned as `feature/live-vmd-ui-texts` `50f6daf`) |
+| 8002 | `forest-rm-api` | `/root/forest_ai_rm` | `574bd97` copy (unchanged) |
+| 8003 | `forest-review-api` (DEMO) | `/root/forest_ai_review` | **active:** `84cb00b` copy + review layer, now versioned as `feature/review-integration-layer` `b781eaa`. **Prepared, not active:** `/root/forest_ai/releases/forest-review-geo-20261113T1023Z` = `feature/review-geo-release` (see `docs/DEPLOY_RELEASES.md`) |
+| 8004 | `forest-ai-ingka` | `/root/forest_ai_ingka` | not in git (unchanged) |
+
+The demo release adds the LVM GEO and Meža karte (Forest Map) sections to the read-only demo:
+- Every non-GET is still 403. Registration, including its dry-run preview dialog, and "Izveidot incidentu" return
+  an explicit bilingual 403 and are refused by the route handlers too. LVM GEO steps 1–2 are GETs.
+- FIELD-TEST-01 (real field test) is hidden from Meža karte and LVM GEO with `REVIEW_MAP_EXCLUDED_SECTORS`
+  (display exclusion through TEMP views; no data edited). The existing pages still show it: see "Open" below.
+- Seeded demo GPS sessions are labelled from their sector's `data_origin` (SIMULATED) instead of a hard-coded REAL.
+- The national catalogue is opened read-only. A systemd sandbox hides the rest of `/root/forest_ai/data`,
+  the other instances and the production `.env` from the demo process; only its own `data/` is writable.
+
+Open (not changed in this task):
+- FIELD-TEST-01's real boundary, centre, live position, session 32 track (29 points) and 48 photos (no EXIF)
+  are still served by the existing demo pages (`/api/sectors`, `/api/sectors/FIELD-TEST-01`, `/api/map`,
+  `/api/gps`, `/api/sessions/27–32/track`, `/api/photos`).
+- :8003 (and 8000/8002/8004) listen on 0.0.0.0 over plain HTTP with Basic Auth. There is no reverse proxy and ufw is inactive.
+- Forest Map tiles: up to 1290 features / 525 KB (parcels z14, Riga) and 702 features at z13 (forest);
+  the code limits are production's 2000 / 1.5 MB.
+
 ## Update 2026-11-10 — LVM GEO registration UX + Forest Map basemap (branch `feature/lvm-geo-finish`, NOT deployed)
 
 Frontend only (`assets/vmd-production.js`, `assets/forest-map.js`, `index.html` `#sec-lvm-geodata`,
