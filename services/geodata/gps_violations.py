@@ -229,7 +229,7 @@ def violations(organization_id, kind, ident, session_key):
                                                 'FROM session_track_points WHERE session_id=? ORDER BY recorded_at,id', (s['id'],))]
             for p in pts:p['inside'] = bool(p['inside_boundary']);p['t'] = gps._parse(p['recorded_at'])
             incidents = _incidents(c, s['id'])
-            assigned, origin = s['sector'], 'REAL'
+            assigned, origin = s['sector'], gps.session_origins(c, {s['id']}).get(s['id'], 'REAL')
             meta = {'session_id':s['id'], 'employee':s['employee'], 'employee_id':s['employee_id'], 'check_in_local':session_track._local(s['check_in_time']),
                     'finish_local':session_track._local(s['finish_time']), 'open':not s['finish_time']}
             flag_source = 'stored'

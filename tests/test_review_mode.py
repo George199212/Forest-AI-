@@ -162,7 +162,11 @@ def test_every_non_get_route_is_403(review):
         for m in sorted(r.methods - {"GET", "HEAD"}):
             resp = review.request(m, _fill(r.path), auth=AUTH, json={})
             assert resp.status_code == 403, (m, r.path, resp.status_code)
-            assert resp.json() == {"detail": "read_only_review_mode"}
+            blocked = review_mode.demo_blocked(r.path)
+            if blocked:  # geodata registration / incident creation: explicit bilingual refusal
+                assert resp.json() == {"detail": blocked[1], "code": blocked[0]}
+            else:
+                assert resp.json() == {"detail": "read_only_review_mode"}
             checked += 1
     assert checked >= 40
     for m in ("OPTIONS", "TRACE", "PROPFIND"):

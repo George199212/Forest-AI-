@@ -13,6 +13,11 @@ can be changed and nothing costs money:
   (data/satellite_cache/<kind>/<key>.jpg), never from a live Sentinel call
 * repeated wrong logins from one IP are answered with 429
 * the background risk AI worker is not started (see api.py startup hook)
+* geodata registration (incl. its dry-run preview dialog) and "Izveidot
+  incidentu" are refused with an explicit bilingual 403 (DEMO_BLOCKED); there
+  is NO non-GET exception: LVM GEO steps 1-2 are GET /api/geodata/vmd/cadastre
+* Forest Map hides sectors listed in REVIEW_MAP_EXCLUDED_SECTORS (see
+  excluded_sectors()); the data itself is never changed
 
 With ACCESS_MODE unset none of this is installed: api.py adds the middleware
 only when ENABLED is true, so MAIN and client instances behave exactly as before.
@@ -42,6 +47,39 @@ DENY_PREFIXES = (
 HIDDEN_EXACT = {"/docs", "/redoc", "/openapi.json"}
 HIDDEN_PREFIXES = ("/docs/", "/api/webhooks/")
 HIDDEN_EXACT_EXTRA = {"/api/webhooks"}
+
+# Bilingual refusals for demo actions that would write (detail is shown by the UI as-is).
+REGISTRATION_BLOCKED = ("registration_disabled_in_demo",
+                        "Demo režīmā reģistrācija ir izslēgta (Registration is disabled in demo mode)")
+INCIDENT_BLOCKED = ("incident_creation_disabled_in_demo",
+                    "Demo režīmā incidentu izveide ir izslēgta (Incident creation is disabled in demo mode)")
+DEMO_BLOCKED = {
+    "/api/geodata/vmd/import-selected": REGISTRATION_BLOCKED,
+    "/api/geodata/vmd/import": REGISTRATION_BLOCKED,
+    "/api/geodata/vmd/territories": REGISTRATION_BLOCKED,
+    "/api/geodata/lvm/preview": REGISTRATION_BLOCKED,
+    "/api/geodata/lvm/import": REGISTRATION_BLOCKED,
+    "/api/geodata/lvm/apply": REGISTRATION_BLOCKED,
+    "/api/geodata/forest-map/gps/violations/incident": INCIDENT_BLOCKED,
+}
+DEMO_BLOCKED_PREFIXES = (("/api/geodata/lvm/sectors/", REGISTRATION_BLOCKED),)
+
+
+def demo_blocked(path: str):
+    """(code, message) when a non-GET on this path is a demo-blocked action, else None."""
+    p = _normalize(path)
+    if p in DEMO_BLOCKED:
+        return DEMO_BLOCKED[p]
+    return next((v for prefix, v in DEMO_BLOCKED_PREFIXES if p.startswith(prefix)), None)
+
+
+def excluded_sectors() -> frozenset:
+    """Sector codes hidden from Forest Map in review mode (REVIEW_MAP_EXCLUDED_SECTORS, comma-separated).
+    Display-only exclusion: nothing in the database is changed or offset."""
+    if not ENABLED:
+        return frozenset()
+    raw = os.environ.get("REVIEW_MAP_EXCLUDED_SECTORS", "")
+    return frozenset(x.strip() for x in raw.split(",") if x.strip())
 
 SATELLITE_CACHE_DIR = Path("data/satellite_cache")
 SATELLITE_KINDS = ("image", "ndvi", "object")
@@ -141,12 +179,45 @@ def satellite_not_cached_body(kind: str, key) -> str:
     })
 
 
-async def _send_json(send, status: int, detail: str, extra_headers=()):
-    body = json.dumps({"detail": detail}).encode()
+async def _send_json(send, status: int, detail: str, extra_headers=(), code=None):
+    body = json.dumps({"detail": detail, **({"code": code} if code else {})}, ensure_ascii=False).encode()
     headers = [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]
     headers.extend(extra_headers)
     await send({"type": "http.response.start", "status": status, "headers": headers})
     await send({"type": "http.response.body", "body": body})
+
+
+def apply_sector_exclusion(conn):
+    """Review mode only: shadow sector-linked tables on a READ-ONLY geodata connection with TEMP views
+    that omit excluded_sectors() (sector/name columns, their work sessions, their incidents).
+    SQLite resolves unqualified table names to the temp schema first, so every existing query in the
+    Forest Map / LVM GEO modules sees the filtered rows. Nothing is written to the database file."""
+    excluded = sorted(excluded_sectors())
+    if not excluded:
+        return conn
+    marks = ",".join("?" for _ in excluded)
+    sessions = f"SELECT id FROM main.work_sessions WHERE sector IN ({marks})"
+    risks = f"SELECT id FROM main.risks WHERE sector IN ({marks}) OR session_id IN ({sessions})"
+    tables = [r[0] for r in conn.execute("SELECT name FROM main.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+    for table in tables:
+        cols = {r[1] for r in conn.execute(f'PRAGMA main.table_info("{table}")')}
+        where, params = [], []
+        if table == "sectors" and "name" in cols:
+            where.append(f"name NOT IN ({marks})"); params += excluded
+        if "sector" in cols:
+            where.append(f"COALESCE(sector,'') NOT IN ({marks})"); params += excluded
+        if "session_id" in cols:
+            where.append(f"COALESCE(session_id,-1) NOT IN ({sessions})"); params += excluded
+        if "risk_id" in cols:
+            where.append(f"COALESCE(risk_id,-1) NOT IN ({risks})"); params += excluded * 2
+        if not where:
+            continue
+        # Views cannot take bound parameters: inline excluded codes as escaped SQL literals.
+        sql = f'SELECT * FROM main."{table}" WHERE ' + " AND ".join(where)
+        for value in params:
+            sql = sql.replace("?", "'" + value.replace("'", "''") + "'", 1)
+        conn.execute(f'CREATE TEMP VIEW IF NOT EXISTS "{table}" AS {sql}')
+    return conn
 
 
 class ReviewModeMiddleware:
@@ -163,7 +234,12 @@ class ReviewModeMiddleware:
         if auth_blocked(ip):
             return await _send_json(send, 429, "too_many_failed_logins", [(b"retry-after", str(AUTH_FAIL_WINDOW_S).encode())])
 
-        refused = classify(scope.get("method", "GET"), scope.get("path", "/"))
+        method = scope.get("method", "GET").upper()
+        path = scope.get("path", "/")
+        refused = classify(method, path)
+        if refused and refused[0] == 403 and method not in ALLOWED_METHODS and demo_blocked(path):
+            code, message = demo_blocked(path)
+            return await _send_json(send, 403, message, code=code)
         if refused:
             return await _send_json(send, *refused)
 

@@ -61,7 +61,8 @@ def _iso(dt):return dt.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ') i
 def _app():
     c = sqlite3.connect('file:'+os.path.abspath(database.DB_NAME)+'?mode=ro', uri=True, timeout=5)
     c.row_factory = sqlite3.Row
-    return c
+    from services import review_mode
+    return review_mode.apply_sector_exclusion(c)   # no-op outside review mode / empty list
 
 
 def registered_sectors(organization_id):
@@ -223,10 +224,24 @@ def positions(organization_id, stale_minutes=STALE_MINUTES, now=None):
     return {'generated_at':_iso(now), 'stale_minutes':stale_minutes, 'max_accuracy_m':MAX_ACCURACY_M, 'entities':out}
 
 
+def session_origins(c, session_ids):
+    """Review mode only: {session_id: data_origin} for worker sessions whose sector is stored as non-REAL
+    (e.g. SIMULATED seeded demo sessions). Production keeps Telegram worker tracks REAL, unchanged."""
+    from services import review_mode
+    ids = [i for i in session_ids if i is not None]
+    if not review_mode.ENABLED or not ids:
+        return {}
+    if 'data_origin' not in {r[1] for r in c.execute('PRAGMA table_info(sectors)')}:
+        return {}
+    rows = c.execute('SELECT w.id,s.data_origin FROM work_sessions w JOIN sectors s ON s.name=w.sector WHERE w.id IN (%s)' % ','.join('?'*len(ids)), ids)
+    return {r[0]:r[1] for r in rows if r[1] and r[1] != 'REAL'}
+
+
 def _points(c, kind, ident, start, end):
     if kind == 'worker':
         rows = c.execute('SELECT id,session_id,latitude,longitude,horizontal_accuracy,recorded_at FROM session_track_points WHERE employee_id=? ORDER BY recorded_at,id', (ident,)).fetchall()
-        return [dict(r, origin='REAL', ref_table='session_track_points') for r in rows]
+        origins = session_origins(c, {r['session_id'] for r in rows})
+        return [dict(r, origin=origins.get(r['session_id'], 'REAL'), ref_table='session_track_points') for r in rows]
     if kind in ('vehicle', 'equipment'):
         column = 'equipment_id' if kind == 'equipment' else 'vehicle_id'
         rows = c.execute(f'SELECT id,vehicle_id,latitude,longitude,recorded_at,provider FROM vehicle_gps_pings WHERE {column}=? ORDER BY recorded_at,id', (ident,)).fetchall()

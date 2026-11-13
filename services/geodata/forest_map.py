@@ -319,6 +319,8 @@ def router(auth):
     @r.post('/gps/violations/incident')
     def post_gps_incident(session_id:int=Body(ge=1),exit_point_id:int=Body(ge=1),actor=Depends(auth)):
         # Human action only: the authenticated dashboard account is recorded as the actor.
+        from services import review_mode
+        if review_mode.ENABLED:raise HTTPException(403,review_mode.INCIDENT_BLOCKED[1])  # defence in depth behind the middleware
         return guarded(gv.create_incident,context(actor)['organization_id'],session_id,exit_point_id,actor)
     gps.start_alert_loop()
     return r

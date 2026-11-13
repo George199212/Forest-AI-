@@ -99,7 +99,11 @@ def territory_geometry(data):
 def _app_connection(readonly=True):
     if readonly:c=sqlite3.connect('file:'+str(Path(database.DB_NAME).resolve())+'?mode=ro',uri=True,timeout=5)
     else:c=store.connect()
-    c.row_factory=sqlite3.Row;return c
+    c.row_factory=sqlite3.Row
+    if readonly:
+        from services import review_mode
+        review_mode.apply_sector_exclusion(c)   # review-mode display exclusion; no-op otherwise
+    return c
 
 
 def _existing(c,row,g):

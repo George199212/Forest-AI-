@@ -103,6 +103,8 @@ def router(auth):
         return call(data.matching_selection,geometry=body.geometry,bbox=body.bbox,mode=body.mode,min_overlap=body.min_overlap,dataset_version=body.dataset_version,filters={k:getattr(body,k) for k in Filters.model_fields})
     @r.post('/import-selected',dependencies=[Depends(require_json_mutation)])
     def import_selected(body:Import,actor=Depends(auth)):
+        from services import review_mode
+        if review_mode.ENABLED:raise HTTPException(403,review_mode.REGISTRATION_BLOCKED[1])  # defence in depth behind the middleware
         if not body.dry_run and not body.confirmed:raise HTTPException(400,'Confirm the selected compartment import explicitly')
         if not body.responsible_first_name.strip() or not body.responsible_last_name.strip():raise HTTPException(422,'Norādiet atbildīgās personas vārdu un uzvārdu')
         return call(data.selected_import,body.feature_ids,body.dataset_version,actor,body.dry_run,body.territory_id,body.responsible_first_name,body.responsible_last_name,sector_name=body.sector_name,requested_designation=body.cadastral_designation)
