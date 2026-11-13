@@ -318,3 +318,57 @@ cyan = union).
 - No visual or human review.
 - Sheets of long events are very wide (event 2: 25 after-images, 14,871 px). They are readable only at full
   resolution.
+
+## 9. F6 accepted + remnant rule + compartment split (offline re-run, 2026-11-13)
+
+**Owner decisions 2026-11-13:**
+- **F6 accepted.** The 5th outside event after F6 (§8) is event 2 shrinking, not a split: same id and onset, and
+  its current mask lies wholly inside its own pre-F6 mask. Total outside area fell from 112.78 to 105.19 ha.
+- **Remnant rule** (`22b19ed`): an open SUSPECTED event whose CURRENT mask stays below `min_cluster_ha` (0.3 ha) in
+  `event_recovered_consecutive` (2) consecutive valid acquisitions of one of its sensors becomes **RECOVERED**. The
+  event is kept, with `recovered_reason`, `recovered_at_utc` and the transitions in `recovery_json`. It reopens
+  (SUSPECTED) if its current mask reaches `min_cluster_ha` again. Human states are never changed.
+- **Compartment split** (`22b19ed`, metadata only; detection unchanged): ha of the current mask on forest stands
+  (zkat 10), clear-cut land (zkat 14), other compartments and no compartment, from the same read-only VMD index.
+
+**How:** a fresh `sqlite3` backup of the live `satellite.db` (sha256 `9ce79c76…`, unchanged) into the session
+scratchpad. Then `python -m satellite_monitoring.redetect --area 1 --area 2` on that copy at `22b19ed`: generation 1,
+the old rows superseded and none deleted. The stored RAW GeoTIFFs were read, and the provider raises on any network
+call: **0 requests, 0 PU**, about 20 min. Then `positive_control` on the copy. With `a6079d3` + the generation
+layer, the same procedure had reproduced §8 exactly (9 events, the same 5 outside areas).
+
+| | §7 F1–F4 (`4853cc0`) | §8 F6 (`a6079d3`) | **§9 F6 + remnant + split (`22b19ed`)** |
+|---|---|---|---|
+| events | 9 | 9 | **9** (8 SUSPECTED, 1 RECOVERED) |
+| detected / eligible | 3 / 3 | 3 / 3 | **3 / 3** (Wilson 0.44–1.00) |
+| median delay (range) | 6 d (−3 … 7) | 6 d (−3 … 7) | 6 d (−3 … 7) |
+| outside events (unreviewed) | 4 | 5 | **5, of which 1 RECOVERED** (4 open) |
+| total outside area | 112.78 ha | 105.19 ha | **105.19 ha** (open: 105.11 ha) |
+
+**Gate for the live database (recall 3/3, total outside area not growing): MET.**
+
+**Outside events** (INTERPRETATION; ids of the new generation):
+
+| id | status | current ha | max ha | stand z10 / clear-cut z14 / other / none (ha) | pre-tag | first … last after |
+|---|---|---|---|---|---|---|
+| 49 | **RECOVERED** | 0.08 | 1.30 | 0 / 0.08 / 0 / 0 | — | 05-15 … 08-03 |
+| 50 | SUSPECTED | 1.04 | 3.60 | 0.21 / 0.05 / 0.78 / 0 | — | 06-01 … 11-08 |
+| 53 | SUSPECTED | 6.78 | 7.79 | 5.34 / 1.06 / 0.38 / 0 | VMD_OTHER_FELLING_2025_2026 | 07-29 … 08-21 |
+| 56 | SUSPECTED | 68.70 | 68.76 | 59.51 / 3.32 / 5.87 / 0 | VMD_OTHER_FELLING_2025_2026 | 10-01 … 11-08 |
+| 57 | SUSPECTED | 28.59 | 28.59 | 27.09 / 1.04 / 0.46 / 0 | VMD_OTHER_FELLING_2025_2026 | 10-02 … 11-08 |
+
+Event 49 reason: "current mask 0.14 ha < min_cluster_ha 0.3 ha in 2 consecutive valid S1 acquisitions (last
+2026-06-05)". It never grew back above 0.3 ha.
+
+**Compartment split, all events:**
+- The three in-window fellings lie mainly on clear-cut land: event 51 (79-11 + 91-1) has 4.75 of 5.97 ha on zkat 14,
+  event 52 (91-5) 1.32 of 3.51 ha.
+- The large autumn events lie mainly on standing forest: 55 has 107.19 of 123.71 ha on zkat 10, 56 has 59.51 of
+  68.70 ha, 57 has 27.09 of 28.59 ha.
+
+**Open items:**
+- **Events 55, 56 and 57 lie mostly on standing forest (zkat 10) with onsets in Oct–Nov.** They need human visual
+  review: likely leaf-off / seasonal reflectance change, not felling. The system does not decide this.
+- No human review of any event. Whether a RECOVERED remnant should also stop being counted as an outside event
+  in the evaluation is not decided; both counts are shown above.
+

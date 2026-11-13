@@ -505,6 +505,20 @@ F6 changes only existing events, and BIK-001 has none after F3, so nothing chang
 areas and no per-stand table (no ground-truth stands). The live `satellite.db` was not modified: the Ķekava
 outside-event count is worse after F6, so the owner's condition for the live re-run is not met.
 
+## 12. F6 accepted + remnant rule + compartment split (2026-11-13)
+
+Same procedure as the Ķekava report §9: `redetect` on a fresh copy at `22b19ed`, 0 requests, 0 PU.
+
+| | §11 F6 (`a6079d3`) | **`22b19ed`** |
+|---|---|---|
+| events | 0 | **0** |
+| radar anomalies (promoted) | 3 (0) | 3 (0) |
+| S2 candidates TRANSIENT | 6 | 6 |
+
+BIK-001 (negative control) still has **no event**, so the remnant rule and the compartment split have nothing to
+act on. The owner's gate for the live re-run is met on the Ķekava evaluation (recall 3/3; total outside area
+105.19 ha, not growing). The live run is recorded in the Ķekava report.
+
 ## Appendix A — product list (Catalog discovery 2026-08-01 … 2026-11-10, stored status)
 
 | acq | sensor | platform | sensing (UTC) | orbit / rel. orbit | scene cloud % | status |
