@@ -143,3 +143,15 @@ def test_geodata_review_ui_and_english_overlay():
     import subprocess
     from pathlib import Path
     subprocess.run(["node", str(Path(__file__).with_name("review_geo_ui_checks.cjs"))], check=True, capture_output=True, text=True)
+
+
+def test_demo_sidebar_keeps_map_and_navmap_matches_order():
+    """The demo keeps the standalone Map page; navMap indices must follow the sidebar order."""
+    import re
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[1] / "index.html").read_text(encoding="utf-8")
+    nav = html[html.index("<nav"):html.index("</nav>")]
+    order = re.findall(r'class="nav-item[^"]*"[^>]*onclick="[^"]*nav\(\'([^\']+)\'\)', nav)
+    assert {"map", "lvm-geodata", "forest-map"} <= set(order)
+    nav_map = dict((k.strip("'"), int(v)) for k, v in re.findall(r"('?[\w-]+'?):(\d+)", re.search(r"const navMap = \{([^}]*)\}", html).group(1)))
+    assert {k: order.index(k) for k in nav_map} == nav_map

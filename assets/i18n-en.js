@@ -955,6 +955,8 @@
   "Esri satelītattēli un aerofotogrāfijas; uzņemšanas laiks atšķiras. Nogabalu robežas: VMD.": "Esri satellite and aerial imagery; capture dates vary. Compartment boundaries: VMD.",
   "Nogabals nav datu kopā.": "The compartment is not in the dataset.",
   "Sektors ar šādu nosaukumu jau pastāv; dati netika pārrakstīti.": "A sector with this name already exists; nothing was overwritten.",
+  "Neatbalstīta ģeometrija": "Unsupported geometry", "Savienojums izveidots": "Connected",
+  "Ievadiet sektora nosaukumu.": "Enter a sector name.",
   // server messages (nationwide / cadastral authority / registration identity)
   "Atrasti VMD nogabali. Zaļas robežas — pārbaudīti nogabali; zila robeža — VZD zemes vienība.": "VMD compartments found. Green boundaries — verified compartments; blue boundary — VZD land unit (zemes vienība).",
   "Atrasti ieraksti pārbaudei. Oranži telpiskie kandidāti nav apstiprināta kadastra saistība un nav reģistrējami.": "Records found for review. Orange spatial candidates are not a confirmed cadastral association and cannot be registered.",
@@ -1012,6 +1014,10 @@
     const pad = (v) => original.match(/^\s*/)[0] + v + original.match(/\s*$/)[0];
     if (Object.prototype.hasOwnProperty.call(GEO_EXACT, normalized)) return pad(GEO_EXACT[normalized]);
     if (Object.prototype.hasOwnProperty.call(EXACT, normalized)) return pad(EXACT[normalized]);
+    // Reason lists joined with " · ": translate only when EVERY part is a known UI string.
+    const parts = normalized.split(' · ');
+    if (parts.length > 1 && parts.every(x => Object.prototype.hasOwnProperty.call(GEO_EXACT, x)))
+      return pad(parts.map(x => GEO_EXACT[x]).join(' · '));
     let text = normalized, changed = false;
     GEO_TEMPLATES.forEach(([pattern, replacement]) => { const next = text.replace(pattern, replacement); if (next !== text) { text = next; changed = true; } });
     return changed ? pad(text) : original;

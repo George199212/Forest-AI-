@@ -18,6 +18,9 @@ const cases=[
  ['Pieprasītais apzīmējums: 01000922053 · Atrasti: 5 nogabali · Šajā lapā: 5 · Kopējā platība: 12.34 ha · VZD zemes vienība: 01000922053 · Platība: 13.0000 ha · Pārbaudīti: 4 · Telpiski kandidāti: 1',
   'Requested designation (apzīmējums): 01000922053 · Found: 5 compartments · On this page: 5 · Total area: 12.34 ha · VZD land unit (zemes vienība): 01000922053 · Area: 13.0000 ha · Verified: 4 · Spatial candidates: 1'],
  ['Robežu neatbilstība · 97.1234% sakritība','Boundary discrepancy · 97.1234% overlap'],
+ ['Norādiet sektora nosaukumu (1–120 rakstzīmes, bez slīpsvītrām un vadības rakstzīmēm) · Ievadiet atbildīgās personas vārdu un uzvārdu.',
+  'Enter a sector name (1–120 characters, no slashes or control characters) · Enter the responsible person\'s first and last name.'],
+ ['VMD · nodala2653','VMD · nodala2653'],
 ];
 for(const [source,expected] of cases) assert.equal(trGeo(source),expected,source);
 // Source values (VMD/VZD attributes, cadastral numbers, place names) are never rewritten in geodata areas,
