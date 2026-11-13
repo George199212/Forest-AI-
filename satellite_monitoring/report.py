@@ -99,7 +99,12 @@ def render(conn, area):
     for e in evs:
         ctx = json.loads(e["gps_context_json"] or "{}")
         L.append(f"### Event #{e['id']} — {e['classification']} (suspected change)\n")
-        L.append(f"- Status (HUMAN): {e['status']}{' by ' + e['reviewed_by'] if e['reviewed_by'] else ''}")
+        keys = e.keys()
+        if e["status"] in ("SUSPECTED", "RECOVERED"):
+            L.append(f"- Status (AUTOMATIC): {e['status']}"
+                     + (f" — {e['recovered_reason']}" if "recovered_reason" in keys and e["recovered_reason"] else ""))
+        else:
+            L.append(f"- Status (HUMAN): {e['status']}{' by ' + e['reviewed_by'] if e['reviewed_by'] else ''}")
         L.append(f"- Sensor basis: {e['sensor_basis']} · detection confidence: {e['confidence']} · "
                  f"evidence quality: {e['evidence_quality']}")
         L.append(f"- After window: {e['first_after_time_utc']} … {e['last_after_time_utc']}; "
@@ -112,6 +117,13 @@ def render(conn, area):
             L.append(f"- Area history (F6): current {e['changed_area_ha']:.2f} ha = pixels still changed in >= 2 of "
                      f"the last 3 valid images; union of all after-images {e['union_area_ha']:.2f} ha; largest "
                      f"current area so far {_f(e['max_area_ha'], 2)} ha")
+        split = json.loads(e["compartment_split_json"]) if "compartment_split_json" in keys and e["compartment_split_json"] else None
+        if split and "unavailable" not in split:
+            L.append(f"- Current mask by VMD compartment type (METADATA): forest stand (zkat 10) "
+                     f"{split['stand_zkat10_ha']:.2f} ha · clear-cut land (zkat 14) {split['clearcut_zkat14_ha']:.2f} ha · "
+                     f"other compartments {split['other_compartments_ha']:.2f} ha · no compartment {split['no_compartment_ha']:.2f} ha")
+        elif split:
+            L.append(f"- Compartment split: NULL ({split['unavailable']})")
         if e["seasonal_caveat"]:
             L.append(f"- Seasonal caveat: {e['seasonal_caveat']}")
         L.append(f"- Operational context: {ctx.get('context_label', 'unavailable')} "

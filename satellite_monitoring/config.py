@@ -132,6 +132,10 @@ DEFAULTS = {
     # current mask. Pixels with too few observations to decide are KEPT (missing data is not "recovered").
     "event_current_last_n": 3,
     "event_current_min_changed": 2,
+    # Remnant rule (decided 2026-11-13): an open SUSPECTED event whose CURRENT mask stays below min_cluster_ha
+    # in this many consecutive valid acquisitions of one of its sensors becomes RECOVERED (kept, reason
+    # stored); a RECOVERED event whose current mask reaches min_cluster_ha again is reopened (SUSPECTED).
+    "event_recovered_consecutive": 2,
     "layer_cache_size": 24,              # decoded rasters kept in memory per run (F6 re-reads recent images)
 
     # B: an optical (S2) change is a PENDING_CONFIRMATION candidate, not an event. The next usable
@@ -195,5 +199,5 @@ def thresholds_snapshot():
             "candidate_persist_fraction", "uniform_drop_min_fraction", "uniform_drop_max_std_dndvi",
             "s1_anomaly_s2_confirm_days", "s1_promote_min_acq", "s1_promote_min_orbits", "s1_promote_min_ha",
             "s1_promote_window_days", "forest_mask", "forest_mask_zkat", "event_current_last_n",
-            "event_current_min_changed"]
+            "event_current_min_changed", "event_recovered_consecutive"]
     return {k: DEFAULTS[k] for k in keys}

@@ -79,6 +79,10 @@ def lock_state(path=None):
 
 
 # ── runner ──────────────────────────────────────────────────────────────────
+# Events that new detections may update and that are re-evaluated when pixels recover: open ones plus RECOVERED
+# (remnant rule, 2026-11-13: a RECOVERED event reopens when its current mask grows again).
+MATCHABLE = "('SUSPECTED','FIELD_CHECK_REQUESTED','RECOVERED')"
+
 class Runner:
     def __init__(self, conn, provider, trigger, cfg=None, decoder=None, now=None, forest_conn=None):
         self.conn = conn
@@ -477,7 +481,7 @@ class Detector:
         labels, sizes = det.clusters(mask, self.a["grid"]["pixel_area_ha"])
         out = []
         for ev in self.conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=? AND superseded_at_utc"
-                                    " IS NULL AND status IN ('SUSPECTED','FIELD_CHECK_REQUESTED') ORDER BY id",
+                                    " IS NULL AND status IN " + MATCHABLE + " ORDER BY id",
                                     (self.a["id"],)).fetchall():
             ev = dict(ev)
             hist = json.loads(ev["after_acq_history_json"])
@@ -704,7 +708,7 @@ class Detector:
         gap = timedelta(days=self.cfg["ongoing_max_gap_days"])
         candidates = []
         for ev in self.conn.execute(
-                "SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN ('SUSPECTED','FIELD_CHECK_REQUESTED')"
+                "SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN " + MATCHABLE +
                 " AND superseded_at_utc IS NULL ORDER BY id DESC", (self.a["id"],)).fetchall():
             if prov.parse_time(ev["first_after_time_utc"]) - gap <= t <= prov.parse_time(ev["last_after_time_utc"]) + gap:
                 old = self._union_of(dict(ev))
@@ -821,7 +825,41 @@ class Detector:
             union_area_ha=round(int(union.sum()) * pa, 4),
             max_area_ha=max(prev_max or 0.0, stats["changed_area_ha"]),
             current_mask_json=sdb.dumps(cinfo))
+        zk = self.a.get("_zkat")
+        if zk is not None:
+            from . import forest_mask
+            split = dict(forest_mask.split_ha(current, zk, pa), source_version=self.a["_zkat_meta"]["source_version"])
+        else:
+            split = {"unavailable": (self.a.get("_zkat_meta") or {}).get("unavailable", "VMD compartments not loaded")}
+        values["compartment_split_json"] = sdb.dumps(split)
         return values, current
+
+    def _recovery(self, ev, values, sensor, t):
+        """Remnant rule (2026-11-13). Only automatic transitions SUSPECTED -> RECOVERED -> SUSPECTED; human states
+        (REVIEW_*, FIELD_CHECK_REQUESTED) are never changed. Each evaluation triggered by a valid acquisition of
+        `sensor` whose CURRENT area is below min_cluster_ha adds 1 to that sensor's streak; any evaluation at or
+        above it resets all streaks (the current mask is one joint mask). event_recovered_consecutive in a row
+        -> RECOVERED with the reason stored; a RECOVERED event at or above min_cluster_ha again -> SUSPECTED."""
+        rec = json.loads(ev["recovery_json"]) if ev and ev.get("recovery_json") else {"streak": {}, "history": []}
+        status = ev["status"] if ev else "SUSPECTED"
+        min_ha, n = self.cfg["min_cluster_ha"], self.cfg["event_recovered_consecutive"]
+        area = values["changed_area_ha"]
+        below = area < min_ha
+        if below:
+            rec["streak"][sensor] = rec["streak"].get(sensor, 0) + 1
+        else:
+            rec["streak"] = {}
+        if status == "SUSPECTED" and below and rec["streak"][sensor] >= n:
+            reason = (f"current mask {area:.2f} ha < min_cluster_ha {min_ha} ha in {rec['streak'][sensor]} consecutive "
+                      f"valid {sensor} acquisitions (last {t[:10]})")
+            values.update(status="RECOVERED", recovered_at_utc=t, recovered_reason=reason)
+            rec["history"].append({"to": "RECOVERED", "at": t, "sensor": sensor, "area_ha": area, "reason": reason})
+        elif status == "RECOVERED" and not below:
+            reason = f"reopened: current mask {area:.2f} ha >= min_cluster_ha {min_ha} ha ({sensor} {t[:10]})"
+            values.update(status="SUSPECTED", recovered_at_utc=None, recovered_reason=None)
+            rec["history"].append({"to": "SUSPECTED", "at": t, "sensor": sensor, "area_ha": area, "reason": reason})
+        values["recovery_json"] = sdb.dumps(rec)
+        return values
 
     def _save_event_masks(self, eid, current, union):
         p, u = self._mask_path(eid), self._union_path(eid)
@@ -850,6 +888,7 @@ class Detector:
         ctx = context.operational_context({"source": self.a["source"], "name": self.a["name"], "geometry": self.a["geometry"]},
                                           min(before_times), max(h["time"] for h in history), self.a["buffer_m"],
                                           forest_conn=self.r.forest_conn)
+        self._recovery(target, values, acq["sensor"], t_after)
         values.update(updated_at_utc=now, before_acq_ids=sdb.dumps(before_ids), after_acq_id=acq["id"],
                       after_acq_history_json=sdb.dumps(history), first_after_time_utc=min(h["time"] for h in history),
                       last_after_time_utc=max(h["time"] for h in history), gps_context_json=sdb.dumps(ctx))
@@ -859,8 +898,8 @@ class Detector:
             self.conn.execute(f"UPDATE sat_change_events SET {sets} WHERE id=?", (*values.values(), target["id"]))
             self.conn.commit()
             return target["id"], "EVENT_UPDATED"
-        values.update(monitored_area_id=self.a["id"], detected_at_utc=now, change_mask_path="", union_mask_path="",
-                      status="SUSPECTED")
+        values.update(monitored_area_id=self.a["id"], detected_at_utc=now, change_mask_path="", union_mask_path="")
+        values.setdefault("status", "SUSPECTED")
         cols = ", ".join(values)
         cur = self.conn.execute(f"INSERT INTO sat_change_events ({cols}) VALUES ({','.join('?' * len(values))})",
                                 tuple(values.values()))
@@ -882,8 +921,8 @@ class Detector:
         t = acq["sensing_time_utc"]
         gap = timedelta(days=self.cfg["ongoing_max_gap_days"])
         for ev in [dict(e) for e in self.conn.execute(
-                "SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN ('SUSPECTED',"
-                "'FIELD_CHECK_REQUESTED') AND superseded_at_utc IS NULL ORDER BY id", (self.a["id"],))]:
+                "SELECT * FROM sat_change_events WHERE monitored_area_id=? AND status IN " + MATCHABLE +
+                " AND superseded_at_utc IS NULL ORDER BY id", (self.a["id"],))]:
             history = json.loads(ev["after_acq_history_json"])
             if acq["sensor"] not in {h["sensor"] for h in history} or acq["id"] in {h["acq_id"] for h in history}:
                 continue
@@ -891,6 +930,7 @@ class Detector:
                 continue
             union = self._union_of(ev)
             values, current = self._event_values(history, union, ev["evidence_quality"], t, ev["max_area_ha"])
+            self._recovery(ev, values, acq["sensor"], t)
             values["updated_at_utc"] = sdb.iso(sdb.utcnow())
             values["change_mask_path"], values["union_mask_path"] = self._save_event_masks(ev["id"], current, union)
             sets = ", ".join(f"{k}=?" for k in values)
@@ -913,6 +953,14 @@ def _prepare_area(a, cfg, conn=None):
             except forest_mask.ForestMaskUnavailable as e:
                 a["_forest_error"] = str(e)
     a["_zone"] = zone & a["_forest"] if a["_forest"] is not None else zone
+    # Compartment-type split (METADATA only, 2026-11-13): never changes what is detected.
+    a["_zkat"], a["_zkat_meta"] = None, None
+    if cfg.get("forest_mask"):
+        from . import forest_mask
+        try:
+            a["_zkat"], a["_zkat_meta"] = forest_mask.get_classes(a)
+        except forest_mask.ForestMaskUnavailable as e:
+            a["_zkat_meta"] = {"unavailable": str(e)}
     return a
 
 

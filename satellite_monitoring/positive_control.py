@@ -231,6 +231,9 @@ def evaluate(conn, area, truth_fc, ref_db, out_dir, cfg=None):
         ev["pretag"] = "VMD_OTHER_FELLING_2025_2026" if oth * pha >= OVERLAP_MIN_HA else None
         ev["other_felling_overlap_ha"] = round(oth * pha, 2)
         ev["seasonal_month"] = int(e["first_after_time_utc"][5:7]) in cfg["seasonal_months"]
+        ev["status"] = e["status"]
+        ev["max_area_ha"] = e.get("max_area_ha")
+        ev["compartment_split"] = json.loads(e["compartment_split_json"]) if e.get("compartment_split_json") else None
         ev["review_sheet"] = evidence.event_review(conn, area, e, review_dir)["sheet"]
         outside.append(ev)
 

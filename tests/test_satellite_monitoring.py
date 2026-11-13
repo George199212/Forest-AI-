@@ -59,9 +59,10 @@ def make_vmd(path, polygons, zkat="10"):
     c.executescript("CREATE TABLE compartments (id INTEGER PRIMARY KEY, geometry BLOB NOT NULL, properties TEXT);"
                     "CREATE VIRTUAL TABLE spatial_index USING rtree(id, min_lon, max_lon, min_lat, max_lat);")
     for i, p in enumerate(polygons, 1):
+        p, z = p if isinstance(p, tuple) else (p, zkat)          # (polygon, zkat) overrides the default zkat
         g = shape(p)
         w, s, e, n = g.bounds
-        c.execute("INSERT INTO compartments VALUES (?,?,?)", (i, shapely.to_wkb(g), json.dumps({"zkat": zkat})))
+        c.execute("INSERT INTO compartments VALUES (?,?,?)", (i, shapely.to_wkb(g), json.dumps({"zkat": z})))
         c.execute("INSERT INTO spatial_index VALUES (?,?,?,?,?)", (i, w, e, s, n))
     c.commit()
     c.close()
@@ -1431,3 +1432,138 @@ def test_supersede_migration_on_an_old_schema_db(env):
     assert "trg_cand_update_only_pending" not in idx
     assert c.execute("PRAGMA integrity_check").fetchone()[0] == "ok" and not c.execute("PRAGMA foreign_key_check").fetchall()
     sdb.connect(p).close()                                            # idempotent
+
+
+# ── Remnant rule (RECOVERED) and compartment-type split (2026-11-13) ────────
+_CUT_THEN_GONE = [("2026-06-05", None), ("2026-06-15", None), ("2026-06-25", None),
+                  ("2026-07-05", "core"), ("2026-07-15", "core"), ("2026-07-25", None), ("2026-08-04", None)]
+
+
+def _plan(a, plan):
+    core = centre_block(a, 10)
+    return _s2_masks(a, [(t, core if m == "core" else m) for t, m in plan])
+
+
+def test_one_below_min_evaluation_does_not_recover_the_event(env):
+    a = make_area(env["conn"])
+    prods, rasters = _plan(a, _CUT_THEN_GONE)                       # current area 0 only from 08-04 (1 evaluation)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    e = env["conn"].execute("SELECT * FROM sat_change_events").fetchone()
+    assert e["changed_area_ha"] == 0 and e["status"] == "SUSPECTED" and e["recovered_at_utc"] is None
+    assert json.loads(e["recovery_json"])["streak"] == {"S2": 1}
+
+
+def test_two_consecutive_below_min_evaluations_recover_the_event_and_keep_it(env):
+    a = make_area(env["conn"])
+    prods, rasters = _plan(a, _CUT_THEN_GONE + [("2026-08-14", None)])
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    c = env["conn"]
+    e = c.execute("SELECT * FROM sat_change_events").fetchone()
+    assert e["status"] == "RECOVERED" and e["recovered_at_utc"].startswith("2026-08-14")
+    assert "2 consecutive valid S2 acquisitions" in e["recovered_reason"] and "< min_cluster_ha 0.3" in e["recovered_reason"]
+    hist = json.loads(e["recovery_json"])["history"]
+    assert [h["to"] for h in hist] == ["RECOVERED"]
+    assert e["union_area_ha"] == pytest.approx(1.0) and e["max_area_ha"] == pytest.approx(1.0)   # history kept
+    assert c.execute("SELECT COUNT(*) FROM sat_change_events").fetchone()[0] == 1                # kept, not deleted
+    with pytest.raises(sqlite3.IntegrityError):
+        c.execute("DELETE FROM sat_change_events")
+
+
+def test_recovered_event_reopens_when_it_grows_again(env):
+    a = make_area(env["conn"])
+    prods, rasters = _plan(a, _CUT_THEN_GONE + [("2026-08-14", None), ("2026-08-24", "core"), ("2026-09-03", "core")])
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    evs = env["conn"].execute("SELECT * FROM sat_change_events").fetchall()
+    assert len(evs) == 1                                             # the same event is reopened, no new one
+    e = evs[0]
+    assert e["status"] == "SUSPECTED" and e["recovered_at_utc"] is None and e["recovered_reason"] is None
+    assert e["changed_area_ha"] >= 0.3
+    assert [h["to"] for h in json.loads(e["recovery_json"])["history"]] == ["RECOVERED", "SUSPECTED"]
+
+
+def test_remnant_rule_never_changes_a_human_status(env):
+    a = make_area(env["conn"])
+    c = env["conn"]
+    plan = _CUT_THEN_GONE + [("2026-08-14", None)]
+    p1, r1 = _plan(a, plan[:5])
+    run(env, FakeProvider(p1, r1), sensors=("S2",))
+    c.execute("UPDATE sat_change_events SET status='FIELD_CHECK_REQUESTED'")
+    c.commit()
+    p2, r2 = _plan(a, plan)
+    run(env, FakeProvider(p2, r2), sensors=("S2",))
+    e = c.execute("SELECT * FROM sat_change_events").fetchone()
+    assert e["status"] == "FIELD_CHECK_REQUESTED" and e["recovered_at_utc"] is None
+    assert e["changed_area_ha"] == 0                                 # the area itself is still recomputed
+
+
+def test_redetect_treats_recovered_as_automatic_not_human(env):
+    from satellite_monitoring import redetect
+    a = make_area(env["conn"])
+    prods, rasters = _plan(a, _CUT_THEN_GONE + [("2026-08-14", None)])
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    c = env["conn"]
+    assert c.execute("SELECT status FROM sat_change_events").fetchone()[0] == "RECOVERED"
+    redetect.redetect(c, [a["id"]], "test", decoder=decoder, lock_file=env["tmp"] / "lock")   # no Refused
+    cur = c.execute("SELECT status FROM sat_change_events WHERE superseded_at_utc IS NULL").fetchall()
+    assert [r[0] for r in cur] == ["RECOVERED"]                      # same result in the new generation
+
+
+def test_recovered_status_migrates_on_an_old_schema_db(env):
+    c = env["conn"]
+    a = make_area(c)
+    prods, rasters = _plan(a, _CUT_THEN_GONE)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    old_sql = sdb._table_sql("sat_change_events").replace(",'RECOVERED'", "")
+    assert "'RECOVERED'" not in old_sql
+    sdb._rebuild(c, "sat_change_events", old_sql, [r[1] for r in c.execute("PRAGMA table_info(sat_change_events)")])
+    rows = c.execute("SELECT * FROM sat_change_events ORDER BY id").fetchall()
+    c.close()
+    c = sdb.connect(env["tmp"] / "sat" / "satellite.db")             # migration runs on connect
+    sql = c.execute("SELECT sql FROM sqlite_master WHERE name='sat_change_events'").fetchone()[0]
+    assert "'RECOVERED'" in sql
+    assert [tuple(r) for r in c.execute("SELECT * FROM sat_change_events ORDER BY id")] == [tuple(r) for r in rows]
+    trg = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
+    assert {"trg_events_no_delete", "trg_sat_change_events_frozen_when_superseded"} <= trg
+    c.execute("UPDATE sat_change_events SET status='RECOVERED'")      # now allowed
+    sdb.connect(env["tmp"] / "sat" / "satellite.db").close()          # idempotent
+    env["conn"] = c
+
+
+def test_compartment_split_is_metadata_and_sums_to_the_current_area(env, monkeypatch):
+    a = make_area(env["conn"])
+    w, s, e, n = a["grid"]["bbox"]
+    mid = (w + e) / 2
+    big = {"type": "Polygon", "coordinates": [[[w - 0.01, s - 0.01], [e + 0.01, s - 0.01], [e + 0.01, n + 0.01],
+                                               [w - 0.01, n + 0.01], [w - 0.01, s - 0.01]]]}
+    west = {"type": "Polygon", "coordinates": [[[w - 0.01, s - 0.01], [mid, s - 0.01], [mid, n + 0.01],
+                                                [w - 0.01, n + 0.01], [w - 0.01, s - 0.01]]]}
+    p = env["tmp"] / "vmd_classes.sqlite"
+    make_vmd(p, [(big, "10"), (west, "14")])                         # west half = clear-cut land, east = stand
+    monkeypatch.setenv("SAT_FOREST_DB", str(p))
+    monkeypatch.setenv("SAT_FOREST_DB_VERSION", "test-vmd-classes")
+    prods, rasters = _plan(a, _CUT_THEN_GONE[:5])                    # centre block straddles the two halves
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    ev = env["conn"].execute("SELECT * FROM sat_change_events").fetchone()
+    split = json.loads(ev["compartment_split_json"])
+    assert split["source_version"].startswith("test-vmd-classes")
+    total = split["stand_zkat10_ha"] + split["clearcut_zkat14_ha"] + split["other_compartments_ha"] + split["no_compartment_ha"]
+    assert total == pytest.approx(ev["changed_area_ha"])
+    assert split["stand_zkat10_ha"] > 0 and split["clearcut_zkat14_ha"] > 0 and split["other_compartments_ha"] == 0
+
+
+def test_compartment_split_does_not_change_detection(env, monkeypatch):
+    a = make_area(env["conn"])
+    prods, rasters = _plan(a, _CUT_THEN_GONE[:5])
+    from satellite_monitoring import forest_mask
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    with_split = [tuple(r) for r in env["conn"].execute(
+        "SELECT changed_area_ha, n_changed_pixels, classification, confidence FROM sat_change_events")]
+    def broken(area):
+        raise forest_mask.ForestMaskUnavailable("test: classes off")
+    monkeypatch.setattr(forest_mask, "get_classes", broken)
+    from satellite_monitoring import redetect
+    redetect.redetect(env["conn"], [a["id"]], "test", decoder=decoder, lock_file=env["tmp"] / "lock")
+    ev = env["conn"].execute("SELECT * FROM sat_change_events WHERE superseded_at_utc IS NULL").fetchone()
+    assert (ev["changed_area_ha"], ev["n_changed_pixels"], ev["classification"], ev["confidence"]) == with_split[0]
+    assert json.loads(ev["compartment_split_json"]) == {"unavailable": "test: classes off"}
+

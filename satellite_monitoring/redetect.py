@@ -7,7 +7,7 @@ python -m satellite_monitoring.redetect --area ID [--area ID ...] --reason TEXT 
 - Append-only: the current rows of sat_detections, sat_change_events, sat_s2_candidates and sat_radar_anomalies of
   the areas are kept and marked superseded_at_utc / superseded_by_generation (frozen by triggers); nothing is
   deleted. Acquisitions, metrics, request log and runs are untouched.
-- Refuses when a human acted on an event in scope (status other than SUSPECTED, a review log entry, a reviewer
+- Refuses when a human acted on an event in scope (status other than SUSPECTED/RECOVERED (both automatic), a review log entry, a reviewer
   or a risk link): such a decision must not be superseded silently.
 - Takes the same run lock as TIMER/MANUAL/BACKFILL runs and records a sat_runs row (MANUAL) plus a
   sat_detection_generations row.
@@ -46,7 +46,7 @@ def redetect(conn, area_ids, reason, code_version=None, cfg=None, decoder=None, 
             raise Refused(f"not all areas are active: {area_ids}")
         human = conn.execute(
             f"SELECT id FROM sat_change_events WHERE monitored_area_id IN ({q}) AND superseded_at_utc IS NULL AND "
-            "(status <> 'SUSPECTED' OR reviewed_by IS NOT NULL OR risk_id IS NOT NULL OR "
+            "(status NOT IN ('SUSPECTED','RECOVERED') OR reviewed_by IS NOT NULL OR risk_id IS NOT NULL OR "
             " id IN (SELECT event_id FROM sat_review_log))", area_ids).fetchall()
         if human:
             raise Refused(f"events with a human decision or risk link: {[r[0] for r in human]}")

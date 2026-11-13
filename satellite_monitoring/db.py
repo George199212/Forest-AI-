@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS sat_change_events (
     seasonal_caveat TEXT,
     gps_context_json TEXT,
     status TEXT NOT NULL DEFAULT 'SUSPECTED' CHECK (status IN ('SUSPECTED','REVIEW_CONFIRMED',
-        'REVIEW_REJECTED','FIELD_CHECK_REQUESTED')),
+        'REVIEW_REJECTED','FIELD_CHECK_REQUESTED','RECOVERED')),
     risk_id INTEGER,
     reviewed_by TEXT, reviewed_at_utc TEXT, review_note TEXT,
     -- F6: change_mask_path / changed_area_* / change_geojson describe the CURRENT mask. The union of every
@@ -125,6 +125,11 @@ CREATE TABLE IF NOT EXISTS sat_change_events (
     union_area_ha REAL,
     max_area_ha REAL,                        -- largest CURRENT area the event ever had (history)
     current_mask_json TEXT,                  -- per-sensor counts behind the current mask, evaluated up to ...
+    -- Remnant rule (2026-11-13): automatic SUSPECTED <-> RECOVERED only (never touches human states).
+    recovery_json TEXT,                      -- per-sensor below-min streaks + history of automatic transitions
+    recovered_at_utc TEXT,                   -- set while status = RECOVERED (sensing time that closed it)
+    recovered_reason TEXT,
+    compartment_split_json TEXT,             -- METADATA: ha of the current mask per VMD compartment type
     superseded_at_utc TEXT,                  -- set when a later detection generation replaced this row
     superseded_by_generation INTEGER
 );
@@ -423,6 +428,21 @@ def _migrate_supersede(conn):
 
 EVENT_F6_COLUMNS = (("union_mask_path", "TEXT"), ("union_area_ha", "REAL"), ("max_area_ha", "REAL"),
                     ("current_mask_json", "TEXT"))
+EVENT_RECOVERY_COLUMNS = (("recovery_json", "TEXT"), ("recovered_at_utc", "TEXT"), ("recovered_reason", "TEXT"),
+                          ("compartment_split_json", "TEXT"))
+
+
+def _migrate_event_status_recovered(conn):
+    """2026-11-13: status 'RECOVERED' (remnant rule). SQLite cannot alter a CHECK constraint, so
+    sat_change_events is rebuilt once (rows, ids and FKs checked in _rebuild); the triggers that the rebuild
+    drops are re-created by POST_SCHEMA / _supersede_triggers right after. Idempotent."""
+    sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='sat_change_events'").fetchone()[0]
+    if "'RECOVERED'" in sql:
+        return
+    old_cols = [r[1] for r in conn.execute("PRAGMA table_info(sat_change_events)")]
+    _rebuild(conn, "sat_change_events", _table_sql("sat_change_events"), old_cols)
+    conn.executescript(POST_SCHEMA)
+    _supersede_triggers(conn)
 
 
 def _add_columns(conn, table, cols):
@@ -446,6 +466,8 @@ def connect(path=None):
     _migrate_area_source_check(conn)
     _add_columns(conn, "sat_change_events", EVENT_F6_COLUMNS)
     _migrate_supersede(conn)
+    _add_columns(conn, "sat_change_events", EVENT_RECOVERY_COLUMNS)
+    _migrate_event_status_recovered(conn)
     for suffix in ("", "-wal", "-shm"):
         config.secure_file(str(path) + suffix)
     return conn

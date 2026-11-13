@@ -84,3 +84,57 @@ def get(conn, area, inside, buffer, cfg=None):
                  tuple(vals.values()))
     conn.commit()
     return mask, vals
+
+
+# ── Compartment-type classes (METADATA only, 2026-11-13; never used by detection) ─────────────────────────
+CLASS_NONE, CLASS_OTHER, CLASS_STAND, CLASS_CLEARCUT = 0, 1, 10, 14
+
+
+def build_classes(area, path):
+    """Per-pixel VMD compartment type: 10 = forest stand (zkat 10), 14 = clear-cut land (zkat 14),
+    1 = any other compartment, 0 = no compartment. Overlaps (rare): 14 wins over 10, 10 over other."""
+    import shapely
+    g = area["grid"]
+    w, s, e, n = g["bbox"]
+    try:
+        c = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        rows = c.execute(
+            "SELECT c.geometry, json_extract(c.properties,'$.zkat') FROM spatial_index s JOIN compartments c "
+            "ON c.id=s.id WHERE s.max_lon>? AND s.min_lon<? AND s.max_lat>? AND s.min_lat<?", (w, e, s, n)).fetchall()
+        c.close()
+    except sqlite3.Error as ex:
+        raise ForestMaskUnavailable(f"VMD index not readable: {type(ex).__name__}")
+    groups = {CLASS_OTHER: [], CLASS_STAND: [], CLASS_CLEARCUT: []}
+    for wkb, z in rows:
+        groups[{"10": CLASS_STAND, "14": CLASS_CLEARCUT}.get(str(z), CLASS_OTHER)].append(shapely.from_wkb(wkb))
+    x, y = geo.pixel_centres(g)
+    out = np.zeros(x.shape, dtype=np.int8)
+    for cls in (CLASS_OTHER, CLASS_STAND, CLASS_CLEARCUT):          # later classes win
+        if groups[cls]:
+            out[shapely.contains_xy(shapely.union_all(groups[cls]), x, y)] = cls
+    return out
+
+
+def get_classes(area):
+    """Cached class raster for the area + ACTIVE dataset version (file only, sha256 in the cache name check)."""
+    path, version = config.forest_db_source()
+    if path is None:
+        raise ForestMaskUnavailable(version)
+    key = f"{version}|classes=10,14,other"
+    p = config.raster_root() / str(area["id"]) / "masks" / f"vmd_zkat_classes_{hashlib.sha256(key.encode()).hexdigest()[:12]}.npy"
+    if p.exists():
+        arr = np.load(p)
+        if arr.shape == (area["grid"]["height"], area["grid"]["width"]):
+            return arr, {"source_version": key, "path": str(p)}
+    arr = build_classes(area, path)
+    config.secure_dir(p.parent)
+    np.save(p, arr)
+    config.secure_file(p)
+    return arr, {"source_version": key, "path": str(p)}
+
+
+def split_ha(mask, classes, pixel_area_ha):
+    """ha of `mask` per compartment type (METADATA)."""
+    f = lambda c: round(int((mask & (classes == c)).sum()) * pixel_area_ha, 4)
+    return {"stand_zkat10_ha": f(CLASS_STAND), "clearcut_zkat14_ha": f(CLASS_CLEARCUT),
+            "other_compartments_ha": f(CLASS_OTHER), "no_compartment_ha": f(CLASS_NONE)}
