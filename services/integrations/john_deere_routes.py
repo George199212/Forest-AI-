@@ -54,8 +54,11 @@ def router(verify_credentials):
     def status(request: Request, account: str = Depends(verify_credentials)):
         cookie = request.cookies.get(jd.COOKIE)
         session = jd.browser_session(cookie, account)
+        from services import review_mode
         if session:
             token = session['csrf_token']
+        elif review_mode.ENABLED:
+            cookie, token = None, None   # demo: every John Deere action is a refused POST; never write a session
         else:
             cookie, token = jd.new_session(account)
         try:
@@ -71,8 +74,9 @@ def router(verify_credentials):
                         error=exc.detail, organizations_list=[])
         data['csrf_token'] = token  # Browser CSRF value only, never an OAuth credential.
         response = JSONResponse(data)
-        response.set_cookie(jd.COOKIE, cookie, max_age=3600, httponly=True,
-                            secure=request.url.scheme == 'https', samesite='lax', path='/')
+        if cookie:   # review mode creates no session, so it sets no cookie
+            response.set_cookie(jd.COOKIE, cookie, max_age=3600, httponly=True,
+                                secure=request.url.scheme == 'https', samesite='lax', path='/')
         return response
 
     @routes.post('/integrations/john-deere/connect')
