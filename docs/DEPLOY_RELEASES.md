@@ -184,7 +184,7 @@ Read-only decisions:
 
 Activation (ONLY after explicit human OK):
 ```sh
-install -m 644 /root/forest_ai/releases/forest-review-geo-20261113T1023Z/50-review-geo-release.conf /etc/systemd/system/forest-review-api.service.d/50-review-geo-release.conf
+install -D -m 644 /root/forest_ai/releases/forest-review-geo-20261113T1023Z/50-review-geo-release.conf /etc/systemd/system/forest-review-api.service.d/50-review-geo-release.conf
 systemctl daemon-reload && systemctl restart forest-review-api
 readlink /proc/$(systemctl show -p MainPID --value forest-review-api)/cwd   # -> /root/forest_ai/releases/forest-review-geo-20261113T1023Z
 ```
