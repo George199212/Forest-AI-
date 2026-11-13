@@ -363,7 +363,7 @@
     if (r !== null) return r;
     r = lookupLead(t);                          // "⚠ Risk", "Status:", "← Back", "ℹ Text."
     if (r !== null) return r;
-    if (t.indexOf(' · ') > 0) {                 // "Rigas Mezi · ACTIVE"
+    if (t.indexOf(' · ') > 0) {                 // "Contractor Name · ACTIVE"
       var parts = t.split(' · '), changed = false;
       for (var j = 0; j < parts.length; j++) {
         var q = parts[j].trim() ? lookupLead(parts[j].trim()) : null;

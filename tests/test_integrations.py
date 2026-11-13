@@ -280,10 +280,20 @@ def test_fleet_sector_exit_no_incident_when_inside_boundary():
 # ── API routes (tenant scoping stays organization_id=1 today; see manager.py) ──
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     from fastapi.testclient import TestClient
     import api
-    with TestClient(api.app) as c:
+    from services import review_mode
+    from copy import copy
+    # These assertions exercise the ordinary integration API contract, including writes.
+    # Keep that target explicit when the suite is launched with ACCESS_MODE=review;
+    # test_review_mode exercises the actual guarded application independently.
+    app = copy(api.app)
+    app.user_middleware = [m for m in api.app.user_middleware
+                           if m.cls is not review_mode.ReviewModeMiddleware]
+    app.middleware_stack = None
+    monkeypatch.setattr(review_mode, "ENABLED", False)
+    with TestClient(app) as c:
         yield c
 
 
