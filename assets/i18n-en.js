@@ -18,6 +18,8 @@
   "MONITORINGS": "MONITOR",
   "Operācijas": "Operations",
   "OPERĀCIJAS": "OPERATIONS",
+  "Meža kvartāli (LVM)": "Forest quarters (meža kvartāli, LVM)",
+  "Meža nogabali (LVM)": "Forest compartments (meža nogabali, LVM)",
   "Slāņi": "LVM GEO",
   "Administrēšana": "Admin",
   "ADMINISTRĒŠANA": "ADMIN",
