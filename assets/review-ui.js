@@ -27,8 +27,9 @@
   }
   function blockDemoAction(el, selector) {
     const kind=DEMO_BLOCKED[selector], text=demoText(kind);
-    el.setAttribute('data-review-read','');            // keep it visible (review CSS hides unknown actions)
-    el.setAttribute('data-review-demo-blocked',kind);
+    // Every write below happens only on change (the observer watches 'disabled'; no write loops).
+    if (!el.hasAttribute('data-review-read')) el.setAttribute('data-review-read','');   // keep it visible
+    if (el.getAttribute('data-review-demo-blocked')!==kind) el.setAttribute('data-review-demo-blocked',kind);
     if ('disabled' in el && !el.disabled) el.disabled=true;
     if (el.getAttribute('aria-disabled')!=='true') el.setAttribute('aria-disabled','true');
     if (el.title!==text) el.title=text;
@@ -111,8 +112,9 @@
         if (allowed(el)) { if(!el.hasAttribute('data-review-read')) el.setAttribute('data-review-read',''); }
         else {
           if(!el.hasAttribute('data-review-action')) el.setAttribute('data-review-action','');
-          if ('disabled' in el) el.disabled=true;
-          el.setAttribute('aria-disabled','true');
+          // Write only on change: the observer watches 'disabled', so an unconditional write would loop.
+          if ('disabled' in el && !el.disabled) el.disabled=true;
+          if (el.getAttribute('aria-disabled')!=='true') el.setAttribute('aria-disabled','true');
         }
       } else if (el.matches('input:not([type=search]):not([type=date]):not([type=range])')) el.readOnly=true;
     }
@@ -147,6 +149,6 @@
     // The current PDF generator embeds untranslated labels. Hide and refuse it in review.
     window.downloadPDF=()=>undefined;
   }
-  window.ForestReview={allowed,displayText,demoApiBlocked};
+  window.ForestReview={allowed,displayText,demoApiBlocked,process};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start);else start();
 })();

@@ -34,6 +34,22 @@ assert(!R.allowed(el('button',false,'createSector()')),'outside geo sections the
 assert.equal(R.demoApiBlocked('/api/geodata/vmd/import-selected'),'registration');
 assert.equal(R.demoApiBlocked('/api/geodata/forest-map/gps/violations/incident'),'incident');
 assert.equal(R.demoApiBlocked('/api/geodata/vmd/cadastre'),null);
+
+// Regression: process() must not rewrite already-applied state. The MutationObserver watches 'disabled',
+// so an unconditional el.disabled=true / setAttribute loops forever (froze the AI Inspector page).
+function fakeButton(handler,sel) {
+  const attrs={'aria-disabled':'true','data-review-action':'','onclick':handler};let writes=0;
+  const el={nodeType:1,_disabled:true,get disabled(){return this._disabled;},set disabled(v){writes++;this._disabled=v;},
+    getAttribute:k=>k in attrs?attrs[k]:null,hasAttribute:k=>k in attrs,setAttribute:(k,v)=>{writes++;attrs[k]=v;},
+    matches:s=>s.split(',').some(x=>x.trim()==='button'||x.trim()===sel),closest:()=>null,querySelectorAll:()=>[],
+    get title(){return attrs.title||'';},set title(v){writes++;attrs.title=v;},nextElementSibling:{classList:{contains:()=>true}},after(){writes++;}};
+  return {el,writes:()=>writes};
+}
+for (const [handler,sel] of [['createSector()','x'],['','#lvm-import']]) {
+  const f=fakeButton(handler,sel);if(sel==='#lvm-import'){f.el.setAttribute('data-review-read','');f.el.setAttribute('data-review-demo-blocked','registration');f.el.title=R.demoApiBlocked&&'Registration is disabled in demo mode (Demo režīmā reģistrācija ir izslēgta)';}
+  const before=f.writes();R.process(f.el);R.process(f.el);
+  assert.equal(f.writes(),before,'process() rewrote unchanged state for '+(handler||sel));
+}
 review.window.fetch=async()=>{throw Error('no network')};
 const withFetch=context(true);let outbound=0;withFetch.window.fetch=async()=>{outbound++;return new Response('{}');};
 vm.runInContext(fs.readFileSync(root+'/assets/review-ui.js','utf8'),withFetch);
