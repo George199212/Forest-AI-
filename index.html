@@ -343,7 +343,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
       <div class="nav-group">Admin</div>
       <div class="nav-item" onclick="nav('lvm-geodata')"><span class="nav-icon">🌲</span> LVM GEO</div>
       <div class="nav-item" onclick="nav('integrations')"><span class="nav-icon">🔌</span> Integrations</div>
-      <div class="nav-item" id="forest-map-nav" style="display:none" onclick="nav('forest-map')"><span class="nav-icon">🌳</span> <span id="forest-map-nav-label">Forest Map</span></div>
+      <div class="nav-item" id="forest-map-nav" style="display:none" onclick="nav('forest-map')"><span class="nav-icon">🌳</span> <span id="forest-map-nav-label">Meža karte</span></div>
     </nav>
     <div class="sidebar-foot" id="last-update">–</div>
   </div>
@@ -893,7 +893,7 @@ function tbl(headers, keys, rows) {
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
-const titles = {'forest-map':'Forest Map','lvm-geodata':'Slāņi',overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor',integrations:'Integrations','integration-detail':'Integration','sat-monitoring':'Satellite Monitoring'};
+const titles = {'forest-map':'Meža karte','lvm-geodata':'Slāņi',overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor',integrations:'Integrations','integration-detail':'Integration','sat-monitoring':'Satellite Monitoring'};
 
 const geodataNavigationText=new Map();
 function localizeGeodataNavigation(active){
@@ -922,7 +922,8 @@ function nav(id, push=true) {
   const items = document.querySelectorAll('.nav-item');
   if (navMap[id]!==undefined) items[navMap[id]].classList.add('active');
   document.getElementById('page-title').textContent = titles[id]||id;
-  document.getElementById('page-refresh').textContent=id==='lvm-geodata'?'↻ Atjaunot':'↻ Refresh';
+  // Latvian-native pages show Latvian from the first paint (forest-map.js later applies its own LV/EN choice).
+  document.getElementById('page-refresh').textContent=(id==='lvm-geodata'||id==='forest-map'||id==='sat-monitoring')?'↻ Atjaunot':'↻ Refresh';
   document.getElementById('page-sub').textContent = new Date().toLocaleString('lv-LV');
   if (push) history.pushState({type:'nav', id}, '', '#'+id);
   load(id);

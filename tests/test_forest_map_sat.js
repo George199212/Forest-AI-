@@ -98,3 +98,9 @@ test('index.html keeps the exact script tags api.py rewrites to enable LVM GEO /
  assert.ok(tags.length>=2,'api.py activation replaces found');
  for(const tag of tags)assert.ok(html.includes(tag),'index.html lost the activation anchor '+tag);
 });
+
+test('Forest Map shows Latvian header and sidebar label from the first paint (before forest-map.js loads)',()=>{
+ assert.match(html,/<span id="forest-map-nav-label">Meža karte<\/span>/);
+ assert.match(html,/const titles = \{'forest-map':'Meža karte',/);
+ assert.match(html,/\(id==='lvm-geodata'\|\|id==='forest-map'\|\|id==='sat-monitoring'\)\?'↻ Atjaunot':'↻ Refresh'/);
+});
