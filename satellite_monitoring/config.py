@@ -171,8 +171,14 @@ DEFAULTS = {
     "eq_good_valid_pct": 80.0, "eq_good_min_baseline": 2, "eq_good_max_gap_days": 30,
     "eq_limited_valid_pct": 60.0, "eq_limited_min_baseline": 1, "eq_limited_max_gap_days": 60,
 
-    # Stage 2 (recorded now so the report shows the full config)
+    # Stage 2. D3 (2026-11-16): NO automatic risks. A risk is created only by a human CREATE_RISK review action
+    # (API, existing add_incident + risk_evidence). Nothing reads auto_risk_min_confidence while this is False.
+    "auto_risk_enabled": False,
     "auto_risk_min_confidence": "MEDIUM",
+    # Redetect: a superseded event's risk link moves to the successor whose mask overlaps it by at least this
+    # share of the smaller of the two union masks (decided 2026-11-16).
+    "risk_carry_min_overlap": 0.30,
+    "area_backfill_days": 120,           # ADD_AREA job: first backfill window
     "schedule": "daily 07:30 Europe/Riga (timer prepared in Stage 2, not installed)",
 }
 

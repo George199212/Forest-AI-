@@ -131,7 +131,10 @@ CREATE TABLE IF NOT EXISTS sat_change_events (
     recovered_reason TEXT,
     compartment_split_json TEXT,             -- METADATA: ha of the current mask per VMD compartment type
     superseded_at_utc TEXT,                  -- set when a later detection generation replaced this row
-    superseded_by_generation INTEGER
+    superseded_by_generation INTEGER,
+    -- Stage 2 (2026-11-16): risk link carried from a superseded event by a redetect (mask overlap share)
+    risk_carried_from_event_id INTEGER,
+    risk_carry_overlap REAL
 );
 
 CREATE TABLE IF NOT EXISTS sat_s2_candidates (
@@ -263,6 +266,26 @@ CREATE TRIGGER IF NOT EXISTS trg_req_no_delete BEFORE DELETE ON sat_request_log
 BEGIN SELECT RAISE(ABORT, 'sat_request_log is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS trg_runs_no_delete BEFORE DELETE ON sat_runs
 BEGIN SELECT RAISE(ABORT, 'sat_runs is append-only'); END;
+
+CREATE TABLE IF NOT EXISTS sat_jobs (
+    -- Stage 2 (D2): the API process only queues small job rows; the worker (venv2) picks them up and does the work.
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL CHECK (kind IN ('ADD_AREA','STOP_AREA','FETCH')),
+    payload_json TEXT NOT NULL,
+    dedup_key TEXT NOT NULL,                 -- one QUEUED/RUNNING job per key (partial unique index below)
+    status TEXT NOT NULL DEFAULT 'QUEUED' CHECK (status IN ('QUEUED','RUNNING','DONE','FAILED')),
+    requested_by TEXT NOT NULL,
+    requested_at_utc TEXT NOT NULL,
+    started_at_utc TEXT,
+    finished_at_utc TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    result_json TEXT,
+    error_text TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_sat_jobs_open ON sat_jobs (dedup_key) WHERE status IN ('QUEUED','RUNNING');
+CREATE INDEX IF NOT EXISTS ix_sat_jobs_status ON sat_jobs (status, id);
+CREATE TRIGGER IF NOT EXISTS trg_jobs_no_delete BEFORE DELETE ON sat_jobs
+BEGIN SELECT RAISE(ABORT, 'sat_jobs is append-only'); END;
 """
 
 
@@ -430,6 +453,8 @@ EVENT_F6_COLUMNS = (("union_mask_path", "TEXT"), ("union_area_ha", "REAL"), ("ma
                     ("current_mask_json", "TEXT"))
 EVENT_RECOVERY_COLUMNS = (("recovery_json", "TEXT"), ("recovered_at_utc", "TEXT"), ("recovered_reason", "TEXT"),
                           ("compartment_split_json", "TEXT"))
+# Stage 2 (2026-11-16): a redetect carries the risk link of a superseded event to its successor (mask overlap).
+EVENT_RISK_CARRY_COLUMNS = (("risk_carried_from_event_id", "INTEGER"), ("risk_carry_overlap", "REAL"))
 
 
 def _migrate_event_status_recovered(conn):
@@ -468,6 +493,7 @@ def connect(path=None):
     _migrate_supersede(conn)
     _add_columns(conn, "sat_change_events", EVENT_RECOVERY_COLUMNS)
     _migrate_event_status_recovered(conn)
+    _add_columns(conn, "sat_change_events", EVENT_RISK_CARRY_COLUMNS)
     for suffix in ("", "-wal", "-shm"):
         config.secure_file(str(path) + suffix)
     return conn

@@ -861,6 +861,21 @@ class Detector:
         values["recovery_json"] = sdb.dumps(rec)
         return values
 
+    AUTO_STATUS_KEYS = ("status", "recovered_at_utc", "recovered_reason", "recovery_json")
+
+    def _update_event(self, eid, values, read_status):
+        """Stage 2: a human review in the API process may change the status between this run's read and write.
+        The write is guarded by the status that was read; if it changed, the automatic status fields are dropped
+        (the human decision wins) and only the measurements are written."""
+        sets = ", ".join(f"{k}=?" for k in values)
+        cur = self.conn.execute(f"UPDATE sat_change_events SET {sets} WHERE id=? AND status=?",
+                                (*values.values(), eid, read_status))
+        if cur.rowcount == 0:
+            rest = {k: v for k, v in values.items() if k not in self.AUTO_STATUS_KEYS}
+            sets = ", ".join(f"{k}=?" for k in rest)
+            self.conn.execute(f"UPDATE sat_change_events SET {sets} WHERE id=?", (*rest.values(), eid))
+        self.conn.commit()
+
     def _save_event_masks(self, eid, current, union):
         p, u = self._mask_path(eid), self._union_path(eid)
         self._save_mask(p, current)
@@ -894,9 +909,7 @@ class Detector:
                       last_after_time_utc=max(h["time"] for h in history), gps_context_json=sdb.dumps(ctx))
         if target:
             values["change_mask_path"], values["union_mask_path"] = self._save_event_masks(target["id"], current, union)
-            sets = ", ".join(f"{k}=?" for k in values)
-            self.conn.execute(f"UPDATE sat_change_events SET {sets} WHERE id=?", (*values.values(), target["id"]))
-            self.conn.commit()
+            self._update_event(target["id"], values, target["status"])
             return target["id"], "EVENT_UPDATED"
         values.update(monitored_area_id=self.a["id"], detected_at_utc=now, change_mask_path="", union_mask_path="")
         values.setdefault("status", "SUSPECTED")
@@ -933,9 +946,7 @@ class Detector:
             self._recovery(ev, values, acq["sensor"], t)
             values["updated_at_utc"] = sdb.iso(sdb.utcnow())
             values["change_mask_path"], values["union_mask_path"] = self._save_event_masks(ev["id"], current, union)
-            sets = ", ".join(f"{k}=?" for k in values)
-            self.conn.execute(f"UPDATE sat_change_events SET {sets} WHERE id=?", (*values.values(), ev["id"]))
-            self.conn.commit()
+            self._update_event(ev["id"], values, ev["status"])
 
 
 def _prepare_area(a, cfg, conn=None):
