@@ -7,6 +7,14 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-16 evening — UI review fixes on the branch (NOT deployed)
+
+- :8000 unchanged (`7bd2bbb`, Stage 4). Branch has the 7 UI review fixes (see KNOWN_BUGS "UI review 2026-11-16");
+  verified in the sandbox `127.0.0.1:8030` (fresh copy of the migrated live satellite.db).
+- Fragmentation rule: offline only (copy, generation 2, 0 PU); the live satellite.db still has generation 1 (events
+  49–57). Applying it live = a redetect after a backup, owner approval needed.
+- :8000 has no `UI_LANGUAGE`; the Satellite Monitoring section is now Latvian by itself (next release).
+
 ## Update 2026-11-16 16:45 UTC — Satellite Monitoring is LIVE on :8000 (Stage 4)
 
 - :8000 runs `/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z` (`7bd2bbb`, `geo-178d80bd1896`) since 15:52 UTC; drop-ins

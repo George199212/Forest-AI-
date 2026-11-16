@@ -2,6 +2,16 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-16 (evening) — `feature/satellite-monitoring`: UI review fixes (not deployed)
+
+- Detection: fragmentation rule (largest cluster < 30 % of the current area → POSSIBLE_SEASONAL_OR_ENVIRONMENTAL,
+  LOW). Offline re-run on a copy: gate met (Ķekava §12). Live satellite.db unchanged.
+- Satellite Monitoring is Latvian by default (LV/EN switch); stored server sentences translated for display.
+- Event images: loading / error state instead of a silent black box; colour composite stated (true colour not
+  available: B02/B03 not stored).
+- Worker status from systemd (Nav uzstādīts / Darbojas / Dīkstāvē / Taimeri izslēgti / Statuss nav zināms).
+- Forest Map: Latvian header and sidebar label from the first paint on a deep link.
+
 ## 2026-11-16 — Satellite Monitoring Stage 4: DEPLOYED to :8000 at 15:52 UTC
 
 - Release `forest-api-satellite-monitoring-20261116T1545Z` (branch `feature/satellite-monitoring` @ `7bd2bbb`, `geo-178d80bd1896`) via drop-ins `97-` / `98-`.

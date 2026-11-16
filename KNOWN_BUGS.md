@@ -60,24 +60,33 @@
   atjauninājumu"). Guarded by `tests/test_forest_map_sat.js` since 2026-11-16.
 
 
-### Satellite Monitoring — UI review 2026-11-16, open, post-release work (released as is, owner decision)
-1. Fragmentation rule missing: when the largest cluster is < 30 % of the event's current area, the event should be
-   POSSIBLE_SEASONAL_OR_ENVIRONMENTAL with LOW confidence (config). Needs an offline re-run on a COPY (0 PU) of
-   Ķekava + BIK-001 with the gate "recall 3/3, outside events/area not growing" before the live DB is touched.
-2. Satellite Monitoring section not fully Latvian in the review sandbox (title, KPIs, banners, tables, event page,
-   legends, buttons, empty states). Finding so far: `assets/i18n-lv.js` is injected only when the process runs
-   with `UI_LANGUAGE=lv` (`api.py:604-608`); the review sandbox did not pass `UI_LANGUAGE`. Whether production
-   :8000 sets it was NOT checked; list of untranslated strings not yet produced.
-3. Forest Map popup link: verify that the popup of event #52 opens event 52 (the after_10 screenshot opened #55
-   on purpose; not yet checked for #52).
-4. Event #52 page: BEFORE / AFTER images reported black. Not investigated yet.
-5. "Open in Forest Map" from event #52: screenshot after_05 was captured right after the click (map not loaded,
-   English static title "Forest Map" / "Refresh" until `forest-map.js` loads). The English title and nav label
-   during loading are real; the final state (after_06) is centred on the event.
-6. Worker status shows "Idle" when no worker unit exists; should be "Not installed" (LV "Nav uzstādīts").
-7. Event images: add "True colour / False colour" toggle (true colour = B04/B03/B02, default). Stored rasters must
-   be checked for the bands first; no new Copernicus calls.
-8. Checked 2026-11-16 (closed): the "HTTP 401 invalid_client 2026-11-16 07:30" banner was a SYNTHETIC sandbox state
-   (`/root/sat_sandbox/toggle/sat_auth.db`). Live satellite.db (read-only, immutable): no `token` row in
-   `sat_provider_status`; catalog last OK 2026-11-11T07:06:56Z, process 2026-11-11T07:13:26Z; `sat_request_log`
-   302 rows, all HTTP 200, last 2026-11-11T07:13:26Z. Token requests are not logged in `sat_request_log`.
+### Satellite Monitoring — UI review 2026-11-16 (post-release work on `feature/satellite-monitoring`, NOT deployed)
+Status 2026-11-16 evening; :8000 still runs `7bd2bbb` (Stage 4 release). Next deployment needs the owner's "approved release".
+1. **Fragmentation rule — done on the branch (`eaac5d4`), NOT applied to the live satellite.db.** Offline re-run on a
+   copy (0 PU, generation 2): gate MET (recall 3/3, open outside 4 = 105.11 ha, masks identical); 5 events become
+   POSSIBLE_SEASONAL_OR_ENVIRONMENTAL / LOW, event 55 (12 %) included. Details `docs/SATELLITE_POSITIVE_CONTROL_KEKAVA.md`
+   §12. Open: live redetect (new event ids 58–66; links to 49–57 then open superseded rows) needs approval + backup.
+2. **Latvian — done (`2013e7c`).** Root cause: :8000 runs without `UI_LANGUAGE` (serves `<html lang="en">`, no
+   `i18n-lv.js`). The section is now Latvian by default (LV/EN switch), dictionaries generated from `i18n-lv.js`.
+   Still English on purpose: Copernicus licence line, Leaflet/OSM attribution, and the stored server text kept in
+   tooltips (title attribute). Untranslated strings found and fixed: page title/refresh, Leaflet zoom titles, the
+   seasonal caveat, recovery reason and operational-context reasons (display-only translation).
+3. **Popup #52 → event 52 — no bug.** Popups 51/52/55/57 link to their own event pages; after_10 opened #55 on purpose.
+4. **Event 52 images — fixed (`0530225`).** The quicklooks (acq 299, 331) were served 200 every time; the black panels
+   were images still loading with no indicator. Now "Ielādē attēlu…" / "Attēlu neizdevās ielādēt.".
+5. **"Atvērt Meža kartē" from event 52 — fixed (`714462f`).** The map did load and centre (bbox in view, zoom 15,
+   popup open); after_05 was taken 0 s after the click. English "Forest Map" / "Refresh" during loading → Latvian.
+6. **Worker status — done (`e5a6826`).** From systemd: Nav uzstādīts / Darbojas / Dīkstāvē / Taimeri izslēgti /
+   Statuss nav zināms, plus next daily run and last queue check.
+7. **True / false colour toggle — NOT possible from stored data.** Stored S2 bands: B04, B08, B11, B12, SCL,
+   dataMask. True colour needs B03 + B02. What it would take (owner decision, not done):
+   - add B02, B03 to `EVALSCRIPT_S2` / `S2_BANDS` (8 output bands), adapt the raster decode/indices and
+     `quicklook_png` (second, true-colour quicklook);
+   - only NEW acquisitions get them; history needs re-fetching: ~291 Process requests, ESTIMATE ≈ 1,140 PU
+     (852.8 PU × 8/6 bands, not verified with CDSE) — above the remaining November guard (1,600 − 852.8 ≈ 747 PU);
+   - every future S2 request costs ≈ +33 % PU (estimate).
+   Done instead (`9b91e49`): the event page says the images are false colour (B11/B08/B04) and that true colour is
+   not available.
+8. **Closed** (2026-11-16): the "HTTP 401 invalid_client" banner was a synthetic sandbox state; live satellite.db has
+   no token failure (302 requests, all HTTP 200, last 2026-11-11). A real token request on 2026-11-16 ~15:44 UTC
+   returned 200.
