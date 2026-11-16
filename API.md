@@ -190,6 +190,22 @@ Descriptions from reading each handler. **Supersedes:** earlier API.md (54 route
 | GET | `/api/satellite-intel/sectors` | `satellite_intel_sectors` | — | — | Latest satellite score/band/tier, pending request per sector. |
 | GET | `/api/satellite-intel/sector/{sector_name}` | `satellite_intel_sector_detail` | — | — | Score, requests, observations, timeline for one sector. |
 
+## Satellite Monitoring (S1+S2, Stage 2 — not deployed)
+
+Router `satellite_monitoring/api_routes.py`, Basic Auth on every route. Reads `satellite.db` read-only (`SAT_DB_PATH`); POSTs write only a `sat_jobs` row (picked up by the worker, `python -m satellite_monitoring.jobs`) or a review row. Missing DB → 503. Wording is neutral ("suspected", "outside the approved boundary"). `/api/satellite/*` and `/api/satellite-intel/*` are unchanged.
+
+| Method | Path | Body | Behaviour |
+|---|---|---|---|
+| GET | `/api/sat-monitoring/overview` | — | Per area: last S1, last valid S2 (+ valid %), data status, open SUSPECTED events, RECOVERED events (separate, not counted as open), gaps, open jobs |
+| GET | `/api/sat-monitoring/areas/{id}` | — | Acquisition timeline (NULL metrics kept with `null_reason`), current events, geometry |
+| POST | `/api/sat-monitoring/areas` | `{source: SECTOR\|LVM_GEO, source_ref, name, geometry?}` | 422 on invalid input; 409 if already monitored; 202 + `job_id` (ADD_AREA: worker validates, creates and runs a 120-day backfill). The same queued job is returned again (`deduplicated`) |
+| POST | `/api/sat-monitoring/areas/{id}/stop` | — | 202 + job (STOP_AREA: `active=0`, history kept); 404 / 409 |
+| POST | `/api/sat-monitoring/fetch` | `{area_id}` or `{all: true}` | 202 + job (FETCH: MANUAL run, same code path and lock) + lock state |
+| GET | `/api/sat-monitoring/events/{id}` | — | Event, neutral summary, before/after quicklook URLs, `change_geojson`, operational context, review log |
+| POST | `/api/sat-monitoring/events/{id}/review` | `{decision: CONFIRM\|REJECT\|FIELD_CHECK\|CREATE_RISK\|UNDO, note?}` | Appends to `sat_review_log`. CREATE_RISK is the only way a risk is created (human, existing `add_incident` + `risk_evidence` source `SATELLITE`; 409 if already linked). REJECT on a linked risk adds a risk event; the risk status is left to the existing workflow. FIELD_CHECK sends a Telegram message to `DISPATCHER_CHAT_ID` (502 and no change if sending fails). UNDO undoes the most recent status decision (not CREATE_RISK). Superseded events → 409 |
+| GET | `/api/sat-monitoring/file/{acq_id}/{kind}` | — | `kind=quicklook` only; the path comes from the DB and must resolve inside `SAT_RASTER_DIR` and be a `.png`; otherwise 404 |
+| GET | `/api/sat-monitoring/health` | — | Last run, PU and requests this month vs budget, provider status, lock state, job counts, `auto_risk_enabled` (false) |
+
 ## Integration Layer
 
 | Method | Path | Handler | Body | Query | Behaviour |
