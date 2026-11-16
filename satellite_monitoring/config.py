@@ -166,6 +166,10 @@ DEFAULTS = {
     # Classification (F2: decided on the ONSET month = first after-image; latest month -> seasonal_caveat)
     "seasonal_months": [10, 11, 12, 1, 2, 3, 4],   # Oct–Apr (leaf fall/leaf-off, frost, snow, spring thaw)
     "snow_max_pct": 10.0,                # S2: SCL=11 share of the INSIDE zone
+    # Fragmentation rule (owner decision 2026-11-16, UI review): when the largest connected cluster of the CURRENT
+    # mask is below this share of the current area, the change is scattered (typical of phenology, wet ground,
+    # haze edges) -> POSSIBLE_SEASONAL_OR_ENVIRONMENTAL with LOW confidence. INSUFFICIENT_EVIDENCE keeps priority.
+    "fragmentation_min_largest_share": 0.30,
 
     # Evidence quality (separate from detection confidence)
     "eq_good_valid_pct": 80.0, "eq_good_min_baseline": 2, "eq_good_max_gap_days": 30,
@@ -205,5 +209,5 @@ def thresholds_snapshot():
             "candidate_persist_fraction", "uniform_drop_min_fraction", "uniform_drop_max_std_dndvi",
             "s1_anomaly_s2_confirm_days", "s1_promote_min_acq", "s1_promote_min_orbits", "s1_promote_min_ha",
             "s1_promote_window_days", "forest_mask", "forest_mask_zkat", "event_current_last_n",
-            "event_current_min_changed", "event_recovered_consecutive"]
+            "event_current_min_changed", "event_recovered_consecutive", "fragmentation_min_largest_share"]
     return {k: DEFAULTS[k] for k in keys}

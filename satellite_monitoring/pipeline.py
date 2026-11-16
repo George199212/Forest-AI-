@@ -814,6 +814,8 @@ class Detector:
             if cav_last:
                 note = f"Latest after-image {latest['time'][:10]} (not used for the class): {cav_last}"
                 caveat = f"{cav_on} | {note}" if cav_on else note
+        cls, conf, caveat = det.apply_fragmentation(cls, conf, caveat, stats["largest_cluster_ha"],
+                                                    stats["changed_area_ha"], self.cfg)
         pa = self.a["grid"]["pixel_area_ha"]
         values = dict(
             sensor_basis=basis, confidence=conf, evidence_quality=eq, classification=cls, seasonal_caveat=caveat,

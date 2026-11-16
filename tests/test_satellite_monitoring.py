@@ -1567,3 +1567,25 @@ def test_compartment_split_does_not_change_detection(env, monkeypatch):
     assert (ev["changed_area_ha"], ev["n_changed_pixels"], ev["classification"], ev["confidence"]) == with_split[0]
     assert json.loads(ev["compartment_split_json"]) == {"unavailable": "test: classes off"}
 
+
+
+# ── Fragmentation rule (owner decision 2026-11-16) ───────────────────────────
+def test_fragmentation_rule_reclassifies_scattered_change_with_low_confidence():
+    from satellite_monitoring import detection as det
+    cfg = dict(config.DEFAULTS)
+    assert cfg["fragmentation_min_largest_share"] == 0.30
+    # largest cluster 2 of 10 ha (20 %) -> fragmented
+    cls, conf, cav = det.apply_fragmentation("POTENTIAL_FOREST_LOSS", "HIGH", None, 2.0, 10.0, cfg)
+    assert (cls, conf) == ("POSSIBLE_SEASONAL_OR_ENVIRONMENTAL", "LOW") and "20%" in cav and "below 30%" in cav
+    # outside-boundary class is also scattered change -> same rule; an existing caveat is kept
+    cls, conf, cav = det.apply_fragmentation("POTENTIAL_CHANGE_OUTSIDE_BOUNDARY", "MEDIUM", "Oct", 1.0, 5.0, cfg)
+    assert (cls, conf) == ("POSSIBLE_SEASONAL_OR_ENVIRONMENTAL", "LOW") and cav.startswith("Oct | Fragmented")
+    # exactly 30 % is not fragmented; a compact clear-cut keeps its class and confidence
+    assert det.apply_fragmentation("POTENTIAL_FOREST_LOSS", "HIGH", None, 3.0, 10.0, cfg) == \
+        ("POTENTIAL_FOREST_LOSS", "HIGH", None)
+    # data quality first: INSUFFICIENT_EVIDENCE is not changed
+    assert det.apply_fragmentation("INSUFFICIENT_EVIDENCE", "MEDIUM", None, 0.1, 10.0, cfg)[:2] == \
+        ("INSUFFICIENT_EVIDENCE", "MEDIUM")
+    # missing area never becomes a class
+    assert det.fragmentation(None, 10.0, cfg) == (False, None) and det.fragmentation(1.0, 0.0, cfg) == (False, None)
+    assert "fragmentation_min_largest_share" in config.thresholds_snapshot()

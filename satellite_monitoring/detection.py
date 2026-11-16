@@ -33,7 +33,9 @@ Neither field states a cause.
 Classification (first rule that matches):
   1. INSUFFICIENT_EVIDENCE              evidence_quality == POOR
   2. POSSIBLE_SEASONAL_OR_ENVIRONMENTAL after-image month in Oct–Apr, or snow
-                                        (S2 SCL=11) > snow_max_pct of INSIDE
+                                        (S2 SCL=11) > snow_max_pct of INSIDE,
+                                        or FRAGMENTED: largest cluster < fragmentation_min_largest_share of the
+                                        current area (then confidence is LOW; decided 2026-11-16)
   3. POTENTIAL_CHANGE_OUTSIDE_BOUNDARY  changed area in BUFFER >= outside_min_ha
   4. POTENTIAL_FOREST_LOSS              otherwise
 """
@@ -180,6 +182,28 @@ def classify(evidence_q, after_month, snow_pct_inside, changed_ha_buffer, cfg=No
     if changed_ha_buffer is not None and changed_ha_buffer >= cfg["outside_min_ha"]:
         return "POTENTIAL_CHANGE_OUTSIDE_BOUNDARY", None
     return "POTENTIAL_FOREST_LOSS", None
+
+
+def fragmentation(largest_cluster_ha, changed_area_ha, cfg=None):
+    """Share of the current area held by the largest connected cluster. Returns (is_fragmented, share or None).
+    None (no current area) is never 'fragmented': missing data does not become a class."""
+    cfg = cfg or config.DEFAULTS
+    if not changed_area_ha or largest_cluster_ha is None:
+        return False, None
+    share = float(largest_cluster_ha) / float(changed_area_ha)
+    return share < cfg["fragmentation_min_largest_share"], round(share, 4)
+
+
+def apply_fragmentation(cls, conf, caveat, largest_cluster_ha, changed_area_ha, cfg=None):
+    """(classification, confidence, caveat) after the fragmentation rule. INSUFFICIENT_EVIDENCE keeps priority
+    (data quality first); the class becomes POSSIBLE_SEASONAL_OR_ENVIRONMENTAL and the confidence LOW."""
+    cfg = cfg or config.DEFAULTS
+    frag, share = fragmentation(largest_cluster_ha, changed_area_ha, cfg)
+    if not frag or cls == "INSUFFICIENT_EVIDENCE":
+        return cls, conf, caveat
+    note = (f"Fragmented change: the largest cluster ({largest_cluster_ha:.2f} ha) is {share * 100:.0f}% of the "
+            f"current area ({changed_area_ha:.2f} ha), below {cfg['fragmentation_min_largest_share'] * 100:.0f}%.")
+    return "POSSIBLE_SEASONAL_OR_ENVIRONMENTAL", "LOW", f"{caveat} | {note}" if caveat else note
 
 
 def uniform_drop(changed, comparable, d, cfg=None):
