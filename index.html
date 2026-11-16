@@ -330,6 +330,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
       <div class="nav-item active" onclick="nav('overview')"><span class="nav-icon">◈</span> Overview</div>
       <div class="nav-item" onclick="nav('objects')"><span class="nav-icon">🗂</span> Objects</div>
       <div class="nav-item" onclick="objectFilter=undefined;nav('sectors')"><span class="nav-icon">⬡</span> Sectors</div>
+      <div class="nav-item" onclick="nav('sat-monitoring')"><span class="nav-icon">🛰</span> Satellite Monitoring</div>
       <div class="nav-group">Operations</div>
       <div class="nav-item" onclick="nav('risks')"><span class="nav-icon">△</span> Risks</div>
       <div class="nav-item" onclick="nav('gps')"><span class="nav-icon">⊕</span> GPS Sessions</div>
@@ -706,6 +707,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
       </div><!-- /sec-integrations -->
 
       <!-- LVM GEO geodata browser -->
+      <div class="section" id="sec-sat-monitoring"><div id="satm-root"></div></div>
       <div class="section" id="sec-forest-map"></div>
       <div class="section" id="sec-lvm-geodata">
         <header class="vmd-page-head"><div><div class="vmd-eyebrow">LVM GEO · VMD</div><h2>Reģistrēt meža nogabalus</h2><p>Atrodiet īstos nogabalus un pievienojiet tos Forest AI uzraudzībai.</p></div><span id="geodata-build" class="vmd-version"></span></header>
@@ -811,6 +813,8 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 <script src="/assets/forest-map.js?v=20261107"></script>
 <script src="/assets/lvm-geodata.js?v=20261106"></script>
 <script src="/assets/lvm-wms-map.js?v=1"></script>
+<link rel="stylesheet" href="/assets/sat-monitoring.css">
+<script src="/assets/sat-monitoring.js"></script>
 <script>
 const API = '';
 let cache = {};
@@ -888,12 +892,12 @@ function tbl(headers, keys, rows) {
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
-const titles = {'forest-map':'Forest Map','lvm-geodata':'Slāņi',overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor',integrations:'Integrations','integration-detail':'Integration'};
+const titles = {'forest-map':'Forest Map','lvm-geodata':'Slāņi',overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor',integrations:'Integrations','integration-detail':'Integration','sat-monitoring':'Satellite Monitoring'};
 
 const geodataNavigationText=new Map();
 function localizeGeodataNavigation(active){
   if(window.ForestI18n?.lang==='lv')return;
-  const labels={'Overview':'Pārskats','Objects':'Objekti','Sectors':'Sektori','Map':'Karte','Risks':'Riski','GPS Sessions':'GPS sesijas','Truck Reports':'Kokvedēju atskaites','Timber':'Kokmateriāli','Photos':'Foto','AI Inspector':'AI inspektors','Satellite':'Satelīts','Integrations':'Integrācijas','Monitor':'Monitorings','Operations':'Operācijas','Admin':'Administrēšana'};
+  const labels={'Overview':'Pārskats','Objects':'Objekti','Sectors':'Sektori','Map':'Karte','Risks':'Riski','GPS Sessions':'GPS sesijas','Truck Reports':'Kokvedēju atskaites','Timber':'Kokmateriāli','Photos':'Foto','AI Inspector':'AI inspektors','Satellite':'Satelīts','Satellite Monitoring':'Satelītu monitorings','Integrations':'Integrācijas','Monitor':'Monitorings','Operations':'Operācijas','Admin':'Administrēšana'};
   document.querySelectorAll('.sidebar .nav-item,.sidebar .nav-group').forEach(element=>{
     element.childNodes.forEach(node=>{
       if(node.nodeType!==3)return;
@@ -913,7 +917,7 @@ function nav(id, push=true) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el = document.getElementById('sec-'+id);
   if (el) el.classList.add('active');
-  const navMap = {overview:0,objects:1,sectors:2,risks:3,gps:4,trucks:5,timber:6,photos:7,inspector:8,satellite:9,'lvm-geodata':10,integrations:11,'forest-map':12};
+  const navMap = {overview:0,objects:1,sectors:2,'sat-monitoring':3,risks:4,gps:5,trucks:6,timber:7,photos:8,inspector:9,satellite:10,'lvm-geodata':11,integrations:12,'forest-map':13};
   const items = document.querySelectorAll('.nav-item');
   if (navMap[id]!==undefined) items[navMap[id]].classList.add('active');
   document.getElementById('page-title').textContent = titles[id]||id;
@@ -932,6 +936,7 @@ const loaders = {
   'risk-detail': () => currentRiskId && openRisk(currentRiskId, false),
   integrations: loadIntegrations,
   'lvm-geodata': loadLvmLayers,
+  'sat-monitoring': () => window.SatMonitoring ? window.SatMonitoring.load() : Promise.resolve(),
   'forest-map': () => window.ForestMap.load(),
   'integration-detail': () => currentIntegrationId && openIntegration(currentIntegrationId, false),
 };

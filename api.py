@@ -578,7 +578,7 @@ def inspector_report_issue(body: ReportIssueIn):
 _BACKEND_REVISION = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
 
 def frontend_deployment():
-    files = [Path('index.html'), Path('assets/lvm-geodata.js'), Path('assets/vmd-production.js'), Path('assets/vmd-workflow.css'), Path('assets/forest-map.js'), Path('assets/forest-map.css')]
+    files = [Path('index.html'), Path('assets/lvm-geodata.js'), Path('assets/vmd-production.js'), Path('assets/vmd-workflow.css'), Path('assets/forest-map.js'), Path('assets/forest-map.css'), Path('assets/sat-monitoring.js'), Path('assets/sat-monitoring.css')]
     hashes = {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files if path.is_file()}
     digest = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:12]
     return {'version': 'geo-' + digest, 'backend_revision': _BACKEND_REVISION,
