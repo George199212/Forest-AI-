@@ -35,9 +35,15 @@
     srcSECTOR: 'Sector', srcLVM: 'LVM GEO', srcEVAL: 'Evaluation area',
     emptyAreas: 'No monitored areas yet.',
     emptyHint: 'Add a sector here, or use “Add to satellite monitoring” in LVM GEO.',
-    noCreds: 'Copernicus credentials are not configured (SENTINEL_CLIENT_ID / SENTINEL_CLIENT_SECRET). Fetching is disabled.',
+    pNotConfigured: 'The worker reported that Copernicus credentials are missing (SENTINEL_CLIENT_ID / SENTINEL_CLIENT_SECRET). Fetching is disabled.',
+    pAuth: 'Copernicus sign-in failed in the worker', pDegraded: 'The worker reported a Copernicus access problem',
+    pUnknown: 'Status unknown: the worker has not reported Copernicus access yet.',
+    pLastOk: 'last successful Copernicus call',
     unavailable: 'Satellite monitoring data is unavailable (satellite.db).',
     notMigrated: 'The worker has not prepared the database yet; changes cannot be queued.',
+    qNotMigrated: 'Changes cannot be queued: satellite.db does not have the queue schema yet. The API never changes the database schema; the worker creates it on its first run. Missing:',
+    qReadOnly: 'Changes cannot be queued: this API process has read-only access to satellite.db (deployment setting).',
+    openForestMap: 'Open in Forest Map',
     sectorsTitle: 'Sectors with a polygon', noPolygon: 'No polygon', monitored: 'Monitored', queued: 'Queued',
     add: 'Add', pendingTitle: 'Queued areas', waitingWorker: 'waiting for the worker',
     cFetch: 'Fetch new Sentinel-1/2 observations for all monitored areas now?',
@@ -174,7 +180,8 @@
   function banner(kind, html) { return '<div class="satm-banner satm-' + kind + '">' + html + '</div>'; }
   function errorBanner(e) {
     if (e && e.status === 503 && /satellite\.db not/.test(e.message || '')) return banner('err', t('unavailable'));
-    if (e && e.status === 503 && /not migrated/.test(e.message || '')) return banner('warn', t('notMigrated'));
+    if (e && e.status === 503 && /not migrated/.test(e.message || ''))
+      return banner('warn', t('qNotMigrated') + ' ' + data(((e.body || {}).missing || []).join(', ')));
     return banner('err', t('error') + ': ' + data(e && e.message ? e.message : e));
   }
   function flash() {
@@ -199,11 +206,11 @@
     var el = root(); el.innerHTML = '<div class="empty">' + t('loading') + '</div>';
     var ov, h;
     try { var r = await Promise.all([get('/overview'), get('/health')]); ov = r[0]; h = r[1]; }
-    catch (e) { el.innerHTML = head(false) + errorBanner(e); return; }
+    catch (e) { if (S.view === 'overview') el.innerHTML = head(false) + errorBanner(e); return; }
+    if (S.view !== 'overview') return;                 // another view was opened meanwhile (deep link)
     S.health = h;
     var k = ov.kpis, html = head(true) + flash();
-    if (!h.credentials_configured) html += banner('warn', t('noCreds'));
-    if (!h.schema_stage2) html += banner('warn', t('notMigrated'));
+    html += providerBanner(h.provider) + queueBanner(h.queue);
     html += '<div class="kpis satm-kpis">' +
       kpi('kMonitored', k.monitored_areas, '') +
       kpi('kRecent', k.with_recent_observations, '<span>' + esc(TD.lastDays(k.recent_days)) + '</span>') +
@@ -260,8 +267,29 @@
     else map.setView([56.9, 24.6], 7);
   }
 
+  // Copernicus access as the WORKER recorded it (sat_provider_status / sat_runs), never the API process env.
+  function providerBanner(p) {
+    if (!p || p.state === 'OK') return '';
+    if (p.state === 'UNKNOWN') return banner('info', t('pUnknown'));
+    if (p.state === 'NOT_CONFIGURED') return banner('warn', t('pNotConfigured') + ' ' + data(dt(p.at_utc) + ' UTC'));
+    return banner('warn', t(p.auth_failure ? 'pAuth' : 'pDegraded') + ': ' + data(dt(p.at_utc) + ' UTC · ' +
+      (p.source || '') + (p.error ? ' · ' + p.error : '')) +
+      (p.last_ok_utc ? ' · ' + t('pLastOk') + ': ' + data(dt(p.last_ok_utc) + ' UTC') : ''));
+  }
+  function queueBanner(q) {
+    if (!q || q.state === 'READY') return '';
+    if (q.state === 'READ_ONLY') return banner('warn', t('qReadOnly'));
+    return banner('warn', t('qNotMigrated') + ' ' + data((q.missing || []).join(', ')));
+  }
+  function canQueue(h) {
+    return !!h && (!h.queue || h.queue.state === 'READY') && !(h.provider && h.provider.state === 'NOT_CONFIGURED');
+  }
+  function fmLink(q) {
+    return '<a class="btn satm-fm-link" href="#forest-map?' + q + '">' + t('openForestMap') + '</a>';
+  }
+
   function head(withButtons) {
-    var h = S.health, disabled = h && !h.credentials_configured ? ' disabled' : '';
+    var h = S.health, disabled = h && !canQueue(h) ? ' disabled' : '';
     return '<div class="satm-head"><div class="card-head" style="margin:0">' + t('title') + '</div>' +
       (withButtons ? '<div class="satm-actions"><button class="btn" id="satm-fetch"' + disabled + '>' + t('fetchNow') +
        '</button><button class="btn" id="satm-add-sector">' + t('addSector') + '</button></div>' : '') + '</div>';
@@ -338,11 +366,13 @@
     var el = root(); el.innerHTML = '<div class="empty">' + t('loading') + '</div>';
     var d;
     try { d = await get('/areas/' + id); } catch (e) { el.innerHTML = backLink() + errorBanner(e); bindBack(); return; }
+    if (S.view !== 'area' || S.areaId !== id) return;
     S.area = d;
     var a = d.area, st = DATA_STATUS[a.data_status] || ['stOK', 'b-gray'];
     var html = backLink() + flash() + '<div class="satm-title"><h2>' + data(a.name) + '</h2>' + badge(st[0], st[1]) + ' ' +
       '<span class="badge b-gray">' + esc(T[SOURCE[a.source]] || a.source) + '</span> ' +
-      data(a.source + ' ' + a.source_ref + ' · ' + num(a.area_ha, 2) + ' ha · buffer ' + num(a.buffer_m, 0) + ' m') + '</div>';
+      data(a.source + ' ' + a.source_ref + ' · ' + num(a.area_ha, 2) + ' ha · buffer ' + num(a.buffer_m, 0) + ' m') +
+      ' ' + fmLink('sat_area=' + a.id) + '</div>';
     if (a.data_status === 'NO_DATA_YET') html += banner('info', t('bNoData'));
     if (a.data_status === 'BACKFILL_OR_FETCH_IN_PROGRESS') html += banner('warn', t('bBackfill'));
     if (a.data_status === 'STOPPED') html += banner('info', t('bStopped'));
@@ -520,13 +550,15 @@
     var el = root(); el.innerHTML = '<div class="empty">' + t('loading') + '</div>';
     var e;
     try { e = await get('/events/' + id); } catch (err) { el.innerHTML = backLink() + errorBanner(err); bindBack(); return; }
+    if (S.view !== 'event' || S.eventId !== id) return;
     S.event = e;
     var st = STATUS[e.status] || ['sSUSPECTED', 'b-gray'], imgs = pickImages(e), ar = e.area;
     var html = backLink(ar.name) + flash() + '<div class="satm-title"><h2><span>' + esc(TD.eventTitle(e.id)) + '</span></h2>' +
       badge(st[0], st[1]) +
       ' <span class="satm-badge-lab">' + t('classification') + '</span> <span class="badge b-gray">' + esc(T[CLS[e.classification] || 'clsINS']) + '</span>' +
       ' <span class="satm-badge-lab">' + t('confidence') + '</span> ' + confBadge(e.confidence) +
-      ' <span class="satm-badge-lab">' + t('evidence') + '</span> ' + eqBadge(e.evidence_quality) + '</div>';
+      ' <span class="satm-badge-lab">' + t('evidence') + '</span> ' + eqBadge(e.evidence_quality) +
+      (e.current ? ' ' + fmLink('sat_event=' + e.id) : '') + '</div>';
     if (!e.current) html += banner('warn', t('superseded'));
     html += '<div class="card satm-card satm-lines">' +
       '<div class="satm-line-big"><span>' + esc(TD.changeDetected(ha(e.changed_area_ha))) + '</span></div>' +

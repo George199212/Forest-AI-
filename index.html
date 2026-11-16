@@ -811,6 +811,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 <script src="/assets/vmd-production.js?v=20261106"></script>
 <link rel="stylesheet" href="/assets/forest-map.css?v=20261107">
 <script src="/assets/forest-map.js?v=20261107"></script>
+<script src="/assets/forest-map-sat.js?v=20261116"></script>
 <script src="/assets/lvm-geodata.js?v=20261106"></script>
 <script src="/assets/lvm-wms-map.js?v=1"></script>
 <link rel="stylesheet" href="/assets/sat-monitoring.css">
@@ -4485,7 +4486,8 @@ async function openIntegration(id, push=true) {
 }
 
 // ── AUTO REFRESH every 30s ────────────────────────────────────────────────────
-setInterval(()=>{ if(currentSection&&currentSection!=='detail'&&currentSection!=='lvm-geodata'&&currentSection!=='forest-map'){ clearCache(); load(currentSection); } }, 30000);
+// Satellite Monitoring is excluded: a refresh re-rendered the overview and threw an open area/event page away.
+setInterval(()=>{ if(currentSection&&currentSection!=='detail'&&currentSection!=='lvm-geodata'&&currentSection!=='forest-map'&&currentSection!=='sat-monitoring'){ clearCache(); load(currentSection); } }, 30000);
 
 // Resolve a history route from location.hash (inverse of the hashes written by
 // nav/openSector/openObject/openRisk). Unknown or malformed hashes resolve to Overview.
@@ -4499,6 +4501,12 @@ function routeFromHash() {
   if ((m = h.match(/^object-(\d+)$/))) return {type:'object', id: parseInt(m[1], 10)};
   if ((m = h.match(/^risk\/(\d+)$/))) return {type:'risk', id: parseInt(m[1], 10)};
   if ((m = h.match(/^forest-map\/session-(\d+)$/))) return {type:'nav', id:'forest-map', session: parseInt(m[1], 10)};
+  // Satellite deep links: #forest-map?sat_event=<id> | ?sat_area=<id>, #sat-monitoring?event=<id> | ?area=<id>
+  if ((m = h.match(/^(forest-map|sat-monitoring)\?(.*)$/))) {
+    const q = new URLSearchParams(m[2]), num = k => { const v = parseInt(q.get(k), 10); return v > 0 ? v : null; };
+    return m[1] === 'forest-map' ? {type:'nav', id:'forest-map', satEvent: num('sat_event'), satArea: num('sat_area')}
+                                 : {type:'nav', id:'sat-monitoring', event: num('event'), area: num('area')};
+  }
   if (h === 'financial-breakdown') return {type:'financial-breakdown'};
   if (h === 'integration-detail') return {type:'nav', id:'integrations'};
   if (h !== 'risk-detail' && Object.prototype.hasOwnProperty.call(loaders, h)) return {type:'nav', id: h};
@@ -4528,6 +4536,10 @@ function openRoute(route) {
   } else {
     nav(route.id, false);
     if (route.session) window.ForestMap?.openSession(route.session).catch(() => {});
+    if (route.satEvent) window.ForestMapSat?.openEvent(route.satEvent);
+    else if (route.satArea) window.ForestMapSat?.openArea(route.satArea);
+    if (route.event) window.SatMonitoring?.openEvent(route.event);
+    else if (route.area) window.SatMonitoring?.openArea(route.area);
   }
 }
 
