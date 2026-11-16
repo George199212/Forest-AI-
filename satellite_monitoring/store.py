@@ -441,6 +441,61 @@ def quicklook_file(acq_id, kind):
     return p
 
 
+# ── worker installation / timers (read-only, systemd) ───────────────────────
+WORKER_UNITS = {"jobs": "forest-satellite-jobs", "sync": "forest-satellite-sync"}
+_TIMER_PROPS = ("LoadState", "ActiveState", "UnitFileState", "NextElapseUSecRealtime", "LastTriggerUSec")
+_SERVICE_PROPS = ("LoadState", "ActiveState", "Result", "ExecMainStatus", "ExecMainExitTimestamp")
+
+
+def _systemctl_show(unit, props):
+    """{prop: value} from `systemctl show` (read-only), or None if systemd cannot be asked."""
+    import subprocess
+    try:
+        r = subprocess.run(["systemctl", "show", unit, "--timestamp=utc"] + [a for p in props for a in ("-p", p)],
+                           capture_output=True, text=True, timeout=3)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    return dict(line.split("=", 1) for line in r.stdout.splitlines() if "=" in line)
+
+
+def _utc_iso(v):
+    """'Mon 2026-11-16 17:08:16 UTC' -> '2026-11-16T17:08:16Z'; empty/unknown -> None."""
+    import re
+    m = re.search(r"(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) UTC", v or "")
+    return f"{m.group(1)}T{m.group(2)}Z" if m else None
+
+
+def worker_state(lock=None):
+    """The satellite worker as systemd sees it (UI review item 6): NOT_INSTALLED (no worker units), RUNNING (a run
+    holds the lock or a worker service is active), IDLE (installed and both timers active), TIMERS_OFF (installed, a
+    timer is not active), UNKNOWN (systemd could not be asked). 'Idle' is never shown for a worker that is not there."""
+    lock = lock if lock is not None else lock_state()
+    units = {}
+    for key, name in WORKER_UNITS.items():
+        t, s = _systemctl_show(name + ".timer", _TIMER_PROPS), _systemctl_show(name + ".service", _SERVICE_PROPS)
+        if t is None or s is None:
+            return {"state": "UNKNOWN", "units": {}, "reason": "systemctl not available"}
+        units[key] = {
+            "installed": s.get("LoadState") == "loaded",
+            "timer_active": t.get("ActiveState") == "active", "timer_enabled": t.get("UnitFileState") == "enabled",
+            "next_run_utc": _utc_iso(t.get("NextElapseUSecRealtime")),
+            "last_trigger_utc": _utc_iso(t.get("LastTriggerUSec")),
+            "service_active": s.get("ActiveState") in ("active", "activating", "reloading"),
+            "last_exit_utc": _utc_iso(s.get("ExecMainExitTimestamp")),
+            "last_result": s.get("Result") or None, "last_exit_status": s.get("ExecMainStatus") or None}
+    if not any(u["installed"] for u in units.values()):
+        state = "NOT_INSTALLED"
+    elif lock.get("locked") or any(u["service_active"] for u in units.values()):
+        state = "RUNNING"
+    elif all(u["installed"] and u["timer_active"] for u in units.values()):
+        state = "IDLE"
+    else:
+        state = "TIMERS_OFF"
+    return {"state": state, "units": units}
+
+
 def health(now=None):
     now = now or sdb.utcnow()
     conn = ro()
@@ -470,6 +525,7 @@ def health(now=None):
                       "request_guard": int(cfg["monthly_request_budget"] * g)},
             "provider_status": provider,
             "lock": lock_state(),
+            "worker": worker_state(),
             "jobs": jobs, "failed_jobs": jobs.get("FAILED", 0), "recent_failed_jobs": failed,
             "schema_stage2": not queue_schema_missing(conn),
             "queue": queue_state(conn),

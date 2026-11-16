@@ -26,7 +26,9 @@
     kMonitored: 'Monitored areas', kRecent: 'With recent observations', kAwaiting: 'Awaiting data',
     kOpen: 'Open suspected events', kLastSync: 'Last successful sync', kFailed: 'Failed jobs', never: 'never',
     hUsage: 'Copernicus usage this month', hPU: 'Processing units (PU)', hReq: 'Requests', hGuard: 'guard',
-    hBudget: 'budget', hLock: 'Worker', hRunning: 'Running', hIdle: 'Idle', hAuto: 'Automatic risks',
+    hBudget: 'budget', hLock: 'Worker', hRunning: 'Running', hIdle: 'Idle', hAuto: 'Automatic risks', wNotInstalled: 'Not installed',
+    wTimersOff: 'Timers off', wUnknown: 'Status unknown', wNextDaily: 'next daily run', wQueueLast: 'job queue last checked',
+    wFailed: 'last run failed',
     hAutoOff: 'Off — risks are created only by a person (Create risk)',
     thArea: 'Monitored area', thSource: 'Source', thHa: 'Area (ha)', thStatus: 'Status', thLastS1: 'Last S1',
     thLastS2: 'Last valid S2', thOpen: 'Open suspected', thRecovered: 'Recovered', thGap: 'Days since valid S2',
@@ -143,6 +145,12 @@
     hRunning: "Darbojas",
     hIdle: "Dīkstāvē",
     hAuto: "Automātiskie riski",
+    wNotInstalled: "Nav uzstādīts",
+    wTimersOff: "Taimeri izslēgti",
+    wUnknown: "Statuss nav zināms",
+    wNextDaily: "nākamā ikdienas palaišana",
+    wQueueLast: "uzdevumu rinda pēdējo reizi pārbaudīta",
+    wFailed: "pēdējā palaišana neizdevās",
     hAutoOff: "Izslēgti — riskus izveido tikai cilvēks (Izveidot risku)",
     thArea: "Uzraudzītā teritorija",
     thSource: "Avots",
@@ -577,8 +585,24 @@
       data(m.pu_budget) + ' (' + t('hBudget') + ')</span>' + meter(m.pu, m.pu_guard) +
       '<span>' + t('hReq') + ': ' + data(m.requests + ' / ' + m.request_guard) + ' (' + t('hGuard') + '), ' +
       data(m.request_budget) + ' (' + t('hBudget') + ')</span>' + meter(m.requests, m.request_guard) +
-      '<span>' + t('hLock') + ': ' + (h.lock.locked ? badge('hRunning', 'b-amber') : badge('hIdle', 'b-gray')) + '</span>' +
+      '<span>' + t('hLock') + ': ' + workerBadge(h.worker, h.lock) + workerDetail(h.worker) + '</span>' +
       '<span>' + t('hAuto') + ': ' + t('hAutoOff') + '</span></div>';
+  }
+  // Real worker state from systemd (store.worker_state); 'Idle' only for an installed worker with active timers.
+  var WORKER = {NOT_INSTALLED: ['wNotInstalled', 'b-gray'], RUNNING: ['hRunning', 'b-amber'], IDLE: ['hIdle', 'b-gray'],
+                TIMERS_OFF: ['wTimersOff', 'b-amber'], UNKNOWN: ['wUnknown', 'b-gray']};
+  function workerBadge(w, lock) {
+    var s = WORKER[w && w.state] || (lock && lock.locked ? WORKER.RUNNING : WORKER.UNKNOWN);
+    return badge(s[0], s[1]);
+  }
+  function workerDetail(w) {
+    var u = (w && w.units) || {}, out = [];
+    if (u.sync && u.sync.timer_active && u.sync.next_run_utc) out.push(t('wNextDaily') + ': ' + data(dt(u.sync.next_run_utc) + ' UTC'));
+    if (u.jobs && u.jobs.last_exit_utc) out.push(t('wQueueLast') + ': ' + data(dt(u.jobs.last_exit_utc) + ' UTC'));
+    ['jobs', 'sync'].forEach(function (k) {
+      if (u[k] && u[k].last_result && u[k].last_result !== 'success') out.push(t('wFailed') + ': ' + data(k + ' · ' + u[k].last_result));
+    });
+    return out.length ? ' <span class="satm-muted">· ' + out.join(' · ') + '</span>' : '';
   }
   function meter(v, max) {
     var p = isNum(v) && max ? Math.min(100, 100 * v / max) : 0;

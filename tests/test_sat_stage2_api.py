@@ -702,3 +702,43 @@ def test_single_part_multipolygon_is_unwrapped_and_multi_part_refused(client, sa
     r = client.post("/api/sat-monitoring/areas", json={"source": "LVM_GEO", "source_ref": "M2", "name": "m",
                                                        "geometry": two}, headers=AUTH)
     assert r.status_code == 422 and "multi-part" in r.json()["error"]
+
+
+# ── worker installation state (UI review item 6) ─────────────────────────────
+def _fake_systemctl(units):
+    """units: {unit_name: {prop: value}}; missing units -> LoadState=not-found (as systemctl show reports)."""
+    def show(unit, props):
+        d = units.get(unit, {"LoadState": "not-found", "ActiveState": "inactive"})
+        return {p: d.get(p, "") for p in props}
+    return show
+
+
+def _installed(jobs_timer="active", sync_timer="active", jobs_service="inactive"):
+    return {
+        "forest-satellite-jobs.timer": {"LoadState": "loaded", "ActiveState": jobs_timer, "UnitFileState": "enabled",
+                                        "LastTriggerUSec": "Mon 2026-11-16 17:08:16 UTC"},
+        "forest-satellite-sync.timer": {"LoadState": "loaded", "ActiveState": sync_timer, "UnitFileState": "enabled",
+                                        "NextElapseUSecRealtime": "Tue 2026-11-17 05:38:40 UTC"},
+        "forest-satellite-jobs.service": {"LoadState": "loaded", "ActiveState": jobs_service, "Result": "success",
+                                          "ExecMainStatus": "0", "ExecMainExitTimestamp": "Mon 2026-11-16 17:08:16 UTC"},
+        "forest-satellite-sync.service": {"LoadState": "loaded", "ActiveState": "inactive", "Result": "success"}}
+
+
+def test_worker_state_not_installed_idle_running_timers_off_unknown(client, monkeypatch):
+    monkeypatch.setattr(store, "_systemctl_show", _fake_systemctl({}))
+    h = client.get("/api/sat-monitoring/health", headers=AUTH).json()
+    assert h["worker"]["state"] == "NOT_INSTALLED" and h["lock"] == {"locked": False}   # never 'Idle' here
+    monkeypatch.setattr(store, "_systemctl_show", _fake_systemctl(_installed()))
+    w = client.get("/api/sat-monitoring/health", headers=AUTH).json()["worker"]
+    assert w["state"] == "IDLE"
+    assert w["units"]["sync"]["next_run_utc"] == "2026-11-17T05:38:40Z"
+    assert w["units"]["jobs"]["last_exit_utc"] == "2026-11-16T17:08:16Z" and w["units"]["jobs"]["last_result"] == "success"
+    monkeypatch.setattr(store, "_systemctl_show", _fake_systemctl(_installed(jobs_service="active")))
+    assert store.worker_state()["state"] == "RUNNING"
+    monkeypatch.setattr(store, "_systemctl_show", _fake_systemctl(_installed()))
+    assert store.worker_state(lock={"locked": True})["state"] == "RUNNING"
+    monkeypatch.setattr(store, "_systemctl_show", _fake_systemctl(_installed(sync_timer="inactive")))
+    assert store.worker_state()["state"] == "TIMERS_OFF"
+    monkeypatch.setattr(store, "_systemctl_show", lambda unit, props: None)
+    assert store.worker_state()["state"] == "UNKNOWN"
+    assert store._utc_iso("") is None and store._utc_iso("n/a") is None

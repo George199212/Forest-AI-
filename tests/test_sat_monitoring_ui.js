@@ -127,3 +127,11 @@ test('event images show a loading state, removed on load, and a visible message 
  assert.match(src,/overlay\.on\('error'[^\n]*t\('imgFailed'\)/);
  const sat=loadSat();assert.equal(sat._T_LV.imgLoading,'Ielādē attēlu…');assert.equal(sat._T_LV.imgFailed,'Attēlu neizdevās ielādēt.');
 });
+
+test('worker badge: Not installed / Running / Idle / Timers off / Status unknown (LV), never Idle without a worker',()=>{
+ const src=read('assets/sat-monitoring.js'),sat=loadSat();
+ assert.match(src,/NOT_INSTALLED: \['wNotInstalled', 'b-gray'\], RUNNING: \['hRunning', 'b-amber'\], IDLE: \['hIdle', 'b-gray'\],/);
+ assert.match(src,/t\('hLock'\) \+ ': ' \+ workerBadge\(h\.worker, h\.lock\)/);
+ assert.equal(sat._T_LV.wNotInstalled,'Nav uzstādīts');assert.equal(sat._T_LV.hIdle,'Dīkstāvē');
+ assert.equal(sat._T_LV.wTimersOff,'Taimeri izslēgti');assert.equal(sat._T_LV.wUnknown,'Statuss nav zināms');
+});
