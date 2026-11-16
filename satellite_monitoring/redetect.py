@@ -7,8 +7,12 @@ python -m satellite_monitoring.redetect --area ID [--area ID ...] --reason TEXT 
 - Append-only: the current rows of sat_detections, sat_change_events, sat_s2_candidates and sat_radar_anomalies of
   the areas are kept and marked superseded_at_utc / superseded_by_generation (frozen by triggers); nothing is
   deleted. Acquisitions, metrics, request log and runs are untouched.
-- Refuses when a human acted on an event in scope (status other than SUSPECTED/RECOVERED (both automatic), a review log entry, a reviewer
-  or a risk link): such a decision must not be superseded silently.
+- Refuses when a human acted on an event in scope (status other than SUSPECTED/RECOVERED (both automatic), a reviewer,
+  or a review log entry other than CREATE_RISK): such a decision must not be superseded silently.
+- Risk links (decided 2026-11-16): an event whose only human trace is a CREATE_RISK link is superseded, and its
+  risk_id moves to the successor event whose union mask overlaps it by >= risk_carry_min_overlap of the smaller
+  mask (best overlap wins; a successor takes at most one risk). Links that find no successor stay on the
+  superseded row and are listed in the result, so one physical change never gets two risks unnoticed.
 - Takes the same run lock as TIMER/MANUAL/BACKFILL runs and records a sat_runs row (MANUAL) plus a
   sat_detection_generations row.
 """
@@ -46,10 +50,14 @@ def redetect(conn, area_ids, reason, code_version=None, cfg=None, decoder=None, 
             raise Refused(f"not all areas are active: {area_ids}")
         human = conn.execute(
             f"SELECT id FROM sat_change_events WHERE monitored_area_id IN ({q}) AND superseded_at_utc IS NULL AND "
-            "(status NOT IN ('SUSPECTED','RECOVERED') OR reviewed_by IS NOT NULL OR risk_id IS NOT NULL OR "
-            " id IN (SELECT event_id FROM sat_review_log))", area_ids).fetchall()
+            "(status NOT IN ('SUSPECTED','RECOVERED') OR reviewed_by IS NOT NULL OR "
+            " id IN (SELECT event_id FROM sat_review_log WHERE action <> 'CREATE_RISK'))", area_ids).fetchall()
         if human:
-            raise Refused(f"events with a human decision or risk link: {[r[0] for r in human]}")
+            raise Refused(f"events with a human decision: {[r[0] for r in human]}")
+        linked = [dict(r) for r in conn.execute(
+            f"SELECT id, monitored_area_id, risk_id, change_mask_path, union_mask_path FROM sat_change_events "
+            f"WHERE monitored_area_id IN ({q}) AND superseded_at_utc IS NULL AND risk_id IS NOT NULL ORDER BY id",
+            area_ids)]
         now = sdb.iso(sdb.utcnow())
         run_id = conn.execute("INSERT INTO sat_runs (trigger, started_at, status, areas, sensors) VALUES "
                               "('MANUAL', ?, 'RUNNING', ?, 'S1,S2')", (now, sdb.dumps(area_ids))).lastrowid
@@ -65,6 +73,7 @@ def redetect(conn, area_ids, reason, code_version=None, cfg=None, decoder=None, 
         r.run_id = run_id
         prepared = [pipeline._prepare_area(a, cfg, conn) for a in al]
         r.detect(prepared, ("S1", "S2"))
+        carry = carry_risks(conn, linked, cfg)
         status = "OK" if not r.errors else "FAILED"
         end = sdb.iso(sdb.utcnow())
         conn.execute("UPDATE sat_runs SET finished_at=?, status=?, new_acquisitions=0, requests_made=?, pu_spent=?, "
@@ -75,7 +84,52 @@ def redetect(conn, area_ids, reason, code_version=None, cfg=None, decoder=None, 
                      "WHERE id=?", (end, status, sdb.dumps(counts), gen))
         conn.commit()
         return {"generation": gen, "run_id": run_id, "status": status, "superseded": counts,
-                "requests": r.requests, "pu": r.pu, "errors": r.errors}
+                "requests": r.requests, "pu": r.pu, "errors": r.errors, "risk_links": carry}
+
+
+def _union_mask(ev):
+    import numpy as np
+    return np.load(ev.get("union_mask_path") or ev["change_mask_path"]).astype(bool)
+
+
+def mask_overlap(a, b):
+    """Share of the smaller mask covered by the other (robust to an event that grew or shrank)."""
+    n = min(int(a.sum()), int(b.sum()))
+    return 0.0 if n == 0 else float((a & b).sum()) / n
+
+
+def carry_risks(conn, linked, cfg):
+    """Move each superseded event's risk link to its best-overlapping successor (>= risk_carry_min_overlap)."""
+    out = {"carried": [], "not_carried": []}
+    if not linked:
+        return out
+    thr = cfg["risk_carry_min_overlap"]
+    cands = []
+    for old in linked:
+        om = _union_mask(old)
+        for new in conn.execute("SELECT id, change_mask_path, union_mask_path FROM sat_change_events WHERE "
+                                "monitored_area_id=? AND superseded_at_utc IS NULL AND risk_id IS NULL",
+                                (old["monitored_area_id"],)):
+            ov = mask_overlap(om, _union_mask(dict(new)))
+            if ov >= thr:
+                cands.append((ov, old["id"], new["id"]))
+    used_old, used_new = set(), set()
+    by_old = {o["id"]: o for o in linked}
+    for ov, oid, nid in sorted(cands, key=lambda c: (-c[0], c[1], c[2])):
+        if oid in used_old or nid in used_new:
+            continue
+        conn.execute("UPDATE sat_change_events SET risk_id=?, risk_carried_from_event_id=?, risk_carry_overlap=? "
+                     "WHERE id=? AND risk_id IS NULL", (by_old[oid]["risk_id"], oid, round(ov, 4), nid))
+        used_old.add(oid)
+        used_new.add(nid)
+        out["carried"].append({"risk_id": by_old[oid]["risk_id"], "from_event": oid, "to_event": nid,
+                               "overlap": round(ov, 4)})
+    for o in linked:
+        if o["id"] not in used_old:
+            out["not_carried"].append({"risk_id": o["risk_id"], "event": o["id"],
+                                       "reason": f"no successor with overlap >= {thr}"})
+    conn.commit()
+    return out
 
 
 def main(argv=None):
