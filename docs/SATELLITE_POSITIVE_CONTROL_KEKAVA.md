@@ -427,3 +427,28 @@ check sha256 = `9ce79c76…`. A newer generation is a non-destructive alternativ
 - RECOVERED counting was decided on 2026-11-16: RECOVERED events are not counted as open outside events and are
   shown on a separate line.
 - Stage 2 has not started.
+
+
+## 11. Evaluation code follows the RECOVERED decision (offline re-run, 2026-11-16)
+
+**Change:** `positive_control.py` no longer counts RECOVERED outside events as open outside events. They are listed
+with `counted_as_open: false` and reported on separate metric lines (`outside_events_recovered_not_counted`,
+`outside_area_ha_recovered_not_counted`). There is also a new `outside_area_ha` line (open events only).
+
+**How:**
+- Copy: an `sqlite3` backup of the live `satellite.db` (generation 1, read-only source; live sha256 `052b99df…`
+  unchanged) into the session scratchpad.
+- Run: `positive_control --area 2` with the same ground truth (sha256 `7faf4613…`) and the same reference DB
+  (nationwide release 20261106) as §7–§9.
+- Code: `6b1a395` plus this change. 0 requests, 0 PU, 2 min.
+- Output: `/root/forest_ai_satellite_data/eval/kekava_recovered_rule_20261116.json`.
+
+| | §9/§10 (counted by hand) | **§11 (evaluation code)** |
+|---|---|---|
+| detected / eligible | 3 / 3 | **3 / 3** (Wilson 0.44–1.00), median delay 6 d (−3 … 7) |
+| open outside events | 4 | **4** = 1.09 / 1,000 ha (105.11 ha) |
+| open outside events without a VMD-felling pre-tag | — | **1** (event 50) = 0.27 / 1,000 ha |
+| open outside events, Oct–Apr onsets excluded | — | 2 (events 50, 53; 7.82 ha) |
+| RECOVERED outside events (separate, not counted) | 1 (event 49) | **1** (event 49, 0.08 ha) |
+
+The code now gives the same numbers as the hand count in §9/§10. Events, stands and recall are unchanged.

@@ -16,7 +16,9 @@ NBR. Spring images (eval_spring_months, F4) instead use an absolute bare-soil te
 NDVI < eval_bare_ndvi_max AND NBR < eval_bare_nbr_max (see cut_test).
 T_cut = first usable image that is cut and still cut in the next usable image.
 Events with < 0.1 ha overlap with every stand interior are listed for visual review (quicklooks), with a
-pre-tag (not a verdict) when they overlap other VMD fellings of 2025-2026.
+pre-tag (not a verdict) when they overlap other VMD fellings of 2025-2026. Outside events with status RECOVERED
+(remnant rule) are listed but NOT counted as open outside events (owner decision 2026-11-16): the metrics show
+them on separate *_recovered_not_counted lines.
 This is INTERPRETATION for calibration; it writes only review PNGs and the report files, never the DB.
 """
 import argparse
@@ -242,17 +244,26 @@ def evaluate(conn, area, truth_fc, ref_db, out_dir, cfg=None):
     delays = [r["delay_days"] for r in detected if r["delay_days"] is not None]
     k1000 = area["area_ha"] / 1000.0
 
+    for o in outside:
+        # Owner decision 2026-11-16: RECOVERED events are not open outside events; they are reported separately.
+        o["counted_as_open"] = o["status"] != "RECOVERED"
+
     def metrics(excl_seasonal):
         dets = [r for r in eligible if any(not (excl_seasonal and int(x["first_after"][5:7]) in cfg["seasonal_months"])
                                            for x in r["events"])]
-        outs = [o for o in outside if not (excl_seasonal and o["seasonal_month"])]
+        window = [o for o in outside if not (excl_seasonal and o["seasonal_month"])]
+        outs = [o for o in window if o["counted_as_open"]]
+        rec = [o for o in window if not o["counted_as_open"]]
         dl = [r["delay_days"] for r in dets if r["delay_days"] is not None]
         return {"eligible": len(eligible), "detected": len(dets),
                 "recall": round(len(dets) / len(eligible), 3) if eligible else None,
                 "recall_wilson95": wilson(len(dets), len(eligible)),
-                "outside_events": len(outs),
+                "outside_events": len(outs),             # OPEN outside events (RECOVERED excluded)
+                "outside_area_ha": round(sum(o["changed_area_ha"] for o in outs), 2),
                 "outside_events_per_1000ha_UPPER_BOUND_unreviewed": round(len(outs) / k1000, 2),
                 "outside_events_without_pretag_per_1000ha": round(len([o for o in outs if not o["pretag"]]) / k1000, 2),
+                "outside_events_recovered_not_counted": len(rec),
+                "outside_area_ha_recovered_not_counted": round(sum(o["changed_area_ha"] for o in rec), 2),
                 "median_delay_days": statistics.median(dl) if dl else None,
                 "delay_range_days": [min(dl), max(dl)] if dl else None}
 
