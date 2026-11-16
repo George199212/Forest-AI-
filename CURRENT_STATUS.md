@@ -7,6 +7,19 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-16 16:45 UTC — Satellite Monitoring is LIVE on :8000 (Stage 4)
+
+- :8000 runs `/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z` (`7bd2bbb`, `geo-178d80bd1896`) since 15:52 UTC; drop-ins
+  `97-satellite-monitoring.conf` (SAT_* paths) + `98-satellite-monitoring-release.conf`. Rollback target `96-`
+  forest-map-contrast (commands in `docs/DEPLOY_RELEASES.md`).
+- Live satellite.db migrated (sat_jobs + 2 columns; counts unchanged; integrity ok). Backup
+  `/root/backups/satellite_before_stage4_20261116T154655Z.db.raw` (sha256 `052b99df…`).
+- Worker: `forest-satellite-jobs.timer` enabled (queue every 5 min, verified exit 0 with an empty queue);
+  `forest-satellite-sync.timer` enabled, first daily run 2026-11-17 05:38 UTC (not yet observed).
+- Copernicus token request with production credentials: OK (2026-11-16 ~15:44 UTC, 0 PU).
+- Open: 8 UI review items (KNOWN_BUGS, "UI review 2026-11-16"). The overview's "Worker: Idle" now reflects a real
+  installed worker. RM / Ingka / review / bot unchanged.
+
 ## Update 2026-11-16 — Satellite Monitoring status source + Forest Map satellite layer (branch `feature/satellite-monitoring`, NOT deployed)
 
 - Live :8000 is unchanged (drop-in `96-forest-map-contrast`); this work is on the branch and in the UI-review sandbox

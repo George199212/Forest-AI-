@@ -2,6 +2,14 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-16 — Satellite Monitoring Stage 4: DEPLOYED to :8000 at 15:52 UTC
+
+- Release `forest-api-satellite-monitoring-20261116T1545Z` (branch `feature/satellite-monitoring` @ `7bd2bbb`, `geo-178d80bd1896`) via drop-ins `97-` / `98-`.
+- Live satellite.db migrated (additive: `sat_jobs` + 2 nullable columns); backup `/root/backups/satellite_before_stage4_20261116T154655Z.db.raw`.
+- Worker units installed: `forest-satellite-jobs.timer` (job queue, every 5 min) and `forest-satellite-sync.timer`
+  (daily 07:30 Europe/Riga, first run 2026-11-17). No automatic risks.
+- Released with the 8 open UI review items listed in KNOWN_BUGS (owner decision: fix after release).
+
 ## 2026-11-16 — `feature/satellite-monitoring`: status from the worker + Forest Map layer "Satelīta izmaiņas" (not deployed)
 
 ### Satellite Monitoring status (`/api/sat-monitoring/health`, overview banners)

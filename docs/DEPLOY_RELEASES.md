@@ -11,7 +11,7 @@ change + restart) only after an explicit human OK in the chat.
 
 | port | unit | code location | git |
 |---|---|---|---|
-| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-lvm-geo-lv-ui-20261110T0858Z` (via drop-in `95-lvm-geo-lv-ui-release.conf`; `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `release/2026-11-10-lvm-geo-lv-ui` @ `beb09d0` (runtime), dashboard version `geo-1ae5a85bfd23`, backend `552c46ae547b`. **Live-only content kept**: the manual nav edit and the `fd3d2c6` `assets/lvm-geodata.js` (see the activation record below) |
+| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z` (via drop-in `98-satellite-monitoring-release.conf`; `97-satellite-monitoring.conf` sets `SAT_DATA_DIR` / `SAT_DB_PATH` / `SAT_RASTER_DIR`; `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `feature/satellite-monitoring` @ `7bd2bbb`, dashboard version `geo-178d80bd1896`, backend `42ca313c1c67` (since 2026-11-16 15:52 UTC) |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
 | 8003 | `forest-review-api` | `/root/forest_ai_review` (copy of `84cb00b`) | 84cb00b |
@@ -64,6 +64,8 @@ these are committed, a release built from git alone would revert them.
 | 2026-11-09 11:44 | `forest-api-forest-map-gps-20261109T1129Z` | 9c94d506a565 | `70-` drop-in |
 | 2026-11-09 14:31 | worktree `/root/wt/remove-map-sidebar/releases/forest-api-remove-map-sidebar-20261109` | 091ed8e852f9 | `80-` drop-in (from a worktree; not documented at the time) |
 | 2026-11-10 09:16 | `forest-api-lvm-geo-lv-ui-20261110T0858Z` | 1ae5a85bfd23 | `95-` drop-in (overrides `90-` WorkingDirectory; `90-` Environment kept) |
+| 2026-11-10 10:32 | `forest-api-forest-map-contrast-20261110T0949Z` | d0015b1f82a0 | `96-` drop-in (row added 2026-11-16) |
+| 2026-11-16 15:52 | `forest-api-satellite-monitoring-20261116T1545Z` | 178d80bd1896 | `97-` env + `98-` release drop-ins; satellite.db migrated; worker units + timers installed |
 | 2026-11-09 16:28 | `forest-api-forest-map-violations-20261109T1623Z` | 3b9cdfaac106 | `90-` drop-in; `80-` removed |
 
 - **Name:** `forest-api-<feature-slug>-<UTC timestamp YYYYMMDDTHHMM[SS]Z>`. The timestamp is
@@ -77,6 +79,32 @@ these are committed, a release built from git alone would revert them.
 - **`.env`** is not in the folder. The unit loads `EnvironmentFile=/root/forest_ai/.env`.
 - **The geodata manifest** comes from the drop-in `geodata.conf`
   (`FOREST_GEODATA_MANIFEST=/root/forest_ai/data/geodata/nationwide/active.json`).
+
+## Activation record: satellite-monitoring (2026-11-16 15:52 UTC, Stage 4, owner "approved release")
+
+- Release `/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z` = active `96-` folder (`forest-map-contrast`) + `git archive 7bd2bbb`
+  of `api.py index.html assets satellite_monitoring` (43 files, all byte-identical to git; changed vs 96-: `api.py`,
+  `index.html`, `assets/{forest-map.js,forest-map-sat.js,i18n-lv.js,sat-monitoring.js,sat-monitoring.css,vmd-production.js}`,
+  `satellite_monitoring/*`). Before the overlay, every live 96- version of the 5 overwritten files was found in git
+  history (no unversioned live edit lost). `release-manifest.json` has the sha256 inventory.
+- Pre-release: one CDSE token request with the production credentials → HTTP 200 (no Catalog/Process, 0 PU).
+- d. Backup: `/root/backups/satellite_before_stage4_20261116T154655Z.db.raw` (byte copy, sha256 `052b99df…20201` = live before) and `.db`
+  (SQLite online backup, integrity ok), `.dropins.txt`; mode 600.
+- e. Migration (`satellite_monitoring.db.connect()` from the release, venv2): integrity ok, foreign_key_check empty;
+  added `sat_jobs` (+2 indexes, 1 trigger) and `sat_change_events.risk_carried_from_event_id` / `risk_carry_overlap`;
+  all 13 existing tables same row counts. Live sha256 after: `97a86c40…`.
+- f. `97-satellite-monitoring.conf` + `98-satellite-monitoring-release.conf`, `daemon-reload`, restart of
+  `forest-api` only (15:52:02). RM / Ingka / review / bot / Telegram workers not restarted (same PIDs).
+- g. Smoke: 46 existing GET routes same status and JSON shape as before (4 pre-existing non-200 need parameters:
+  `/api/geodata/vmd/compartments` 422, three John Deere OAuth routes 400); new `/api/sat-monitoring/{health,overview,
+  sectors,map-layer}` 200; `/health` queue READY, provider OK (last 2026-11-11 07:13 UTC), `auto_risk_enabled` false;
+  overview 2 areas, 8 open + 1 recovered; event 51 quicklooks 200 `image/png`; map-layer 14 features / 137,679 B;
+  unauthenticated 401; risks 19 (max id 62) before = after; journal 15:52–16:35 no traceback, 0 restarts.
+- h. `forest-satellite-{jobs,sync}.{service,timer}` installed (`WorkingDirectory` = the release), `systemd-analyze
+  verify` ok; one manual jobs pass: exit 0, empty queue, no rows changed, no request; `forest-satellite-jobs.timer`
+  enabled (every 5 min after the last run).
+- i. `forest-satellite-sync.timer` enabled: 07:30 Europe/Riga + up to 10 min; first run 2026-11-17 05:38:40 UTC.
+  Not yet observed: the first real daily run (status, PU) — check on 2026-11-17.
 
 ## Activation record: lvm-geo-lv-ui (2026-11-10 09:16 UTC)
 
@@ -258,6 +286,20 @@ sorted-key JSON of `{path: sha256}`. The paths are `index.html`,
 Roll back code only. Do **not** restore the DB backup over live user writes unless a
 data recovery has been separately approved. All schema changes are additive and can
 remain in place.
+
+- **satellite-monitoring → forest-map-contrast (current rollback target, 2026-11-16):**
+  ```sh
+  systemctl disable --now forest-satellite-sync.timer forest-satellite-jobs.timer
+  rm -f /etc/systemd/system/forest-api.service.d/97-satellite-monitoring.conf \
+        /etc/systemd/system/forest-api.service.d/98-satellite-monitoring-release.conf
+  systemctl daemon-reload && systemctl restart forest-api
+  readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd   # → …/forest-api-forest-map-contrast-20261110T0949Z
+  ```
+  Confirm `/api/deployment` reports `geo-d0015b1f82a0`. The old code ignores `sat_jobs` and the 2 new columns, so
+  satellite.db stays as is. Only if satellite.db itself must go back (separate approval; loses jobs/reviews made
+  since 15:52): `cp --preserve=all /root/backups/satellite_before_stage4_20261116T154655Z.db.raw /root/forest_ai_satellite_data/satellite.db
+  && rm -f /root/forest_ai_satellite_data/satellite.db-{wal,shm}` → sha256 `052b99df…`. Optionally remove the unit
+  files `/etc/systemd/system/forest-satellite-{jobs,sync}.{service,timer}` + `daemon-reload`.
 
 - **meza-karte → baseline (pre-Forest-Map):** run
   `/root/forest_ai/data/backups/forest_api_meza_activation_20261107T0852Z/rollback-forest-api.sh`.
