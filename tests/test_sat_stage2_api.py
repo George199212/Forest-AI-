@@ -139,7 +139,8 @@ def test_every_sat_monitoring_route_in_the_real_app_requires_basic_auth(monkeypa
         ("/api/sat-monitoring/fetch", "POST"), ("/api/sat-monitoring/events/{event_id}", "GET"),
         ("/api/sat-monitoring/events/{event_id}/review", "POST"),
         ("/api/sat-monitoring/file/{acq_id}/{kind}", "GET"), ("/api/sat-monitoring/health", "GET"),
-        ("/api/sat-monitoring/sectors", "GET"), ("/api/sat-monitoring/lookup", "GET")}
+        ("/api/sat-monitoring/sectors", "GET"), ("/api/sat-monitoring/lookup", "GET"),
+        ("/api/sat-monitoring/map-layer", "GET")}
     c = TestClient(api.app)
     bad = {"Authorization": "Basic " + base64.b64encode(b"u:wrong").decode()}
     for p, m in found:
@@ -501,15 +502,161 @@ def test_event_detail_area_algorithm_and_undo_flag(client, sat):
     assert client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()["undo_available"] is True
 
 
-def test_health_reports_credentials_by_name_only(client, monkeypatch):
-    monkeypatch.delenv("SENTINEL_CLIENT_ID", raising=False)
-    monkeypatch.delenv("SENTINEL_CLIENT_SECRET", raising=False)
-    h = client.get("/api/sat-monitoring/health", headers=AUTH).json()
-    assert h["credentials_configured"] is False and h["failed_jobs"] == 0 and h["month"]["pu_guard"] == 1600.0
+def test_health_credentials_come_from_worker_records_not_the_api_env(client, sat, monkeypatch):
+    """The API env says nothing about the worker (own env). Status = sat_provider_status + latest sat_runs."""
     monkeypatch.setenv("SENTINEL_CLIENT_ID", "id-value")
     monkeypatch.setenv("SENTINEL_CLIENT_SECRET", "secret-value")
     r = client.get("/api/sat-monitoring/health", headers=AUTH)
-    assert r.json()["credentials_configured"] is True and "secret-value" not in r.text and "id-value" not in r.text
+    h = r.json()
+    assert "credentials_configured" not in h and "secret-value" not in r.text and "id-value" not in r.text
+    assert h["provider"]["state"] == "UNKNOWN"                       # no rows, no runs: never "not configured"
+    monkeypatch.delenv("SENTINEL_CLIENT_ID")
+    monkeypatch.delenv("SENTINEL_CLIENT_SECRET")
+    assert client.get("/api/sat-monitoring/health", headers=AUTH).json()["provider"]["state"] == "UNKNOWN"
+    assert h["failed_jobs"] == 0 and h["month"]["pu_guard"] == 1600.0
+
+
+def _provider(sat, key, ok_at=None, err_at=None, err=None):
+    c = sqlite3.connect(sat["db"])
+    c.execute("INSERT OR IGNORE INTO sat_provider_status (key) VALUES (?)", (key,))
+    c.execute("UPDATE sat_provider_status SET last_ok_utc=COALESCE(?, last_ok_utc), last_error_utc=?, last_error=? "
+              "WHERE key=?", (ok_at, err_at, err, key))
+    c.commit()
+    c.close()
+
+
+def _state(client):
+    return client.get("/api/sat-monitoring/health", headers=AUTH).json()["provider"]
+
+
+def test_provider_state_ok_degraded_not_configured(client, sat, monkeypatch):
+    monkeypatch.delenv("SENTINEL_CLIENT_ID", raising=False)              # the API env is irrelevant
+    _provider(sat, "catalog", ok_at="2026-11-11T07:06:56Z")
+    _provider(sat, "process", ok_at="2026-11-11T07:13:26Z")
+    p = _state(client)
+    assert p["state"] == "OK" and p["last_ok_utc"] == "2026-11-11T07:13:26Z" and p["error"] is None
+    # worker auth failure after the last success -> DEGRADED, flagged as auth, with its timestamp
+    _provider(sat, "token", err_at="2026-11-12T07:30:00Z", err="AUTH: HTTP 401 invalid_client")
+    p = _state(client)
+    assert p["state"] == "DEGRADED" and p["auth_failure"] is True and p["at_utc"] == "2026-11-12T07:30:00Z"
+    assert p["source"] == "provider:token" and p["error"].startswith("AUTH")
+    # the worker itself reported missing credentials -> NOT_CONFIGURED
+    _provider(sat, "token", err_at="2026-11-13T07:30:00Z", err="NOT_CONFIGURED: SENTINEL_CLIENT_ID / "
+                                                              "SENTINEL_CLIENT_SECRET not set")
+    assert _state(client)["state"] == "NOT_CONFIGURED"
+    # a later successful call clears it
+    _provider(sat, "process", ok_at="2026-11-14T07:31:00Z")
+    assert _state(client)["state"] == "OK"
+    # a FAILED run after the last success -> DEGRADED from the run
+    c = sqlite3.connect(sat["db"])
+    rid = c.execute("INSERT INTO sat_runs (trigger, started_at, finished_at, status, stop_reason) VALUES "
+                    "('TIMER','2026-11-15T07:30:00Z','2026-11-15T07:31:00Z','FAILED','HTTP: 503 upstream')").lastrowid
+    c.commit()
+    c.close()
+    p = _state(client)
+    assert p["state"] == "DEGRADED" and p["source"] == f"run:{rid}" and p["auth_failure"] is False
+
+
+def test_queue_state_ready_not_migrated_and_read_only(client, sat, monkeypatch):
+    q = client.get("/api/sat-monitoring/health", headers=AUTH).json()["queue"]
+    assert q == {"state": "READY", "missing": [], "api_can_write": True}
+    monkeypatch.setattr(store.os, "access", lambda *a, **k: False)     # e.g. satellite.db mounted read-only
+    h = client.get("/api/sat-monitoring/health", headers=AUTH).json()
+    assert h["queue"]["state"] == "READ_ONLY" and h["queue"]["api_can_write"] is False
+
+
+def test_queue_not_migrated_lists_exactly_what_is_missing(client, sat):
+    c = sqlite3.connect(sat["db"])
+    c.execute("DROP TABLE sat_jobs")                                     # TEST copy only: pre-Stage-2 schema
+    c.execute("ALTER TABLE sat_change_events DROP COLUMN risk_carried_from_event_id")
+    c.execute("ALTER TABLE sat_change_events DROP COLUMN risk_carry_overlap")
+    c.commit()
+    c.close()
+    before = _sha(sat["db"])
+    h = client.get("/api/sat-monitoring/health", headers=AUTH).json()
+    want = ["table sat_jobs", "column sat_change_events.risk_carried_from_event_id",
+            "column sat_change_events.risk_carry_overlap"]
+    assert h["queue"]["state"] == "NOT_MIGRATED" and h["queue"]["missing"] == want and h["schema_stage2"] is False
+    r = client.post("/api/sat-monitoring/fetch", json={"all": True}, headers=AUTH)
+    assert r.status_code == 503 and r.json()["missing"] == want
+    assert _sha(sat["db"]) == before                                     # the API never migrates
+
+
+# ── Forest Map layer (read-only) ─────────────────────────────────────────────
+def _layer(client, **q):
+    return client.get("/api/sat-monitoring/map-layer", params=q, headers=AUTH)
+
+
+def test_map_layer_empty_area_has_footprint_and_no_events(client, sat):
+    c = sqlite3.connect(sat["db"])
+    aid = c.execute(
+        "INSERT INTO sat_monitored_areas (source, source_ref, name, geometry_geojson, area_ha, buffer_m, grid_json, "
+        "added_by, added_at_utc) VALUES ('SECTOR','9','Empty',?,1.0,100,?,'cli','2026-11-01T00:00:00Z')",
+        (json.dumps(GOOD), json.dumps({"bbox": [24.6, 57.1, 24.62, 57.11]}))).lastrowid
+    c.commit()
+    c.close()
+    r = _layer(client, area_id=aid)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["counts"] == {"areas": 1, "events": 0}
+    assert [f["properties"]["kind"] for f in d["features"]] == ["footprint"]
+    assert d["focus"] == {"event_id": None, "area_id": aid, "bbox": [24.6, 57.1, 24.62, 57.11]}
+
+
+def test_map_layer_area_with_events_current_generation_only(client, sat):
+    before = _sha(sat["db"])
+    d = _layer(client, area_id=sat["area"]).json()
+    ev = {f["properties"]["event_id"]: f["properties"] for f in d["features"] if f["properties"]["kind"] == "event"}
+    assert set(ev) == {sat["open"], sat["rec"]}                          # superseded event not drawn
+    assert ev[sat["open"]]["status_group"] == "SUSPECTED" and ev[sat["rec"]]["status_group"] == "RECOVERED"
+    p = ev[sat["open"]]
+    assert p["onset_utc"] == "2026-10-21T10:00:00Z" and p["area_ha"] == 2.5 and p["confidence"] == "HIGH"
+    assert p["event_url"] == f"#sat-monitoring?event={sat['open']}"
+    assert d["bytes"] <= d["limits"]["max_bytes"] and len(d["features"]) <= d["limits"]["max_features"]
+    assert d["simplified_m_by_area"] == {str(sat["area"]): 2}             # one area: starts at 2 m
+    assert _layer(client).json()["simplified_m_by_area"] == {str(sat["area"]): 10}   # all areas: 10 m
+    _review(client, sat["open"], "REJECT")
+    d = _layer(client, event_id=sat["open"]).json()
+    assert d["focus"]["event_id"] == sat["open"] and d["focus"]["bbox"] == [24.5, 57.0, 24.502, 57.002]
+    assert {f["properties"]["status_group"] for f in d["features"]
+            if f["properties"].get("event_id") == sat["open"]} == {"REVIEWED"}
+    assert _sha(sat["db"]) != before                                     # only the review above wrote
+
+
+def test_map_layer_unknown_or_superseded_ids_are_404(client, sat):
+    assert _layer(client, area_id=999).status_code == 404
+    assert _layer(client, event_id=999).status_code == 404
+    assert _layer(client, event_id=sat["old"]).status_code == 404        # superseded generation
+    c = sqlite3.connect(sat["db"])
+    other = c.execute("INSERT INTO sat_monitored_areas (source, source_ref, name, geometry_geojson, area_ha, buffer_m,"
+                      " grid_json, added_by, added_at_utc) VALUES ('SECTOR','8','Other',?,1,100,'{}','cli',"
+                      "'2026-11-01T00:00:00Z')", (json.dumps(GOOD),)).lastrowid
+    c.commit()
+    c.close()
+    assert _layer(client, area_id=other, event_id=sat["open"]).status_code == 422
+    assert client.get("/api/sat-monitoring/map-layer?area_id=1").status_code == 401
+
+
+def test_map_layer_steps_tolerance_per_area_and_refuses_oversize(client, sat, monkeypatch):
+    import math as _m
+    ring = [[24.5 + 0.004 * _m.cos(a / 400 * 2 * _m.pi), 57.0 + 0.0022 * _m.sin(a / 400 * 2 * _m.pi)]
+            for a in range(400)]
+    ring.append(ring[0])
+    c = sqlite3.connect(sat["db"])
+    c.execute("UPDATE sat_change_events SET change_geojson=? WHERE id=?", (json.dumps(
+        {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"zone": "INSIDE"},
+                                                    "geometry": {"type": "Polygon", "coordinates": [ring]}}]}),
+        sat["open"]))
+    c.commit()
+    c.close()
+    fine = _layer(client, area_id=sat["area"]).json()
+    assert fine["simplified_m_by_area"][str(sat["area"])] == 2
+    monkeypatch.setattr(store, "MAP_AREA_MAX_BYTES", fine["bytes"] - 200)   # cap counts the area features only
+    coarse = _layer(client, area_id=sat["area"]).json()
+    assert coarse["simplified_m_by_area"][str(sat["area"])] > 2 and coarse["bytes"] < fine["bytes"]
+    monkeypatch.setattr(store, "MAP_AREA_MAX_BYTES", 50)
+    r = _layer(client, area_id=sat["area"])
+    assert r.status_code == 413 and r.json()["max_area_bytes"] == 50
 
 
 def test_sectors_list_reads_main_db_read_only(client, sat, tmp_path, monkeypatch):

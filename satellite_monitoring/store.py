@@ -63,10 +63,64 @@ def rw():
     conn.row_factory = sqlite3.Row
     conn.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys=ON")
-    if not _has_table(conn, "sat_jobs") or "risk_carried_from_event_id" not in _columns(conn, "sat_change_events"):
+    missing = queue_schema_missing(conn)
+    if missing:
         conn.close()
-        raise StoreError(503, "satellite.db schema not migrated for Stage 2 (run the worker once)")
+        raise StoreError(503, "satellite.db schema not migrated for Stage 2 (run the worker once)", missing=missing)
     return conn
+
+
+# What the API's writes (rw) need. The API never creates these: the worker migrates satellite.db on its first run.
+QUEUE_REQUIRED_TABLES = ("sat_jobs", "sat_review_log")
+QUEUE_REQUIRED_COLUMNS = (("sat_change_events", "risk_carried_from_event_id"),
+                          ("sat_change_events", "risk_carry_overlap"))
+
+
+def queue_schema_missing(conn):
+    """['table sat_jobs', 'column sat_change_events.risk_carry_overlap', ...]; empty = the queue schema is ready."""
+    out = [f"table {t}" for t in QUEUE_REQUIRED_TABLES if not _has_table(conn, t)]
+    for t, c in QUEUE_REQUIRED_COLUMNS:
+        if _has_table(conn, t) and c not in _columns(conn, t):
+            out.append(f"column {t}.{c}")
+    return out
+
+
+def queue_state(conn):
+    """Can THIS API process queue changes?  READY | NOT_MIGRATED (schema missing, listed) | READ_ONLY (no write
+    access to satellite.db or its directory for the journal: deployment makes the API read-only)."""
+    missing = queue_schema_missing(conn)
+    path = Path(config.sat_db_path())
+    writable = os.access(path, os.W_OK) and os.access(path.parent, os.W_OK)
+    state = "NOT_MIGRATED" if missing else ("READ_ONLY" if not writable else "READY")
+    return {"state": state, "missing": missing, "api_can_write": writable}
+
+
+def provider_state(conn, last_run):
+    """Copernicus access as the WORKER last saw it (sat_provider_status + latest sat_runs), never this process's env:
+    the worker runs with its own environment. States:
+      OK              a provider call succeeded and nothing failed after it
+      DEGRADED        the latest token/catalog/process call or the latest run failed after the last success
+      NOT_CONFIGURED  the worker itself reported missing credentials (CdseError NOT_CONFIGURED), newest event
+      UNKNOWN         no provider status rows and no runs: the worker has not contacted Copernicus yet"""
+    rows = {r["key"]: dict(r) for r in conn.execute("SELECT * FROM sat_provider_status")}
+    last_ok = max((r["last_ok_utc"] for r in rows.values() if r.get("last_ok_utc")), default=None)
+    out = {"state": "UNKNOWN", "last_ok_utc": last_ok, "at_utc": None, "source": None, "error": None,
+           "auth_failure": False}
+    failures = [(r["last_error_utc"], f"provider:{k}", r.get("last_error"))
+                for k, r in rows.items() if r.get("last_error_utc") and r["last_error_utc"] > (r.get("last_ok_utc") or "")]
+    if last_run and last_run.get("status") == "FAILED":
+        failures.append((last_run.get("finished_at") or last_run.get("started_at"), f"run:{last_run['id']}",
+                         last_run.get("stop_reason")))
+    failures = [f for f in failures if f[0] and f[0] > (last_ok or "")]
+    if failures:
+        at, source, err = max(failures, key=lambda f: f[0])
+        not_conf = str(err or "").startswith("NOT_CONFIGURED")
+        out.update(state="NOT_CONFIGURED" if not_conf else "DEGRADED", at_utc=at, source=source,
+                   error=(str(err)[:300] if err else None),
+                   auth_failure=str(err or "").startswith(("AUTH", "NOT_CONFIGURED")))
+    elif last_ok:
+        out.update(state="OK", at_utc=last_ok, source="provider")
+    return out
 
 
 def _has_table(conn, name):
@@ -417,10 +471,10 @@ def health(now=None):
             "provider_status": provider,
             "lock": lock_state(),
             "jobs": jobs, "failed_jobs": jobs.get("FAILED", 0), "recent_failed_jobs": failed,
-            "schema_stage2": _has_table(conn, "sat_jobs"),
-            # names only, never values: the API process shares the worker's environment file in production
-            "credentials_configured": all(os.environ.get(k, "").strip()
-                                          for k in ("SENTINEL_CLIENT_ID", "SENTINEL_CLIENT_SECRET")),
+            "schema_stage2": not queue_schema_missing(conn),
+            "queue": queue_state(conn),
+            # From the worker's own records, never this process's environment (the worker has its own env).
+            "provider": provider_state(conn, last),
             "auto_risk_enabled": bool(cfg["auto_risk_enabled"]),
         }
     finally:
@@ -692,3 +746,178 @@ def _previous_human(conn, event_id, before_id):
         else:
             stack.append(e)
     return stack[-1] if stack else None
+
+
+# ── Forest Map layer "Satelīta izmaiņas" (read-only) ────────────────────────
+# Same bounded-response rule as the other Forest Map overlays: at most MAP_MAX_FEATURES features and MAP_MAX_BYTES
+# of JSON. Geometry is simplified here (stdlib Douglas-Peucker, metric tolerance) step by step until it fits; the
+# tolerance used is returned. The stored masks are never changed.
+MAP_MAX_FEATURES = 600
+MAP_MAX_BYTES = 400_000
+MAP_AREA_MAX_BYTES = 150_000                  # per monitored area (features of that area, compact JSON)
+MAP_TOLERANCES_ALL_M = (10, 20, 40, 80)       # all-areas layer: start coarse (≈2 px at z14)
+MAP_TOLERANCES_SINGLE_M = (2, 5, 10, 20, 40, 80)  # one area / one event: start fine, step up until the area fits
+
+
+def _jsize(obj):
+    return len(json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode())
+STATUS_GROUP = {"SUSPECTED": "SUSPECTED", "RECOVERED": "RECOVERED"}   # every human status -> REVIEWED
+
+
+def _dp(pts, tol):
+    """Douglas-Peucker on [(x, y)] in metres; keeps the first and last point."""
+    if len(pts) < 3 or tol <= 0:
+        return pts
+    keep = [False] * len(pts)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(pts) - 1)]
+    while stack:
+        a, b = stack.pop()
+        (x1, y1), (x2, y2) = pts[a], pts[b]
+        dx, dy = x2 - x1, y2 - y1
+        norm = math.hypot(dx, dy)
+        best, idx = -1.0, None
+        for i in range(a + 1, b):
+            x, y = pts[i]
+            d = abs(dy * (x - x1) - dx * (y - y1)) / norm if norm else math.hypot(x - x1, y - y1)
+            if d > best:
+                best, idx = d, i
+        if idx is not None and best > tol:
+            keep[idx] = True
+            stack += [(a, idx), (idx, b)]
+    return [p for p, k in zip(pts, keep) if k]
+
+
+def _ring(ring, tol, kx, ky):
+    pts = [(float(x) * kx, float(y) * ky) for x, y in (c[:2] for c in ring)]
+    out = _dp(pts, tol)
+    if len(out) < 4:                       # collapsed below a valid ring at this tolerance
+        return None
+    return [[round(x / kx, 6), round(y / ky, 6)] for x, y in out]
+
+
+def _simplify(geom, tol):
+    if not geom or geom.get("type") not in ("Polygon", "MultiPolygon"):
+        return None
+    polys = [geom["coordinates"]] if geom["type"] == "Polygon" else geom["coordinates"]
+    lat0 = next((float(p[0][0][1]) for p in polys if p and p[0]), 57.0)
+    kx, ky = 111_320.0 * math.cos(math.radians(lat0)), 110_574.0
+    out = []
+    for poly in polys:
+        if not poly:
+            continue
+        shell = _ring(poly[0], tol, kx, ky)
+        if shell is None:
+            continue
+        out.append([shell] + [h for h in (_ring(r, tol, kx, ky) for r in poly[1:]) if h])
+    if not out:
+        return None
+    return {"type": "Polygon", "coordinates": out[0]} if len(out) == 1 else {"type": "MultiPolygon", "coordinates": out}
+
+
+def _bbox_of(geoms):
+    xs, ys = [], []
+    for g in geoms:
+        polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+        for poly in polys:
+            for ring in poly:
+                for x, y in ring:
+                    xs.append(x)
+                    ys.append(y)
+    return [min(xs), min(ys), max(xs), max(ys)] if xs else None
+
+
+def _bbox_polygon(b):
+    w, s, e, n = b
+    return {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
+
+
+def map_layer(area_id=None, event_id=None):
+    """GeoJSON for the Forest Map layer: current change masks (sat_change_events.change_geojson, current generation
+    only) of the requested area / the event's area / every active area, plus each area's observation footprint
+    (worker grid bbox). 404 for an unknown or superseded event and an unknown area."""
+    conn = ro()
+    try:
+        focus_event = None
+        if event_id is not None:
+            ev = conn.execute("SELECT * FROM sat_change_events WHERE id=?" + sdb.current_only(conn, "sat_change_events"),
+                              (event_id,)).fetchone()
+            if not ev:
+                raise StoreError(404, "event not found")
+            if area_id is not None and int(area_id) != ev["monitored_area_id"]:
+                raise StoreError(422, "event does not belong to this area")
+            focus_event, area_id = ev["id"], ev["monitored_area_id"]
+        if area_id is not None:
+            areas = [dict(r) for r in conn.execute("SELECT * FROM sat_monitored_areas WHERE id=?", (area_id,))]
+            if not areas:
+                raise StoreError(404, "area not found")
+        else:
+            areas = [dict(r) for r in conn.execute("SELECT * FROM sat_monitored_areas WHERE active=1 ORDER BY id")]
+        names = {a["id"]: a["name"] for a in areas}
+        raw = []                                # (props, geometry) before simplification
+        for a in areas:
+            bbox = (_j(a["grid_json"], {}) or {}).get("bbox")
+            if bbox and len(bbox) == 4:
+                raw.append(({"kind": "footprint", "area_id": a["id"], "area_name": a["name"]},
+                            _bbox_polygon([float(v) for v in bbox])))
+        ids = list(names)
+        if ids:
+            q = ("SELECT * FROM sat_change_events WHERE monitored_area_id IN (%s)" % ",".join("?" * len(ids))
+                 + sdb.current_only(conn, "sat_change_events") + " ORDER BY id")
+            for ev in conn.execute(q, ids):
+                fc = _j(ev["change_geojson"], {}) or {}
+                feats = fc.get("features") if fc.get("type") == "FeatureCollection" else (
+                    [{"geometry": fc, "properties": {}}] if fc.get("type") in ("Polygon", "MultiPolygon") else [])
+                for f in feats or []:
+                    p = f.get("properties") or {}
+                    raw.append(({
+                        "kind": "event", "event_id": ev["id"], "area_id": ev["monitored_area_id"],
+                        "area_name": names.get(ev["monitored_area_id"]), "zone": p.get("zone"),
+                        "zone_ha": p.get("area_ha"), "area_ha": ev["changed_area_ha"],
+                        "onset_utc": ev["first_after_time_utc"], "detected_at_utc": ev["detected_at_utc"],
+                        "confidence": ev["confidence"], "classification": ev["classification"],
+                        "sensor_basis": ev["sensor_basis"], "status": ev["status"],
+                        "status_group": STATUS_GROUP.get(ev["status"], "REVIEWED"),
+                        "event_url": f"#sat-monitoring?event={ev['id']}"}, f.get("geometry")))
+        # Per area: step the tolerance until that area fits MAP_AREA_MAX_BYTES (one dense area never coarsens the
+        # others); then the whole response must still fit MAP_MAX_FEATURES / MAP_MAX_BYTES, else 413.
+        steps = MAP_TOLERANCES_SINGLE_M if (area_id is not None) else MAP_TOLERANCES_ALL_M
+        feats, tol_by_area = [], {}
+        for a in areas:
+            mine = [(p, g) for p, g in raw if p["area_id"] == a["id"]]
+            for tol in steps:
+                part = []
+                for props, g in mine:
+                    sg = _simplify(g, tol) if props["kind"] == "event" else g
+                    if sg:
+                        part.append({"type": "Feature", "properties": props, "geometry": sg})
+                if _jsize(part) <= MAP_AREA_MAX_BYTES:
+                    break
+            if _jsize(part) > MAP_AREA_MAX_BYTES:
+                raise StoreError(413, "satellite change layer of one area exceeds the map limits",
+                                 area_id=a["id"], max_area_bytes=MAP_AREA_MAX_BYTES)
+            feats += part
+            tol_by_area[a["id"]] = tol
+        body = {"type": "FeatureCollection", "features": feats}
+        size = _jsize(body)
+        if len(feats) > MAP_MAX_FEATURES or size > MAP_MAX_BYTES:
+            raise StoreError(413, "satellite change layer exceeds the map limits; open one area",
+                             max_features=MAP_MAX_FEATURES, max_bytes=MAP_MAX_BYTES)
+        tol = max(tol_by_area.values(), default=steps[0])
+        ev_geoms = [f["geometry"] for f in body["features"]
+                    if f["properties"]["kind"] == "event" and (focus_event is None or f["properties"]["event_id"] == focus_event)]
+        fp_geoms = [f["geometry"] for f in body["features"] if f["properties"]["kind"] == "footprint"]
+        body.update({
+            "focus": {"event_id": focus_event, "area_id": area_id,
+                      "bbox": _bbox_of(ev_geoms if focus_event is not None else (ev_geoms or fp_geoms))
+                      or _bbox_of(fp_geoms)},
+            "simplified_m": tol, "simplified_m_by_area": {str(k): v for k, v in tol_by_area.items()},
+            "bytes": size,
+            "limits": {"max_features": MAP_MAX_FEATURES, "max_bytes": MAP_MAX_BYTES,
+                       "max_area_bytes": MAP_AREA_MAX_BYTES},
+            "counts": {"areas": len(areas), "events": len({f["properties"]["event_id"] for f in body["features"]
+                                                           if f["properties"]["kind"] == "event"})},
+            "attribution": "Contains modified Copernicus Sentinel data"})
+        return body
+    finally:
+        conn.close()

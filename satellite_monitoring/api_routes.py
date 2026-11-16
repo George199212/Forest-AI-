@@ -190,6 +190,14 @@ def router(verify_credentials, sender=None, database=None, recommend=None):
         except store.StoreError as e:
             return _err(e)
 
+    @r.get("/map-layer")
+    def map_layer(area_id: Optional[int] = None, event_id: Optional[int] = None):
+        """Forest Map layer "Satelīta izmaiņas": current change masks + observation footprints (read-only)."""
+        try:
+            return store.map_layer(area_id=area_id, event_id=event_id)
+        except store.StoreError as e:
+            return _err(e)
+
     @r.get("/health")
     def health():
         try:
