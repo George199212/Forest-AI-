@@ -59,3 +59,25 @@
   by string-replacing that tag (`FOREST_MAP_ENABLED`). Bumping the `?v=` disables the map ("Meža karte gaida servera
   atjauninājumu"). Guarded by `tests/test_forest_map_sat.js` since 2026-11-16.
 
+
+### Satellite Monitoring — UI review 2026-11-16, open, post-release work (released as is, owner decision)
+1. Fragmentation rule missing: when the largest cluster is < 30 % of the event's current area, the event should be
+   POSSIBLE_SEASONAL_OR_ENVIRONMENTAL with LOW confidence (config). Needs an offline re-run on a COPY (0 PU) of
+   Ķekava + BIK-001 with the gate "recall 3/3, outside events/area not growing" before the live DB is touched.
+2. Satellite Monitoring section not fully Latvian in the review sandbox (title, KPIs, banners, tables, event page,
+   legends, buttons, empty states). Finding so far: `assets/i18n-lv.js` is injected only when the process runs
+   with `UI_LANGUAGE=lv` (`api.py:604-608`); the review sandbox did not pass `UI_LANGUAGE`. Whether production
+   :8000 sets it was NOT checked; list of untranslated strings not yet produced.
+3. Forest Map popup link: verify that the popup of event #52 opens event 52 (the after_10 screenshot opened #55
+   on purpose; not yet checked for #52).
+4. Event #52 page: BEFORE / AFTER images reported black. Not investigated yet.
+5. "Open in Forest Map" from event #52: screenshot after_05 was captured right after the click (map not loaded,
+   English static title "Forest Map" / "Refresh" until `forest-map.js` loads). The English title and nav label
+   during loading are real; the final state (after_06) is centred on the event.
+6. Worker status shows "Idle" when no worker unit exists; should be "Not installed" (LV "Nav uzstādīts").
+7. Event images: add "True colour / False colour" toggle (true colour = B04/B03/B02, default). Stored rasters must
+   be checked for the bands first; no new Copernicus calls.
+8. Checked 2026-11-16 (closed): the "HTTP 401 invalid_client 2026-11-16 07:30" banner was a SYNTHETIC sandbox state
+   (`/root/sat_sandbox/toggle/sat_auth.db`). Live satellite.db (read-only, immutable): no `token` row in
+   `sat_provider_status`; catalog last OK 2026-11-11T07:06:56Z, process 2026-11-11T07:13:26Z; `sat_request_log`
+   302 rows, all HTTP 200, last 2026-11-11T07:13:26Z. Token requests are not logged in `sat_request_log`.
