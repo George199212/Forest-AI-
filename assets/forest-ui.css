@@ -1,0 +1,360 @@
+/*
+ * Forest AI — UI foundation (Concept A "Enterprise Dark"), phase 1.
+ *
+ * CSS ONLY. Loaded by index.html directly after the inline <style>, so it wins over the
+ * inline rules of equal specificity. It changes no text, no element IDs, no JavaScript and
+ * no backend behaviour. Remove the single <link> line in index.html to roll back.
+ *
+ * Structure
+ *   1. Tokens (--fa-*) and aliases for the variables the existing UI already uses
+ *   2. Base: fonts, scrollbars, focus ring, form controls
+ *   3. Shell: sidebar, top bar, content
+ *   4. Components: buttons, cards, KPI tiles, tables, badges, tabs, filters
+ *   5. Page-level fixes: Overview, sector detail, Forest Map, Leaflet controls
+ *   6. Responsive layout
+ *   7. Transitional shims for inline styles (remove once the inline styles are gone)
+ *
+ * Contrast (WCAG 2.2 AA) was checked for every text token on all three surfaces
+ * (#0C110E, #131A15, #1A231D): fg 13.6–16.0, fg-2 8.1–9.6, fg-3 5.35–6.3, accent 7.7–9.1,
+ * severity colours 5.8–10.8. Control borders (--fa-control) are >= 3.2:1 (WCAG 1.4.11).
+ */
+
+/* Inter is loaded from Google Fonts like the existing Sora / DM Mono faces.
+   (@import must precede every other rule.) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+/* ── 1. Tokens ──────────────────────────────────────────────────────────── */
+:root {
+  /* surfaces */
+  --fa-bg: #0C110E;
+  --fa-surface: #131A15;
+  --fa-raised: #1A231D;
+  --fa-hover: #202B23;
+  --fa-line: #243029;
+  --fa-line-strong: #34423A;
+  --fa-control: #627366;
+  /* text */
+  --fa-fg: #E7EDE8;
+  --fa-fg-2: #AEBBB1;
+  --fa-fg-3: #8A988E;
+  /* brand */
+  --fa-accent: #7CC47F;
+  --fa-accent-strong: #9FD8A2;
+  --fa-accent-soft: #2A4A30;
+  --fa-on-accent: #0C110E;
+  /* semantic (severity / status) */
+  --fa-critical: #FF6B61;
+  --fa-high: #F59A52;
+  --fa-medium: #E8BE4A;
+  --fa-low: #6FCB8E;
+  --fa-info: #6AB0F0;
+  /* type */
+  --fa-font-ui: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --fa-font-display: 'Sora', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --fa-font-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --fa-text-xs: 11px;  --fa-text-sm: 12px;  --fa-text-md: 13px;  --fa-text-base: 14px;
+  --fa-text-lg: 16px;  --fa-text-xl: 20px;  --fa-text-2xl: 24px; --fa-text-3xl: 28px;
+  /* shape */
+  --fa-radius-sm: 4px; --fa-radius: 6px; --fa-radius-card: 8px; --fa-radius-lg: 12px;
+  --fa-focus: 0 0 0 2px var(--fa-bg), 0 0 0 4px var(--fa-accent);
+
+  /* Aliases: the existing UI (index.html, vmd-workflow.css, forest-map.css, John Deere card)
+     reads these names. Redefining them restyles hundreds of inline styles without editing them. */
+  --bg: var(--fa-bg);
+  --bg2: var(--fa-surface);
+  --bg3: var(--fa-raised);
+  --bg4: var(--fa-hover);
+  --border: var(--fa-line);
+  --border2: var(--fa-control);
+  --green: var(--fa-accent);
+  --gbright: var(--fa-accent-strong);
+  --gdim: var(--fa-accent-soft);
+  --amber: var(--fa-medium);
+  --red: var(--fa-critical);
+  --blue: var(--fa-info);
+  --text: var(--fa-fg);
+  --text2: var(--fa-fg-2);
+  --text3: var(--fa-fg-3);
+  --sans: var(--fa-font-ui);
+  --mono: var(--fa-font-mono);
+  --r: var(--fa-radius);
+  /* forest-map.css expects these; undefined before, which fell back to a navy palette */
+  --card: var(--fa-surface);
+  --muted: var(--fa-fg-2);
+  color-scheme: dark;
+}
+
+/* ── 2. Base ────────────────────────────────────────────────────────────── */
+html, body {
+  font-family: var(--fa-font-ui);
+  font-size: var(--fa-text-base);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+::selection { background: var(--fa-accent-soft); color: var(--fa-fg); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--fa-line-strong); border-radius: 6px; border: 2px solid var(--fa-bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--fa-control); }
+
+/* One visible focus ring for every keyboard-focusable control. */
+:focus-visible { outline: 2px solid var(--fa-accent); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 0; }
+
+/* Native form controls inside the app (inline-styled ones included). */
+.content input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]),
+.content select, .content textarea {
+  font-family: var(--fa-font-ui);
+  border-color: var(--fa-control);
+  min-height: 34px;
+}
+.content input:hover:not(:disabled), .content select:hover:not(:disabled), .content textarea:hover:not(:disabled) { border-color: var(--fa-fg-3); }
+::placeholder { color: var(--fa-fg-3); opacity: 1; }
+input[type=checkbox], input[type=radio] { accent-color: var(--fa-accent); width: 16px; height: 16px; }
+
+/* ── 3. Shell ───────────────────────────────────────────────────────────── */
+.sidebar { width: 224px; background: var(--fa-surface); border-right-color: var(--fa-line); }
+.logo { padding: 16px; border-bottom-color: var(--fa-line); }
+.logo-name { font-family: var(--fa-font-display); font-size: 15px; letter-spacing: -0.01em; }
+.nav-group {
+  font-family: var(--fa-font-ui);
+  font-size: var(--fa-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--fa-fg-3);
+  padding: 16px 16px 6px;
+}
+.nav-item {
+  margin: 1px 8px;
+  padding: 7px 10px;
+  border-left: 0;
+  border-radius: var(--fa-radius);
+  font-size: var(--fa-text-md);
+  font-weight: 500;
+  color: var(--fa-fg-2);
+}
+.nav-item:hover { background: var(--fa-raised); color: var(--fa-fg); }
+.nav-item.active {
+  background: var(--fa-accent-soft);
+  color: var(--fa-fg);
+  box-shadow: inset 2px 0 0 var(--fa-accent);
+}
+.nav-item.active .nav-icon { color: var(--fa-accent-strong); }
+.nav-icon { color: var(--fa-fg-3); font-size: 14px; }
+.sidebar-foot { font-size: var(--fa-text-xs); color: var(--fa-fg-3); border-top-color: var(--fa-line); }
+
+.main { min-width: 0; }
+.topbar { background: var(--fa-bg); border-bottom-color: var(--fa-line); padding: 14px 28px; min-height: 64px; }
+.topbar-left h1 { font-family: var(--fa-font-display); font-size: 18px; letter-spacing: -0.01em; }
+.topbar-left p { font-size: var(--fa-text-sm); color: var(--fa-fg-3); }
+.content { padding: 24px 28px 40px; }
+
+/* ── 4. Components ──────────────────────────────────────────────────────── */
+/* Buttons: neutral secondary by default; the LVM GEO primary keeps its accent fill. */
+.btn {
+  font-family: var(--fa-font-ui);
+  font-size: var(--fa-text-md);
+  font-weight: 500;
+  color: var(--fa-fg);
+  background: var(--fa-raised);
+  border-color: var(--fa-line-strong);
+  min-height: 32px;
+  padding: 6px 12px;
+}
+.btn:hover { background: var(--fa-hover); color: var(--fa-fg); border-color: var(--fa-control); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-red { color: var(--fa-critical); border-color: rgba(255, 107, 97, 0.4); }
+.btn-red:hover { background: rgba(255, 107, 97, 0.12); color: var(--fa-critical); }
+
+/* Cards */
+.card, .kpi, .pc-point, .inspector-card { border-color: var(--fa-line); border-radius: var(--fa-radius-card); }
+.card { padding: 18px 20px; }
+.card-head {
+  font-family: var(--fa-font-ui);
+  font-size: var(--fa-text-base);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fa-fg);
+  margin-bottom: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.card-head .dot { width: 8px; height: 8px; }
+
+/* KPI tiles */
+.kpi { padding: 16px 18px; display: flex; flex-direction: column; min-width: 0; }
+.kpi[onclick] { transition: border-color .15s, background-color .15s; }
+.kpi[onclick]:hover { border-color: var(--fa-control) !important; background: var(--fa-raised); }
+.kpi-label {
+  font-family: var(--fa-font-ui);
+  font-size: var(--fa-text-sm);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--fa-fg-2);
+  margin-bottom: 10px;
+}
+.kpi-value {
+  font-family: var(--fa-font-display);
+  font-size: var(--fa-text-3xl);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fa-fg);
+}
+.kpi-value.green { color: var(--fa-fg); }
+.kpi-value.amber { color: var(--fa-medium); }
+.kpi-value.red { color: var(--fa-critical); }
+.kpi-sub { font-family: var(--fa-font-ui); font-size: var(--fa-text-sm); color: var(--fa-fg-3); margin-top: 6px; line-height: 1.4; }
+
+/* Tables */
+.tbl { font-size: var(--fa-text-md); font-variant-numeric: tabular-nums; }
+.tbl th {
+  font-family: var(--fa-font-ui);
+  font-size: var(--fa-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--fa-fg-3);
+  padding: 8px 12px;
+  border-bottom-color: var(--fa-line-strong);
+  /* headers may wrap on desktop so a table never outgrows its card; below 760 px .tbl scrolls instead */
+  white-space: normal;
+}
+.tbl td { padding: 10px 12px; border-bottom-color: var(--fa-line); line-height: 1.45; }
+.tbl tr:hover td { background: var(--fa-raised); }
+.tbl td.mono { font-size: var(--fa-text-sm); color: var(--fa-fg-2); }
+.tbl-link { color: var(--fa-accent-strong); font-size: var(--fa-text-sm); text-underline-offset: 3px; }
+.tbl-link:hover { color: var(--fa-accent-strong); text-decoration: underline; }
+
+/* Badges: same shapes, readable sizes, semantic colours from tokens. */
+.badge { font-family: var(--fa-font-ui); font-size: var(--fa-text-xs); font-weight: 600; letter-spacing: 0.02em; padding: 2px 8px; }
+.b-green { background: rgba(111, 203, 142, 0.12); color: var(--fa-low); border-color: rgba(111, 203, 142, 0.35); }
+.b-amber { background: rgba(232, 190, 74, 0.12); color: var(--fa-medium); border-color: rgba(232, 190, 74, 0.35); }
+.b-red { background: rgba(255, 107, 97, 0.12); color: var(--fa-critical); border-color: rgba(255, 107, 97, 0.38); }
+.b-gray { background: var(--fa-raised); color: var(--fa-fg-2); border-color: var(--fa-line-strong); }
+
+/* Tabs: scroll sideways instead of wrapping or overflowing. */
+.tabs { overflow-x: auto; scrollbar-width: thin; border-bottom-color: var(--fa-line); }
+.tab {
+  font-family: var(--fa-font-ui);
+  font-size: var(--fa-text-md);
+  font-weight: 500;
+  color: var(--fa-fg-2);
+  padding: 10px 14px;
+  white-space: nowrap;
+  flex: none;
+}
+.tab:hover { color: var(--fa-fg); }
+.tab.active { color: var(--fa-fg); border-bottom-color: var(--fa-accent); }
+
+/* Filter chips */
+.filter-btn { font-family: var(--fa-font-ui); font-size: var(--fa-text-sm); font-weight: 500; color: var(--fa-fg-2); border-color: var(--fa-line-strong); }
+.filter-btn:hover, .filter-btn.active { background: var(--fa-accent-soft); color: var(--fa-fg); border-color: var(--fa-accent); }
+
+/* Detail pages */
+.back-btn { font-family: var(--fa-font-ui); font-size: var(--fa-text-sm); color: var(--fa-fg-2); }
+.back-btn:hover { color: var(--fa-accent-strong); }
+.detail-title { font-family: var(--fa-font-display); font-size: var(--fa-text-2xl); letter-spacing: -0.01em; }
+.detail-meta { color: var(--fa-fg-2); }
+.stat-box { background: var(--fa-surface); border-color: var(--fa-line); border-radius: var(--fa-radius-card); padding: 12px 16px; }
+.stat-box-n { font-family: var(--fa-font-display); color: var(--fa-fg); font-variant-numeric: tabular-nums; }
+.stat-box-l { font-family: var(--fa-font-ui); font-size: var(--fa-text-xs); color: var(--fa-fg-3); }
+.info-grid { background: var(--fa-line); border-color: var(--fa-line); border-radius: var(--fa-radius-card); }
+.info-cell { background: var(--fa-surface); }
+.info-cell-label { font-family: var(--fa-font-ui); font-size: var(--fa-text-xs); font-weight: 600; letter-spacing: 0.04em; color: var(--fa-fg-3); }
+.score-label { font-size: var(--fa-text-xs); }
+.empty, .loading { font-family: var(--fa-font-ui); font-size: var(--fa-text-md); color: var(--fa-fg-3); }
+.object-card { background: var(--fa-surface); border-radius: var(--fa-radius-card); }
+.object-card:hover { border-color: var(--fa-control); }
+.object-card-title { color: var(--fa-fg); font-family: var(--fa-font-ui); }
+.object-card-meta, .pc-meta, .comment-date, .lightbox-meta { font-size: var(--fa-text-sm); color: var(--fa-fg-3); }
+.comment-card { background: var(--fa-surface); border-radius: var(--fa-radius-card); }
+.lightbox { background: rgba(4, 7, 5, 0.92); }
+
+/* ── 5. Page-level fixes ────────────────────────────────────────────────── */
+/* Overview: 8 KPI tiles as a clean 4 × 2 grid instead of 6 + 2. */
+#kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+/* The financial-exposure tile is the most important figure; its value was set smaller inline. */
+#kpis > .kpi:first-child .kpi-value { font-size: var(--fa-text-2xl) !important; line-height: 1.15; }
+#kpis > .kpi:first-child .kpi-label span[title] { color: var(--fa-fg-3); }
+/* minmax(0,1fr): long table content can no longer make one column wider than the other. */
+.grid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.grid2 > *, .grid3 > * { min-width: 0; }
+
+/* Forest Map: join the app palette (its panels used a navy fallback). */
+#sec-forest-map .forest-map-panel { border-radius: var(--fa-radius-card); border-color: var(--fa-line); }
+#sec-forest-map .forest-map-panel label { color: var(--fa-fg-2); }
+#sec-forest-map .forest-map-count { color: var(--fa-accent-strong); }
+#sec-forest-map .forest-map-canvas { border-color: var(--fa-line); border-radius: var(--fa-radius-lg); }
+#sec-forest-map .forest-map-badge { background: rgba(12, 17, 14, 0.94); color: var(--fa-fg); border: 1px solid var(--fa-line-strong); }
+#sec-forest-map .forest-map-map-title { color: var(--fa-fg-2); }
+dialog.forest-map-review { background: var(--fa-surface); color: var(--fa-fg); border-color: var(--fa-line-strong); border-radius: var(--fa-radius-lg); }
+dialog.forest-map-review td, dialog.forest-map-review th { border-bottom-color: var(--fa-line); }
+
+/* Leaflet zoom controls in the app palette (map tiles, overlays and popups are untouched). */
+.leaflet-bar { border: 1px solid var(--fa-line-strong) !important; box-shadow: none !important; border-radius: var(--fa-radius) !important; overflow: hidden; }
+.leaflet-bar a, .leaflet-bar a:hover { background: var(--fa-surface); color: var(--fa-fg); border-bottom-color: var(--fa-line-strong); }
+.leaflet-bar a:hover { background: var(--fa-raised); }
+.leaflet-bar a.leaflet-disabled { background: var(--fa-surface); color: var(--fa-fg-3); }
+
+/* ── 6. Responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  #kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* Two 5-column tables side by side do not fit below ~1200 px; stack the cards. */
+  .grid2, .grid3 { grid-template-columns: minmax(0, 1fr); }
+  /* Wide tables (e.g. Sectors) scroll inside their wrapper instead of being clipped by .main.
+     The table keeps display:table, so narrow tables still fill the card. */
+  div:has(> table.tbl) { overflow-x: auto; }
+  .content { padding: 20px; }
+  .topbar { padding: 12px 20px; }
+}
+@media (max-width: 1000px) {
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important; }
+  #kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .detail-header { flex-wrap: wrap; gap: 12px; }
+}
+/* Below 760 px the sidebar becomes an icon rail on every page (LVM GEO already did this).
+   Labels stay in the DOM, so screen readers still announce them. */
+@media (max-width: 760px) {
+  .sidebar { width: 60px; }
+  .sidebar .logo { padding: 14px 10px; }
+  .sidebar .logo-name, .sidebar .sidebar-foot { display: none; }
+  .sidebar .nav-group { font-size: 0; height: 12px; padding: 0; }
+  .sidebar .nav-item { font-size: 0; justify-content: center; margin: 2px 6px; padding: 10px 0; }
+  .sidebar .nav-icon { font-size: 17px; width: 22px; }
+  .topbar { padding: 10px 14px; min-height: 0; flex-wrap: wrap; gap: 8px; }
+  .topbar-left h1 { font-size: var(--fa-text-lg); }
+  .content { padding: 14px; }
+  .card { padding: 14px; }
+  /* Wide tables scroll inside their card instead of squeezing every column. */
+  .tbl { white-space: nowrap; }
+  .tbl td { white-space: nowrap; }
+  .info-grid { grid-template-columns: minmax(0, 1fr); }
+  .detail-title { font-size: var(--fa-text-xl); }
+}
+@media (max-width: 480px) {
+  .kpi { padding: 12px 14px; }
+  .kpi-value { font-size: var(--fa-text-2xl); }
+  #kpis > .kpi:first-child { grid-column: 1 / -1; }
+}
+
+/* ── 7. Transitional shims ─────────────────────────────────────────────── */
+/* Many labels set font-size 9–10 px inline. Raise them to the 11 px minimum.
+   Remove these rules once the inline styles are replaced by classes (phase 3). */
+.content [style*="font-size:9px"], .content [style*="font-size:10px"],
+.content [style*="font-size: 9px"], .content [style*="font-size: 10px"] { font-size: var(--fa-text-xs) !important; }
+/* Same for 10 px set by stylesheet classes (inline <style>, vmd-workflow.css, John Deere card).
+   Scoped by section id so they win regardless of stylesheet order; Leaflet attribution is left alone. */
+.auto-refresh-badge,
+#sec-lvm-geodata .vmd-version, #sec-lvm-geodata .vmd-accuracy, #sec-lvm-geodata .vmd-basemap-label,
+#sec-lvm-geodata .vmd-hint, #sec-lvm-geodata .vmd-mode-tabs .btn, #sec-lvm-geodata .vmd-territory-tools .btn,
+#sec-lvm-geodata .vmd-advanced .btn, #sec-lvm-geodata .vmd-map-toolbar .btn, #sec-lvm-geodata #vmd-basemap-status,
+#sec-lvm-geodata .vmd-results-head > span, #sec-lvm-geodata .vmd-selection-toolbar .btn,
+#sec-lvm-geodata .vmd-selection-toolbar select, #sec-lvm-geodata .vmd-result-footer .btn,
+#sec-lvm-geodata #vmd-page-label, #sec-lvm-geodata .vmd-register-top .btn, #sec-lvm-geodata .vmd-progress li,
+.vmd-preview-metrics div,
+#john-deere-card .jd-eyebrow, #john-deere-card .jd-section-title, #john-deere-card .jd-brand-note { font-size: var(--fa-text-xs) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-item, .btn, .tab, .kpi, .object-card, .filter-btn { transition: none !important; }
+}
