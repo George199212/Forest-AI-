@@ -7,6 +7,21 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-16 — Satellite Monitoring status source + Forest Map satellite layer (branch `feature/satellite-monitoring`, NOT deployed)
+
+- Live :8000 is unchanged (drop-in `96-forest-map-contrast`); this work is on the branch and in the UI-review sandbox
+  `127.0.0.1:8030` only (`/root/sat_sandbox`, copies of forest_ai.db / satellite.db / rasters, `/root` read-only).
+- Live satellite.db (`/root/forest_ai_satellite_data/satellite.db`, sha256 `052b99df…`) is still pre-Stage-2: it has
+  no `sat_jobs` table and no `sat_change_events.risk_carried_from_event_id` / `risk_carry_overlap`. The worker's
+  first Stage 2 run creates them (`satellite_monitoring/db.py:270-288`, `:457`, applied in `db.connect()`
+  `:482-500`); until then the UI says "Changes cannot be queued … Missing: …". No migration was applied.
+- Copernicus status shown in the UI = the worker's records. On the sandbox copy: OK (last successful call
+  2026-11-11 07:13 UTC, runs #1–#3 OK). The old banner fired only because the sandbox API has no SENTINEL_* env.
+- "Worker: Idle" only means the lock file is not held; no worker unit/timer is installed yet (Stage 4).
+- Forest Map layer "Satelīta izmaiņas" + deep links verified in headless Chromium on the sandbox (both basemaps,
+  GPS and sector layers still on and toggleable). Evidence: `docs/evidence/sat-status-map-layer/` (not versioned,
+  in the worktree `/root/wt/satellite-monitoring`).
+
 ## Update 2026-11-10 — LVM GEO registration UX + Forest Map basemap (branch `feature/lvm-geo-finish`, NOT deployed)
 
 Frontend only (`assets/vmd-production.js`, `assets/forest-map.js`, `index.html` `#sec-lvm-geodata`,

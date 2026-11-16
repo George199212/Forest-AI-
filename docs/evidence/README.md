@@ -14,6 +14,7 @@ The documents in `docs/` that cite them stay valid as long as that folder is kep
 | `full-diagnostic-20261107/` | 11 | 112 KB | Catalogue health, geometry, indexes, integrity, query plans, preservation checks | `docs/LVM_VMD_FULL_DIAGNOSTIC_20261107.md` |
 | `nationwide/` (+ `audit-01000950031/`) | 14 | 304 KB | data.gov.lv dataset metadata snapshots, VZD bulk and endpoint probes, cadastral audit table | `docs/NATIONWIDE_*.md` |
 | `vmd-real-world-20261107/` | 36 | 7.0 MB | 20 `api-<cadastre>.json` responses, browser tests, quality report, 4 regional PNG previews, 6 Python evidence scripts | `docs/VMD_REAL_WORLD_TEST_20261107.md` |
+| `sat-status-map-layer/` | 16 | 8.5 MB | Satellite Monitoring banners (before/after, AUTH / NOT_CONFIGURED / UNKNOWN from throwaway DB copies), events 51/52/55, BIK-001 empty state, Forest Map layer "Satelīta izmaiņas" on Satelīts and Karte; sandbox 127.0.0.1:8030, kept in `/root/wt/satellite-monitoring/docs/evidence/` | `CURRENT_STATUS.md` (2026-11-16), `CHANGELOG.md` |
 
 All evidence is derived from public open data: VMD forest compartments (CC0-1.0) and
 VZD cadastral parcels (CC-BY-4.0, attribution "Valsts zemes dienests"). It contains no

@@ -42,3 +42,20 @@
   grey GPS transition line were weak on white. Satellite was fine and is unchanged.
 - No GPS session in the production DB has transitions or gaps yet (only session #32 has track points), so the
   white-casing style for them was checked with a clearly labelled synthetic sample only. Found 2026-11-10.
+
+- Satellite Monitoring (fixed on `feature/satellite-monitoring`, not deployed, 2026-11-16): the overview showed
+  "Copernicus credentials are not configured" whenever the API process had no SENTINEL_* variables, although the
+  worker had synced successfully (root cause: `store.health()` read `os.environ` of the API). Now from
+  `sat_provider_status` / `sat_runs`.
+- Satellite Monitoring (fixed on the same branch, 2026-11-16): the 30 s dashboard auto-refresh re-rendered the
+  overview and threw an open event/area page away (reproduced: event #52 → overview after ~35 s).
+- Satellite Monitoring (open, 2026-11-16): "Worker: Idle" is shown although no worker is installed; it only means
+  `.sat-monitoring.lock` is not held. Live satellite.db is not migrated for Stage 2, so add/stop/fetch/review return
+  503 until the worker's first run (Stage 4).
+- Forest Map "Satelīta izmaiņas" (open, 2026-11-16): the focused event is not drawn differently from the other
+  events of its area (only its popup is opened); geometry is simplified (±2–80 m, shown in the popup), the event page
+  keeps the full mask. Superseded events (e.g. #48) return 404 on `/map-layer?event_id=`.
+- `index.html` must keep `<script src="/assets/forest-map.js?v=20261107">` byte-exact: `api.py` enables Forest Map
+  by string-replacing that tag (`FOREST_MAP_ENABLED`). Bumping the `?v=` disables the map ("Meža karte gaida servera
+  atjauninājumu"). Guarded by `tests/test_forest_map_sat.js` since 2026-11-16.
+
