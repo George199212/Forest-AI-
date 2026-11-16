@@ -78,6 +78,9 @@ from services.geodata.vmd_production import router as vmd_production_router
 app.include_router(vmd_production_router(verify_credentials))
 from services.geodata.forest_map import router as forest_map_router
 app.include_router(forest_map_router(verify_credentials))
+# Satellite Monitoring (S1+S2) Stage 2: satellite.db read-only for display; POSTs write only job/review rows.
+from satellite_monitoring.api_routes import router as sat_monitoring_router
+app.include_router(sat_monitoring_router(verify_credentials))
 
 @app.get("/api/geodata/vmd/test-sectors")
 def vmd_test_compartments():
