@@ -372,3 +372,51 @@ Event 49 reason: "current mask 0.14 ha < min_cluster_ha 0.3 ha in 2 consecutive 
 - No human review of any event. Whether a RECOVERED remnant should also stop being counted as an outside event
   in the evaluation is not decided; both counts are shown above.
 
+
+## 10. Live run: F6 + remnant rule + compartment split on the live `satellite.db` (2026-11-13)
+
+**Owner-approved** after the §9 gate was met. Verified read-only on 2026-11-16.
+
+**How:** the live `/root/forest_ai_satellite_data/satellite.db` was backed up first:
+- `/root/backups/satellite_before_redetect_20261113T141918Z.db.raw`: a byte copy, sha256 `9ce79c76…c91f`, which equals the pre-change live hash.
+- `…20261113T141918Z.db`: an `sqlite3` backup, sha256 `8860a698…657c`. The hash differs because of the page layout; the content is the same.
+
+Then `python -m satellite_monitoring.redetect --area 1 --area 2` ran at `b3c0fd4`, from 14:19:28Z to 14:36:10Z, `exit=0`.
+The log is `/root/backups/satellite_redetect_live_20261113T141918Z.log`.
+
+**Result:**
+- Run 3 (MANUAL) finished OK. Generation 1 is `OK` (`code_version b3c0fd4`, areas [1, 2]).
+- **0 requests, 0 PU**, no errors.
+- Superseded, none deleted: 284 detections, 48 change events (BIK-001 9, Ķekava 39), 26 S2 candidates and 100 radar anomalies.
+- `PRAGMA integrity_check` = ok. The live sha256 after the run is `052b99df…0201`, and the file has not been modified since 14:36:09Z.
+- `sat_review_log` is empty: no human decision existed, so none was affected.
+
+**Comparison with §9 (copy):** the live current-generation events are **identical** to the §9 copy. Same ids 49–57,
+area, classification, confidence, current/max ha, status and compartment split. So the §9 metrics carry over unchanged:
+- recall 3 / 3, median delay 6 d (−3 … 7);
+- 5 outside events (1 RECOVERED, 4 open), 105.19 ha in total (open 105.11 ha);
+- BIK-001: 0 events.
+
+`positive_control` was not re-run against the live file. Because the event rows are identical, its output would be too.
+
+**Live events, generation 1** (INTERPRETATION; split = stand z10 / clear-cut z14 / other / none, ha):
+
+| id | class | conf | current ha | max ha | split | status |
+|---|---|---|---|---|---|---|
+| 49 | POTENTIAL_FOREST_LOSS | LOW | 0.08 | 1.30 | 0 / 0.08 / 0 / 0 | **RECOVERED** |
+| 50 | POTENTIAL_FOREST_LOSS | HIGH | 1.04 | 3.60 | 0.21 / 0.05 / 0.78 / 0 | SUSPECTED |
+| 51 | POTENTIAL_FOREST_LOSS | HIGH | 5.97 | 5.97 | 0.38 / 4.75 / 0.84 / 0 | SUSPECTED |
+| 52 | POTENTIAL_FOREST_LOSS | HIGH | 3.51 | 3.59 | 2.19 / 1.32 / 0 / 0 | SUSPECTED |
+| 53 | POTENTIAL_FOREST_LOSS | HIGH | 6.78 | 7.79 | 5.34 / 1.06 / 0.38 / 0 | SUSPECTED |
+| 54 | POTENTIAL_FOREST_LOSS | HIGH | 55.73 | 55.90 | 40.32 / 7.67 / 7.74 / 0 | SUSPECTED |
+| 55 | POTENTIAL_CHANGE_OUTSIDE_BOUNDARY | HIGH | 123.71 | 123.71 | 107.19 / 3.46 / 13.06 / 0 | SUSPECTED |
+| 56 | POSSIBLE_SEASONAL_OR_ENVIRONMENTAL | HIGH | 68.70 | 68.76 | 59.51 / 3.32 / 5.87 / 0 | SUSPECTED |
+| 57 | POSSIBLE_SEASONAL_OR_ENVIRONMENTAL | HIGH | 28.59 | 28.59 | 27.09 / 1.04 / 0.46 / 0 | SUSPECTED |
+
+**Rollback:** stop all writers, then copy `satellite_before_redetect_20261113T141918Z.db.raw` over the live file and
+check sha256 = `9ce79c76…`. A newer generation is a non-destructive alternative, because superseded rows are kept.
+
+**Open items (unchanged from §9):**
+- Events 55, 56 and 57 need human visual review.
+- RECOVERED counting in the evaluation is not decided.
+- Stage 2 has not started.
