@@ -1,0 +1,27 @@
+# Satellite Monitoring daily run (Stage 2: PREPARED ONLY - not installed, not enabled).
+# Install only in Stage 4, after explicit approval. Replace @RELEASE_DIR@ with the ACTIVE release folder in
+# /root/forest_ai/releases/ (never a worktree path). Worker = isolated venv2 (config.WORKER_VENV).
+[Unit]
+Description=Forest AI satellite monitoring - daily Sentinel-1/2 run (queue + TIMER run)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@RELEASE_DIR@
+EnvironmentFile=/root/forest_ai/.env
+Environment=SAT_DATA_DIR=/root/forest_ai_satellite_data
+Environment=FOREST_DB_PATH=/root/forest_ai/data/forest_ai.db
+ExecStart=/root/forest_ai_satellite_venv2/bin/python -m satellite_monitoring.jobs --daily
+UMask=0077
+Nice=10
+CPUQuota=100%
+MemoryMax=2G
+TimeoutStartSec=3h
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/root/forest_ai_satellite_data
+StandardOutput=journal
+StandardError=journal

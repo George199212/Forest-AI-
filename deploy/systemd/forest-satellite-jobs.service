@@ -1,0 +1,26 @@
+# Satellite Monitoring job queue (API "Add area" / "Stop" / "Fetch now"). PREPARED ONLY (Stage 2).
+# Cheap when the queue is empty (no network). Same placeholders as forest-satellite-sync.service.
+[Unit]
+Description=Forest AI satellite monitoring - process queued jobs
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@RELEASE_DIR@
+EnvironmentFile=/root/forest_ai/.env
+Environment=SAT_DATA_DIR=/root/forest_ai_satellite_data
+Environment=FOREST_DB_PATH=/root/forest_ai/data/forest_ai.db
+ExecStart=/root/forest_ai_satellite_venv2/bin/python -m satellite_monitoring.jobs
+UMask=0077
+Nice=10
+CPUQuota=100%
+MemoryMax=2G
+TimeoutStartSec=3h
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/root/forest_ai_satellite_data
+StandardOutput=journal
+StandardError=journal

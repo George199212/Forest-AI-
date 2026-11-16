@@ -1,0 +1,10 @@
+# PREPARED ONLY (Stage 2) - install/enable in Stage 4 after approval.
+[Unit]
+Description=Forest AI satellite monitoring - job queue every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+
+[Install]
+WantedBy=timers.target
