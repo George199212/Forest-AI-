@@ -135,3 +135,11 @@ test('worker badge: Not installed / Running / Idle / Timers off / Status unknown
  assert.equal(sat._T_LV.wNotInstalled,'Nav uzstādīts');assert.equal(sat._T_LV.hIdle,'Dīkstāvē');
  assert.equal(sat._T_LV.wTimersOff,'Taimeri izslēgti');assert.equal(sat._T_LV.wUnknown,'Statuss nav zināms');
 });
+
+test('event images say what the colours are; true colour is stated as unavailable (B02/B03 not stored)',()=>{
+ const src=read('assets/sat-monitoring.js'),prov=read('satellite_monitoring/provider.py'),sat=loadSat();
+ assert.match(prov,/S2_BANDS = \["B04", "B08", "B11", "B12", "SCL", "dataMask"\]/);   // if B02/B03 are ever stored, revisit
+ assert.match(src,/bandNote\(imgs\) \+ '<\/div>';/);
+ assert.match(sat._T_LV.bandNoTrue,/^Patiesās krāsas \(B04 \/ B03 \/ B02\) nav pieejamas/);
+ assert.match(sat._T_LV.bandS2,/^Sentinel-2 viltus krāsas \(B11 \/ B08 \/ B04\)/);
+});

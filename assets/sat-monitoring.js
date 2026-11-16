@@ -93,6 +93,9 @@
     logTitle: 'Review log', noReview: 'No review yet.', thDate: 'Date', thAction: 'Action', thBy: 'By', thNote: 'Note',
     superseded: 'This event was superseded by a later detection generation; review is disabled.',
     noImage: 'No image', validPct: 'Valid %', imgLoading: 'Loading image…', imgFailed: 'The image could not be loaded.',
+    bandS2: 'Sentinel-2 false colour (B11 / B08 / B04): healthy forest green, clear-cut or bare soil magenta/brown.',
+    bandNoTrue: 'True colour (B04 / B03 / B02) is not available: bands B03 and B02 are not stored.',
+    bandS1: 'Sentinel-1: VH radar backscatter, grey scale −25 … −5 dB.',
     lvmAdd: 'Add to satellite monitoring', lvmMonitored: 'Already monitored', lvmQueued: 'Queued for satellite monitoring',
     lvmMulti: 'Multi-part polygon — add the parts separately', alreadyQueued: 'Already queued.'
   };
@@ -307,6 +310,9 @@
     validPct: "Derīgi %",
     imgLoading: "Ielādē attēlu…",
     imgFailed: "Attēlu neizdevās ielādēt.",
+    bandS2: "Sentinel-2 viltus krāsas (B11 / B08 / B04): veselīgs mežs — zaļš, izcirtums vai kaila augsne — violets/brūns.",
+    bandNoTrue: "Patiesās krāsas (B04 / B03 / B02) nav pieejamas: kanāli B03 un B02 netiek saglabāti.",
+    bandS1: "Sentinel-1: VH radara atpakaļizkliede, pelēktoņu skala −25 … −5 dB.",
     lvmAdd: "Pievienot satelītu monitoringam",
     lvmMonitored: "Jau tiek uzraudzīts",
     lvmQueued: "Rindā satelītu monitoringam",
@@ -860,7 +866,7 @@
     html += '<div class="card satm-card"><div class="card-head"><span></span><span class="satm-actions">' +
       '<button class="filter-btn' + (S.imgMode === 'side' ? ' active' : '') + '" data-mode="side">' + t('sideBySide') + '</button>' +
       '<button class="filter-btn' + (S.imgMode === 'swipe' ? ' active' : '') + '" data-mode="swipe">' + t('swipe') + '</button>' +
-      '</span></div>' + (S.imgMode === 'side' ? sideBySide(imgs) : swipeBox(imgs)) + '</div>';
+      '</span></div>' + (S.imgMode === 'side' ? sideBySide(imgs) : swipeBox(imgs)) + bandNote(imgs) + '</div>';
     html += '<div class="satm-grid">' + areasCard(e) + zkatCard(e) + '</div>';
     html += '<div class="satm-grid">' + contextCard(e) + algorithmCard(e) + '</div>';
     html += reviewCard(e);
@@ -894,6 +900,14 @@
     return '<div class="satm-imgmeta">' + data(dt(x.sensing_time_utc) + ' UTC · ' + x.sensor + (x.platform ? ' · ' + x.platform : '')) +
       '<br>' + t('validPct') + ': ' + data(num(x.valid_pct_inside, 1)) + '<br><span class="satm-pid">' + data(x.product_id) + '</span>' +
       attribution('Contains modified Copernicus Sentinel data ' + String(x.sensing_time_utc).slice(0, 4)) + '</div>';
+  }
+  // UI review item 7: stored S2 rasters hold B04, B08, B11, B12, SCL, dataMask only (provider.S2_BANDS), so a true
+  // colour view (B04/B03/B02) cannot be made without new Copernicus requests. Say what the colours mean instead.
+  function bandNote(imgs) {
+    var s = [imgs.before, imgs.after].filter(Boolean).map(function (x) { return x.sensor; });
+    if (!s.length) return '';
+    return '<div class="satm-muted satm-bandnote">' +
+      (s.indexOf('S2') >= 0 ? t('bandS2') + ' ' + t('bandNoTrue') : '') + (s.indexOf('S1') >= 0 ? ' ' + t('bandS1') : '') + '</div>';
   }
   function sideBySide(imgs) {
     return '<div class="satm-imgs">' +
