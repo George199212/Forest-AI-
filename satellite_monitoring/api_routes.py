@@ -176,6 +176,20 @@ def router(verify_credentials, sender=None, database=None, recommend=None):
         return FileResponse(str(p), media_type="image/png",
                             headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
 
+    @r.get("/sectors")
+    def sectors():
+        try:
+            return store.sectors()
+        except store.StoreError as e:
+            return _err(e)
+
+    @r.get("/lookup")
+    def lookup(source: str, source_ref: str):
+        try:
+            return store.lookup(source, source_ref)
+        except store.StoreError as e:
+            return _err(e)
+
     @r.get("/health")
     def health():
         try:

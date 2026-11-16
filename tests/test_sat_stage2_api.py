@@ -138,11 +138,12 @@ def test_every_sat_monitoring_route_in_the_real_app_requires_basic_auth(monkeypa
         ("/api/sat-monitoring/areas", "POST"), ("/api/sat-monitoring/areas/{area_id}/stop", "POST"),
         ("/api/sat-monitoring/fetch", "POST"), ("/api/sat-monitoring/events/{event_id}", "GET"),
         ("/api/sat-monitoring/events/{event_id}/review", "POST"),
-        ("/api/sat-monitoring/file/{acq_id}/{kind}", "GET"), ("/api/sat-monitoring/health", "GET")}
+        ("/api/sat-monitoring/file/{acq_id}/{kind}", "GET"), ("/api/sat-monitoring/health", "GET"),
+        ("/api/sat-monitoring/sectors", "GET"), ("/api/sat-monitoring/lookup", "GET")}
     c = TestClient(api.app)
     bad = {"Authorization": "Basic " + base64.b64encode(b"u:wrong").decode()}
     for p, m in found:
-        path = p.replace("{area_id}", "1").replace("{event_id}", "1").replace("{acq_id}", "1") \
+        path = (p + ("?source=SECTOR&source_ref=1" if p.endswith("/lookup") else "")).replace("{area_id}", "1").replace("{event_id}", "1").replace("{acq_id}", "1") \
                 .replace("{kind}", "quicklook")
         assert c.request(m, path, json={}).status_code == 401, (m, path)
         assert c.request(m, path, json={}, headers=bad).status_code == 401, (m, path)
@@ -440,3 +441,117 @@ def test_wording_is_neutral(ev):
     assert not any(w in s.lower() for w in store.FORBIDDEN_WORDS + ("felling", "logging"))
     if ev["changed_area_ha"] is None:
         assert "unknown" in s                                                 # missing never becomes 0
+
+
+# ── Stage 3 additions: UI fields, sectors, lookup ───────────────────────────
+def test_overview_kpis_geometry_and_pending_area_jobs(client, sat):
+    client.post("/api/sat-monitoring/areas", json={"source": "LVM_GEO", "source_ref": "NEW", "name": "New",
+                                                   "geometry": GOOD}, headers=AUTH)
+    o = client.get("/api/sat-monitoring/overview", headers=AUTH).json()
+    k = o["kpis"]
+    assert (k["monitored_areas"], k["open_suspected_events"], k["recovered_events"]) == (1, 1, 1)
+    assert k["awaiting_data"] == 1                                   # the queued ADD_AREA job
+    assert [j["payload"]["source_ref"] for j in o["pending_area_jobs"]] == ["NEW"]
+    assert "geometry" not in o["pending_area_jobs"][0]["payload"]
+    assert o["areas"][0]["geometry"]["type"] == "Polygon"
+
+
+def test_add_area_job_marks_its_area_as_backfill_in_progress(client, sat):
+    conn = sdb.connect()
+    conn.execute("INSERT INTO sat_jobs (kind, payload_json, dedup_key, status, requested_by, requested_at_utc) VALUES "
+                 "('ADD_AREA', ?, 'ADD_AREA:LVM_GEO:LVM-1', 'RUNNING', 'alice', 'now')",
+                 (json.dumps({"source": "LVM_GEO", "source_ref": "LVM-1", "name": "Stand A"}),))
+    conn.commit()
+    conn.close()
+    a = client.get("/api/sat-monitoring/overview", headers=AUTH).json()["areas"][0]
+    assert a["data_status"] == "BACKFILL_OR_FETCH_IN_PROGRESS"
+
+
+def test_area_detail_has_map_layers_and_radar(client, sat):
+    conn = sdb.connect()
+    conn.execute("UPDATE sat_monitored_areas SET grid_json=? WHERE id=?",
+                 (json.dumps({"bbox": [24.49, 56.99, 24.52, 57.02]}), sat["area"]))
+    conn.execute("INSERT INTO sat_radar_anomalies (monitored_area_id, acquisition_id, sensing_time_utc, orbit_direction,"
+                 " relative_orbit, baseline_acq_ids, created_at_utc, mask_path, n_pixels, changed_area_ha, "
+                 "evidence_quality) VALUES (?, ?, '2026-10-25T05:00:00Z', 'ASCENDING', 58, '[]', 'now', 'm', 5, 0.05, "
+                 "'GOOD')", (sat["area"], sat["acq"][3]))
+    conn.commit()
+    conn.close()
+    d = client.get(f"/api/sat-monitoring/areas/{sat['area']}", headers=AUTH).json()
+    assert d["area"]["grid_bbox"] == [24.49, 56.99, 24.52, 57.02]
+    assert d["buffer_ring"]["type"] == "Polygon" and len(d["buffer_ring"]["coordinates"]) == 2   # ring with a hole
+    assert d["radar_anomalies"][0]["relative_orbit"] == 58
+    assert d["events"][0]["change_geojson"]["type"] == "FeatureCollection"
+    assert {x["product_id"] for x in d["timeline"]} == {"P0", "P1", "P2", "P3"}
+    assert d["attribution"] == "Contains modified Copernicus Sentinel data 2026"
+
+
+def test_event_detail_area_algorithm_and_undo_flag(client, sat):
+    conn = sdb.connect()
+    conn.execute("INSERT INTO sat_detection_generations (created_at_utc, finished_at_utc, area_ids, code_version, reason,"
+                 " status) VALUES ('2026-10-21T10:30:00Z', '2026-10-21T12:00:00Z', ?, 'abc1234', 't', 'OK')",
+                 (json.dumps([sat["area"]]),))
+    conn.commit()
+    conn.close()
+    e = client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()
+    assert e["algorithm"]["generation_id"] == 1 and e["algorithm"]["code_version"] == "abc1234"
+    assert e["area"]["name"] == "Stand A" and e["area"]["geometry"]["type"] == "Polygon"
+    assert e["before"][0]["product_id"] == "P0" and e["undo_available"] is False
+    _review(client, sat["open"], "REJECT")
+    assert client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()["undo_available"] is True
+
+
+def test_health_reports_credentials_by_name_only(client, monkeypatch):
+    monkeypatch.delenv("SENTINEL_CLIENT_ID", raising=False)
+    monkeypatch.delenv("SENTINEL_CLIENT_SECRET", raising=False)
+    h = client.get("/api/sat-monitoring/health", headers=AUTH).json()
+    assert h["credentials_configured"] is False and h["failed_jobs"] == 0 and h["month"]["pu_guard"] == 1600.0
+    monkeypatch.setenv("SENTINEL_CLIENT_ID", "id-value")
+    monkeypatch.setenv("SENTINEL_CLIENT_SECRET", "secret-value")
+    r = client.get("/api/sat-monitoring/health", headers=AUTH)
+    assert r.json()["credentials_configured"] is True and "secret-value" not in r.text and "id-value" not in r.text
+
+
+def test_sectors_list_reads_main_db_read_only(client, sat, tmp_path, monkeypatch):
+    f = tmp_path / "main.db"
+    c = sqlite3.connect(f)
+    c.executescript("CREATE TABLE sectors (id INTEGER PRIMARY KEY, name TEXT, boundary_json TEXT);"
+                    "INSERT INTO sectors VALUES (1, 'A-1', '[[57,24],[57,24.1],[57.1,24.1]]'), (2, 'B-2', '[]'),"
+                    " (3, 'C-3', NULL);")
+    c.commit()
+    c.close()
+    monkeypatch.setenv("FOREST_DB_PATH", str(f))
+    before = _sha(f)
+    conn = sdb.connect()
+    conn.execute("INSERT INTO sat_monitored_areas (source, source_ref, name, geometry_geojson, area_ha, buffer_m, "
+                 "grid_json, added_by, added_at_utc) VALUES ('SECTOR','1','A-1','{}',1,100,'{}','x','now')")
+    conn.commit()
+    conn.close()
+    s = {x["name"]: x for x in client.get("/api/sat-monitoring/sectors", headers=AUTH).json()["sectors"]}
+    assert s["A-1"]["has_polygon"] and s["A-1"]["monitored_area_id"]
+    assert not s["B-2"]["has_polygon"] and not s["C-3"]["has_polygon"]
+    assert _sha(f) == before
+
+
+def test_lookup_for_the_lvm_geo_button(client, sat):
+    r = client.get("/api/sat-monitoring/lookup?source=LVM_GEO&source_ref=LVM-1", headers=AUTH).json()
+    assert r == {"monitored": True, "area_id": sat["area"], "queued_job_id": None}
+    client.post("/api/sat-monitoring/areas", json={"source": "LVM_GEO", "source_ref": "vmd-9", "name": "VMD 1-2",
+                                                   "geometry": GOOD}, headers=AUTH)
+    r = client.get("/api/sat-monitoring/lookup?source=LVM_GEO&source_ref=vmd-9", headers=AUTH).json()
+    assert r["monitored"] is False and r["queued_job_id"]
+    assert client.get("/api/sat-monitoring/lookup?source=NOPE&source_ref=1", headers=AUTH).status_code == 422
+
+
+def test_single_part_multipolygon_is_unwrapped_and_multi_part_refused(client, sat):
+    one = {"type": "MultiPolygon", "coordinates": [GOOD["coordinates"]]}
+    r = client.post("/api/sat-monitoring/areas", json={"source": "LVM_GEO", "source_ref": "M1", "name": "m",
+                                                       "geometry": one}, headers=AUTH)
+    assert r.status_code == 202
+    conn = sdb.connect_ro()
+    assert json.loads(conn.execute("SELECT payload_json FROM sat_jobs").fetchone()[0])["geometry"]["type"] == "Polygon"
+    conn.close()
+    two = {"type": "MultiPolygon", "coordinates": [GOOD["coordinates"], GOOD["coordinates"]]}
+    r = client.post("/api/sat-monitoring/areas", json={"source": "LVM_GEO", "source_ref": "M2", "name": "m",
+                                                       "geometry": two}, headers=AUTH)
+    assert r.status_code == 422 and "multi-part" in r.json()["error"]

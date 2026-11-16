@@ -18,9 +18,10 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import config, db as sdb
+from . import config, db as sdb, display
 
 BUSY_TIMEOUT_MS = 5000
+RECENT_DAYS = 14                               # "with recent observations": last valid S2 or S1 within this
 API_AREA_SOURCES = ("SECTOR", "LVM_GEO")       # EVAL_BBOX stays CLI-only
 MAX_VERTICES = 5000
 REVIEW_DECISIONS = ("CONFIRM", "REJECT", "FIELD_CHECK", "CREATE_RISK", "UNDO")
@@ -134,7 +135,9 @@ def _area_public(a):
                               "added_at_utc", "removed_at_utc")} | {"active": bool(a["active"])}
 
 
-def _open_jobs(conn, area_id=None):
+def _open_jobs(conn, area=None):
+    """Open (QUEUED/RUNNING) jobs; with `area`, only those about it: STOP/FETCH by area id, FETCH all, and the
+    ADD_AREA job that created it (matched by source + source_ref; it stays RUNNING during the first backfill)."""
     if not _has_table(conn, "sat_jobs"):
         return []
     rows = [dict(r) for r in conn.execute("SELECT id, kind, payload_json, status, requested_by, requested_at_utc, "
@@ -143,8 +146,10 @@ def _open_jobs(conn, area_id=None):
     out = []
     for r in rows:
         p = _j(r.pop("payload_json"), {})
-        r["payload"] = p
-        if area_id is None or p.get("area_id") == area_id or (r["kind"] == "FETCH" and p.get("all")):
+        r["payload"] = {k: v for k, v in p.items() if k != "geometry"}
+        if (area is None or p.get("area_id") == area["id"] or (r["kind"] == "FETCH" and p.get("all"))
+                or (r["kind"] == "ADD_AREA" and (p.get("source"), p.get("source_ref")) == (area["source"],
+                                                                                           area["source_ref"]))):
             out.append(r)
     return out
 
@@ -170,7 +175,7 @@ def _area_stats(conn, a, now):
         (a["id"], cfg["min_valid_pct"], since))]
     now_s = sdb.iso(now)
     gaps = [_days_between(x, y) for x, y in zip(times, times[1:])]
-    jobs = _open_jobs(conn, a["id"])
+    jobs = _open_jobs(conn, a)
     if not a["active"]:
         data_status = "STOPPED"
     elif any(j["kind"] == "ADD_AREA" or (j["kind"] == "FETCH" and j["status"] == "RUNNING") for j in jobs):
@@ -179,9 +184,14 @@ def _area_stats(conn, a, now):
         data_status = "NO_DATA_YET"
     else:
         data_status = "OK"
+    recent = [t for t in (s1, s2[0] if s2 else None) if t]
+    grid = _j(a.get("grid_json"), {}) or {}
     return {
         **_area_public(a),
+        "geometry": _j(a.get("geometry_geojson")),
+        "grid_bbox": grid.get("bbox"),
         "data_status": data_status,
+        "recent_observation": bool(recent) and min(_days_between(t, now_s) for t in recent) <= RECENT_DAYS,
         "last_s1_utc": s1,
         "last_valid_s2_utc": s2[0] if s2 else None,
         "last_valid_s2_valid_pct": s2[1] if s2 else None,
@@ -204,7 +214,22 @@ def overview(now=None):
     conn = ro()
     try:
         areas = [dict(r) for r in conn.execute("SELECT * FROM sat_monitored_areas ORDER BY active DESC, id")]
-        return {"generated_at_utc": sdb.iso(now), "areas": [_area_stats(conn, a, now) for a in areas],
+        stats = [_area_stats(conn, a, now) for a in areas]
+        known = {(a["source"], a["source_ref"]) for a in areas if a["active"]}
+        pending = [j for j in _open_jobs(conn) if j["kind"] == "ADD_AREA"
+                   and (j["payload"].get("source"), j["payload"].get("source_ref")) not in known]
+        active = [s for s in stats if s["active"]]
+        kpis = {
+            "monitored_areas": len(active),
+            "with_recent_observations": sum(1 for s in active if s["recent_observation"]),
+            "awaiting_data": sum(1 for s in active if s["data_status"] in ("NO_DATA_YET",
+                                                                            "BACKFILL_OR_FETCH_IN_PROGRESS"))
+                             + len(pending),
+            "open_suspected_events": sum(s["open_suspected_events"] for s in active),
+            "recovered_events": sum(s["recovered_events"] for s in active),
+            "recent_days": RECENT_DAYS,
+        }
+        return {"generated_at_utc": sdb.iso(now), "kpis": kpis, "areas": stats, "pending_area_jobs": pending,
                 "labels": {"interpretation": "automated, suspected change only", "attribution":
                            "Contains modified Copernicus Sentinel data " + str(now.year)}}
     finally:
@@ -247,6 +272,7 @@ def area_detail(area_id):
                               "sensor", (area_id,)):
             timeline.append({
                 "acq_id": r["id"], "sensor": r["sensor"], "sensing_time_utc": r["sensing_time_utc"],
+                "product_id": r["product_id"],
                 "status": r["status"], "platform": r["platform"], "orbit_direction": r["orbit_direction"],
                 "relative_orbit": r["relative_orbit"], "scene_cloud_pct": r["scene_cloud_pct"],
                 "valid_pct_inside": r["valid_pct_inside"], "valid_pct_buffer": r["valid_pct_buffer"],
@@ -254,23 +280,61 @@ def area_detail(area_id):
                 "metrics_inside": met.get(r["id"], {}), "detection": det.get(r["id"]),
                 "quicklook_url": (f"/api/sat-monitoring/file/{r['id']}/quicklook" if r["quicklook_path"] else None),
             })
-        events = [_event_public(dict(e)) for e in conn.execute(
-            "SELECT * FROM sat_change_events WHERE monitored_area_id=?" + sdb.current_only(conn, "sat_change_events")
-            + " ORDER BY id", (area_id,))]
-        return {"area": _area_stats(conn, a, sdb.utcnow()), "geometry": _j(a["geometry_geojson"]),
-                "timeline": timeline, "events": events}
+        events = []
+        for e in conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=?"
+                              + sdb.current_only(conn, "sat_change_events") + " ORDER BY id", (area_id,)):
+            pub = _event_public(dict(e))
+            pub["change_geojson"] = _j(e["change_geojson"])          # CURRENT mask (zone INSIDE / BUFFER)
+            events.append(pub)
+        radar = []
+        if _has_table(conn, "sat_radar_anomalies"):
+            radar = [dict(r) for r in conn.execute(
+                "SELECT id, acquisition_id, sensing_time_utc, orbit_direction, relative_orbit, changed_area_ha, "
+                "evidence_quality, status, promotion_rule, event_id FROM sat_radar_anomalies WHERE monitored_area_id=?"
+                + sdb.current_only(conn, "sat_radar_anomalies") + " ORDER BY sensing_time_utc", (area_id,))]
+        geometry = _j(a["geometry_geojson"])
+        return {"area": _area_stats(conn, a, sdb.utcnow()), "geometry": geometry,
+                "buffer_ring": display.buffer_ring(geometry, a["buffer_m"]) if geometry else None,
+                "timeline": timeline, "events": events, "radar_anomalies": radar,
+                "attribution": _attribution(timeline)}
     finally:
         conn.close()
 
 
+def _attribution(items):
+    """'Contains modified Copernicus Sentinel data [YEAR]' with the sensing year(s) of the images shown."""
+    years = sorted({str(x.get("sensing_time_utc", ""))[:4] for x in items if x.get("sensing_time_utc")})
+    years = [y for y in years if y.isdigit()]
+    span = (years[0] if len(years) == 1 else f"{years[0]}-{years[-1]}") if years else str(sdb.utcnow().year)
+    return f"Contains modified Copernicus Sentinel data {span}"
+
+
 def _acq_brief(conn, acq_id):
-    r = conn.execute("SELECT id, sensor, sensing_time_utc, status, valid_pct_inside, quicklook_path FROM "
-                     "sat_acquisitions WHERE id=?", (acq_id,)).fetchone()
+    r = conn.execute("SELECT id, sensor, product_id, platform, orbit_direction, relative_orbit, sensing_time_utc, "
+                     "status, valid_pct_inside, quicklook_path FROM sat_acquisitions WHERE id=?", (acq_id,)).fetchone()
     if not r:
         return {"acq_id": acq_id, "missing": True}
-    return {"acq_id": r["id"], "sensor": r["sensor"], "sensing_time_utc": r["sensing_time_utc"],
+    return {"acq_id": r["id"], "sensor": r["sensor"], "product_id": r["product_id"], "platform": r["platform"],
+            "orbit_direction": r["orbit_direction"], "relative_orbit": r["relative_orbit"],
+            "sensing_time_utc": r["sensing_time_utc"],
             "status": r["status"], "valid_pct_inside": r["valid_pct_inside"],
             "quicklook_url": f"/api/sat-monitoring/file/{r['id']}/quicklook" if r["quicklook_path"] else None}
+
+
+def _algorithm(conn, ev):
+    """Which detection produced the current row: the detection generation (redetect) whose run covers the event's
+    creation time, else a regular pipeline run (no code version recorded for those)."""
+    out = {"thresholds": _j(ev.get("thresholds_json"), {}), "generation_id": None, "code_version": None,
+           "source": "pipeline run (code version not recorded)"}
+    if not _has_table(conn, "sat_detection_generations"):
+        return out
+    for g in conn.execute("SELECT * FROM sat_detection_generations WHERE status='OK' ORDER BY id DESC"):
+        if ev["monitored_area_id"] in (_j(g["area_ids"], []) or []) and g["created_at_utc"] <= ev["detected_at_utc"] \
+                <= (g["finished_at_utc"] or "9999"):
+            out.update(generation_id=g["id"], code_version=g["code_version"],
+                       source=f"detection generation {g['id']} (redetect over stored acquisitions)")
+            break
+    return out
 
 
 def event_detail(event_id):
@@ -289,6 +353,13 @@ def event_detail(event_id):
         out["review_log"] = [dict(r) for r in conn.execute(
             "SELECT id, action, actor, old_status, new_status, note, created_at_utc FROM sat_review_log "
             "WHERE event_id=? ORDER BY id", (event_id,))]
+        a = dict(conn.execute("SELECT * FROM sat_monitored_areas WHERE id=?", (ev["monitored_area_id"],)).fetchone())
+        geometry = _j(a["geometry_geojson"])
+        out["area"] = {**_area_public(a), "geometry": geometry, "grid_bbox": (_j(a["grid_json"], {}) or {}).get("bbox"),
+                       "buffer_ring": display.buffer_ring(geometry, a["buffer_m"]) if geometry else None}
+        out["algorithm"] = _algorithm(conn, ev)
+        out["undo_available"] = _last_undoable(conn, event_id) is not None
+        out["attribution"] = _attribution(out["before"] + out["after"])
         return out
     finally:
         conn.close()
@@ -334,17 +405,69 @@ def health(now=None):
                 "SELECT id, kind, error_text, finished_at_utc FROM sat_jobs WHERE status='FAILED' ORDER BY id DESC "
                 "LIMIT 5")]
         cfg = config.DEFAULTS
+        ok = conn.execute("SELECT id, trigger, finished_at FROM sat_runs WHERE status IN ('OK','PARTIAL') "
+                          "AND finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1").fetchone()
+        g = cfg["guard_stop_fraction"]
         return {
             "last_run": last,
-            "month": {**usage, "pu_budget": cfg["monthly_pu_budget"], "request_budget": cfg["monthly_request_budget"]},
+            "last_successful_sync": dict(ok) if ok else None,
+            "month": {**usage, "pu_budget": cfg["monthly_pu_budget"], "request_budget": cfg["monthly_request_budget"],
+                      "guard_stop_fraction": g, "pu_guard": round(cfg["monthly_pu_budget"] * g, 1),
+                      "request_guard": int(cfg["monthly_request_budget"] * g)},
             "provider_status": provider,
             "lock": lock_state(),
-            "jobs": jobs, "recent_failed_jobs": failed,
+            "jobs": jobs, "failed_jobs": jobs.get("FAILED", 0), "recent_failed_jobs": failed,
             "schema_stage2": _has_table(conn, "sat_jobs"),
+            # names only, never values: the API process shares the worker's environment file in production
+            "credentials_configured": all(os.environ.get(k, "").strip()
+                                          for k in ("SENTINEL_CLIENT_ID", "SENTINEL_CLIENT_SECRET")),
             "auto_risk_enabled": bool(cfg["auto_risk_enabled"]),
         }
     finally:
         conn.close()
+
+
+def _has_polygon(boundary_json):
+    v = (boundary_json or "").strip()
+    return bool(v) and v not in ("[]", "null", "{}")
+
+
+def sectors():
+    """Sectors from the main forest_ai.db (READ-ONLY) for "Add sector": polygon present?, already monitored?"""
+    path = config.forest_db_path()
+    if not Path(path).exists():
+        raise StoreError(503, "forest_ai.db not available")
+    fc = sdb.forest_ro(path)
+    try:
+        rows = [dict(r) for r in fc.execute("SELECT id, name, boundary_json FROM sectors ORDER BY name")]
+    finally:
+        fc.close()
+    conn = ro()
+    try:
+        active = {r["source_ref"]: r["id"] for r in conn.execute(
+            "SELECT id, source_ref FROM sat_monitored_areas WHERE source='SECTOR' AND active=1")}
+        queued = {j["payload"].get("source_ref"): j["id"] for j in _open_jobs(conn)
+                  if j["kind"] == "ADD_AREA" and j["payload"].get("source") == "SECTOR"}
+    finally:
+        conn.close()
+    return {"sectors": [{"id": r["id"], "name": r["name"], "has_polygon": _has_polygon(r["boundary_json"]),
+                         "monitored_area_id": active.get(str(r["id"])), "queued_job_id": queued.get(str(r["id"]))}
+                        for r in rows]}
+
+
+def lookup(source, source_ref):
+    """Is this object monitored? For the LVM GEO button ("Already monitored")."""
+    if source not in sdb.AREA_SOURCES or not source_ref:
+        raise StoreError(422, "source and source_ref are required")
+    conn = ro()
+    try:
+        a = conn.execute("SELECT id FROM sat_monitored_areas WHERE source=? AND source_ref=? AND active=1",
+                         (source, str(source_ref))).fetchone()
+        job = next((j for j in _open_jobs(conn) if j["kind"] == "ADD_AREA" and j["payload"].get("source") == source
+                    and j["payload"].get("source_ref") == str(source_ref)), None)
+    finally:
+        conn.close()
+    return {"monitored": bool(a), "area_id": a["id"] if a else None, "queued_job_id": job["id"] if job else None}
 
 
 # ── writes: jobs ─────────────────────────────────────────────────────────────
@@ -411,6 +534,10 @@ def queue_add_area(source, source_ref, name, geometry, actor):
             raise StoreError(422, "geometry is required for LVM_GEO")
     else:
         validate_geometry(geometry)
+        if geometry["type"] == "MultiPolygon":          # the worker grid accepts one Polygon only
+            if len(geometry["coordinates"]) != 1:
+                raise StoreError(422, "multi-part polygons are not supported; add each part separately")
+            geometry = {"type": "Polygon", "coordinates": geometry["coordinates"][0]}
     conn = rw()
     try:
         ex = conn.execute("SELECT id FROM sat_monitored_areas WHERE source=? AND source_ref=? AND active=1",
