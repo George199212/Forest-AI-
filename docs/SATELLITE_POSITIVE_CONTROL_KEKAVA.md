@@ -452,3 +452,50 @@ with `counted_as_open: false` and reported on separate metric lines (`outside_ev
 | RECOVERED outside events (separate, not counted) | 1 (event 49) | **1** (event 49, 0.08 ha) |
 
 The code now gives the same numbers as the hand count in §9/§10. Events, stands and recall are unchanged.
+
+
+## 12. Fragmentation rule (offline re-run on a COPY, 2026-11-16) — NOT applied to the live satellite.db
+
+**Rule** (owner decision, UI review item 1; `eaac5d4`): if the largest connected cluster of an event's CURRENT mask
+is below `fragmentation_min_largest_share` = 0.30 of the current area, the event is classified
+POSSIBLE_SEASONAL_OR_ENVIRONMENTAL with LOW confidence and a caveat line is added
+("Fragmented change: the largest cluster (… ha) is …% of the current area (… ha), below 30%."). INSUFFICIENT_EVIDENCE
+keeps priority. The share is recorded in `thresholds_json`.
+
+**How:** fresh SQLite backup of the live (migrated) satellite.db into `/root/sat_sandbox/frag_rerun/` (live opened
+read-only; live sha256 `97a86c40…` unchanged). `python -m satellite_monitoring.redetect --area 1 --area 2` at
+`eaac5d4` in a mount namespace with `/root` read-only and its own `SAT_RASTER_DIR` (stored RAW GeoTIFFs read via
+their absolute paths, sha256-checked): generation 2, run 4, **0 requests, 0 PU**, 16 min 45 s, peak RSS 415 MB,
+exit 0. Then `positive_control --area 2` with the same truth (sha256 `7faf4613…`) and reference DB (nationwide
+20261106) as §11. Output (not versioned): `docs/evidence/sat-ui-review/kekava_fragmentation_20261116.json`.
+
+| | §11 (live generation 1) | **§12 (generation 2, fragmentation rule)** |
+|---|---|---|
+| detected / eligible | 3 / 3 | **3 / 3** (Wilson 0.44–1.00), median delay 6 d (−3 … 7) |
+| open outside events | 4 = 105.11 ha | **4 = 105.11 ha** (not growing) |
+| Oct–Apr onsets excluded | 2 = 7.82 ha | 2 = 7.82 ha |
+| RECOVERED (separate) | 1 (0.08 ha) | 1 (0.08 ha) |
+| events / distinct masks / locations | 9 / 9 / 9 | 9 / 9 / 9 (masks identical) |
+| classes | FOREST_LOSS 6, OUTSIDE 1, SEASONAL 2 | **FOREST_LOSS 4, SEASONAL 5** |
+| BIK-001 | 0 events | 0 events |
+
+**Gate (recall 3/3, outside events/area not growing): MET.** Only classification and confidence change:
+
+| gen 1 → gen 2 | current ha | largest cluster | share | gen 1 | gen 2 |
+|---|---|---|---|---|---|
+| 50 → 59 | 1.04 | 0.22 | 21 % | FOREST_LOSS, HIGH | SEASONAL, LOW |
+| 54 → 63 | 55.73 | 11.97 | 22 % | FOREST_LOSS, HIGH | SEASONAL, LOW |
+| **55 → 64** | **123.71** (116.97 inside, 6.74 buffer) | **14.57** | **12 %** | **POTENTIAL_CHANGE_OUTSIDE_BOUNDARY, HIGH** | **POSSIBLE_SEASONAL_OR_ENVIRONMENTAL, LOW** |
+| 56 → 65 | 68.70 | 15.52 | 23 % | SEASONAL, HIGH | SEASONAL, LOW |
+| 57 → 66 | 28.59 | 4.67 | 16 % | SEASONAL, HIGH | SEASONAL, LOW |
+| 49, 51, 52, 53 → 58, 60, 61, 62 | unchanged | | 38 / 77 / 56 / 32 % | unchanged | unchanged |
+
+Event 55 caveat after: "Latest after-image 2026-11-08 (not used for the class): After-image is from Oct–Apr: … |
+Fragmented change: the largest cluster (14.57 ha) is 12% of the current area (123.71 ha), below 30%."
+
+**Notes for the decision on the live DB:**
+- Event 53 (a detected truth clear-cut) sits at 32 %, just above the threshold; a 0.35 threshold would have
+  re-classified it (recall itself counts events regardless of class).
+- Event 50 (the only open outside event without a VMD felling pre-tag) becomes SEASONAL / LOW.
+- A live redetect creates NEW event ids (here 58–66; 49–57 stay as superseded rows). Links and bookmarks to
+  #49–#57 would then open superseded events. Needs the owner's "approved" and a backup, like generation 1.
