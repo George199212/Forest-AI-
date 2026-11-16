@@ -336,6 +336,7 @@
     'Changes cannot be queued: this API process has read-only access to satellite.db (deployment setting).': 'Izmaiņas nevar ierindot: šim API procesam ir tikai lasīšanas piekļuve satellite.db (izvietošanas iestatījums).',
     'Open in Forest Map': 'Atvērt Meža kartē',
     'Language': 'Valoda',
+    'Loading image…': 'Ielādē attēlu…', 'The image could not be loaded.': 'Attēlu neizdevās ielādēt.',
     'Satellite monitoring data is unavailable (satellite.db).': 'Satelītu monitoringa dati nav pieejami (satellite.db).',
     'The worker has not prepared the database yet; changes cannot be queued.': 'Apstrādes process vēl nav sagatavojis datubāzi; izmaiņas nevar ierindot.',
     'Sectors with a polygon': 'Sektori ar poligonu',

@@ -119,3 +119,11 @@ test('stored server sentences (caveats, recovery, context reasons) are shown in 
  assert.equal(tr('Some new server text'),'Some new server text');
  sat._setLang('en');assert.equal(tr('Snow on 12% of the area in the after-image.'),'Snow on 12% of the area in the after-image.');
 });
+
+test('event images show a loading state, removed on load, and a visible message on error (no silent black box)',()=>{
+ const src=read('assets/sat-monitoring.js');
+ assert.equal((src.match(/imgStatus\(div, L\.imageOverlay\(/g)||[]).length,3);
+ assert.match(src,/overlay\.on\('load'[^\n]*removeChild\(st\)/);
+ assert.match(src,/overlay\.on\('error'[^\n]*t\('imgFailed'\)/);
+ const sat=loadSat();assert.equal(sat._T_LV.imgLoading,'Ielādē attēlu…');assert.equal(sat._T_LV.imgFailed,'Attēlu neizdevās ielādēt.');
+});

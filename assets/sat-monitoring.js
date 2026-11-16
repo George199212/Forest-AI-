@@ -90,7 +90,7 @@
     reviewTitle: 'Review', reject: 'Reject', fieldCheck: 'Request field check', createRisk: 'Create risk', undo: 'Undo',
     logTitle: 'Review log', noReview: 'No review yet.', thDate: 'Date', thAction: 'Action', thBy: 'By', thNote: 'Note',
     superseded: 'This event was superseded by a later detection generation; review is disabled.',
-    noImage: 'No image', validPct: 'Valid %',
+    noImage: 'No image', validPct: 'Valid %', imgLoading: 'Loading image…', imgFailed: 'The image could not be loaded.',
     lvmAdd: 'Add to satellite monitoring', lvmMonitored: 'Already monitored', lvmQueued: 'Queued for satellite monitoring',
     lvmMulti: 'Multi-part polygon — add the parts separately', alreadyQueued: 'Already queued.'
   };
@@ -297,6 +297,8 @@
     superseded: "Šo notikumu aizstāja vēlākas noteikšanas paaudzes rezultāts; pārskatīšana ir atspējota.",
     noImage: "Nav attēla",
     validPct: "Derīgi %",
+    imgLoading: "Ielādē attēlu…",
+    imgFailed: "Attēlu neizdevās ielādēt.",
     lvmAdd: "Pievienot satelītu monitoringam",
     lvmMonitored: "Jau tiek uzraudzīts",
     lvmQueued: "Rindā satelītu monitoringam",
@@ -907,13 +909,22 @@
       });
     });
   }
+  // A quicklook (~0.5 MB PNG) that is still loading, or failed, used to leave a silent black box (UI review item 4).
+  function imgStatus(div, overlay) {
+    var st = document.createElement('div');
+    st.className = 'satm-img-status'; st.innerHTML = t('imgLoading');
+    div.appendChild(st);
+    overlay.on('load', function () { if (st.parentNode) st.parentNode.removeChild(st); div.setAttribute('data-img', 'loaded'); });
+    overlay.on('error', function () { st.innerHTML = t('imgFailed'); st.className += ' satm-img-failed'; div.setAttribute('data-img', 'failed'); });
+    return overlay;
+  }
   function imgMap(L, elId, img, area, change, focus) {
     var div = document.getElementById(elId);
     if (!div || !area.grid_bbox) return null;
     var map = L.map(div, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); S.maps.push(map);
     var b = bboxBounds(area.grid_bbox);
     map.fitBounds(focus || b);                       // view first, then layers (as in the area map)
-    if (img && img.quicklook_url) L.imageOverlay(img.quicklook_url, b, {pane: imagePane(map, 'satmImg', 350)}).addTo(map);
+    if (img && img.quicklook_url) imgStatus(div, L.imageOverlay(img.quicklook_url, b, {pane: imagePane(map, 'satmImg', 350)})).addTo(map);
     if (area.buffer_ring) L.geoJSON(area.buffer_ring, {style: {color: COL.buffer, weight: 1, dashArray: '5 4', fill: false}}).addTo(map);
     if (area.geometry) L.geoJSON(area.geometry, {style: {color: COL.boundary, weight: 2, fill: false}}).addTo(map);
     if (change) changeLayer(L, change).addTo(map);
@@ -924,10 +935,10 @@
     if (!div || !area.grid_bbox) return;
     var map = L.map(div, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); zoomCtl(L, map); S.maps.push(map);
     var b = bboxBounds(area.grid_bbox);
-    if (imgs.before && imgs.before.quicklook_url) L.imageOverlay(imgs.before.quicklook_url, b, {pane: imagePane(map, 'satmImg', 350)}).addTo(map);
+    if (imgs.before && imgs.before.quicklook_url) imgStatus(div, L.imageOverlay(imgs.before.quicklook_url, b, {pane: imagePane(map, 'satmImg', 350)})).addTo(map);
     imagePane(map, 'satmAfter', 360);
     var pane = map.getPane('satmAfter');
-    if (imgs.after && imgs.after.quicklook_url) L.imageOverlay(imgs.after.quicklook_url, b, {pane: 'satmAfter'}).addTo(map);
+    if (imgs.after && imgs.after.quicklook_url) imgStatus(div, L.imageOverlay(imgs.after.quicklook_url, b, {pane: 'satmAfter'})).addTo(map);
     if (change) changeLayer(L, change).addTo(map);
     if (area.geometry) L.geoJSON(area.geometry, {style: {color: COL.boundary, weight: 2, fill: false}}).addTo(map);
     var range = document.getElementById('satm-swipe-range');
