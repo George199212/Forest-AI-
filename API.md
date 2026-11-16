@@ -205,6 +205,8 @@ Router `satellite_monitoring/api_routes.py`, Basic Auth on every route. Reads `s
 | POST | `/api/sat-monitoring/events/{id}/review` | `{decision: CONFIRM\|REJECT\|FIELD_CHECK\|CREATE_RISK\|UNDO, note?}` | Appends to `sat_review_log`. CREATE_RISK is the only way a risk is created (human, existing `add_incident` + `risk_evidence` source `SATELLITE`; 409 if already linked). REJECT on a linked risk adds a risk event; the risk status is left to the existing workflow. FIELD_CHECK sends a Telegram message to `DISPATCHER_CHAT_ID` (502 and no change if sending fails). UNDO undoes the most recent status decision (not CREATE_RISK). Superseded events → 409 |
 | GET | `/api/sat-monitoring/file/{acq_id}/{kind}` | — | `kind=quicklook` only; the path comes from the DB and must resolve inside `SAT_RASTER_DIR` and be a `.png`; otherwise 404 |
 | GET | `/api/sat-monitoring/health` | — | Last run, PU and requests this month vs budget, provider status, lock state, job counts, `auto_risk_enabled` (false) |
+| GET | `/api/sat-monitoring/sectors` | — | Stage 3, for "Add sector": sectors from `forest_ai.db` (read-only) with `has_polygon`, `monitored_area_id` and `queued_job_id` |
+| GET | `/api/sat-monitoring/lookup?source=&source_ref=` | — | Stage 3, for the LVM GEO button: `{monitored, area_id, queued_job_id}` |
 
 ## Integration Layer
 
