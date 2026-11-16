@@ -342,8 +342,12 @@ layer, the same procedure had reproduced §8 exactly (9 events, the same 5 outsi
 | events | 9 | 9 | **9** (8 SUSPECTED, 1 RECOVERED) |
 | detected / eligible | 3 / 3 | 3 / 3 | **3 / 3** (Wilson 0.44–1.00) |
 | median delay (range) | 6 d (−3 … 7) | 6 d (−3 … 7) | 6 d (−3 … 7) |
-| outside events (unreviewed) | 4 | 5 | **5, of which 1 RECOVERED** (4 open) |
-| total outside area | 112.78 ha | 105.19 ha | **105.19 ha** (open: 105.11 ha) |
+| open outside events (unreviewed) | 4 | 5 | **4** |
+| total open outside area | 112.78 ha | 105.19 ha | **105.11 ha** |
+| RECOVERED outside events (separate, not counted) | — | — | 1 (event 49, current 0.08 ha) |
+
+Owner decision 2026-11-16: RECOVERED events are **not** counted as open outside events in the evaluation. They are
+reported on the separate line above. §7 and §8 had no RECOVERED status, so their counts are unchanged.
 
 **Gate for the live database (recall 3/3, total outside area not growing): MET.**
 
@@ -369,8 +373,9 @@ Event 49 reason: "current mask 0.14 ha < min_cluster_ha 0.3 ha in 2 consecutive 
 **Open items:**
 - **Events 55, 56 and 57 lie mostly on standing forest (zkat 10) with onsets in Oct–Nov.** They need human visual
   review: likely leaf-off / seasonal reflectance change, not felling. The system does not decide this.
-- No human review of any event. Whether a RECOVERED remnant should also stop being counted as an outside event
-  in the evaluation is not decided; both counts are shown above.
+- No human review of any event.
+- RECOVERED counting was decided by the owner on 2026-11-16: not counted as open outside events, and shown on a
+  separate line (table above).
 
 
 ## 10. Live run: F6 + remnant rule + compartment split on the live `satellite.db` (2026-11-13)
@@ -394,7 +399,8 @@ The log is `/root/backups/satellite_redetect_live_20261113T141918Z.log`.
 **Comparison with §9 (copy):** the live current-generation events are **identical** to the §9 copy. Same ids 49–57,
 area, classification, confidence, current/max ha, status and compartment split. So the §9 metrics carry over unchanged:
 - recall 3 / 3, median delay 6 d (−3 … 7);
-- 5 outside events (1 RECOVERED, 4 open), 105.19 ha in total (open 105.11 ha);
+- **4 open outside events, 105.11 ha**;
+- RECOVERED outside events, shown separately and not counted: 1 (event 49, 0.08 ha);
 - BIK-001: 0 events.
 
 `positive_control` was not re-run against the live file. Because the event rows are identical, its output would be too.
@@ -416,7 +422,8 @@ area, classification, confidence, current/max ha, status and compartment split. 
 **Rollback:** stop all writers, then copy `satellite_before_redetect_20261113T141918Z.db.raw` over the live file and
 check sha256 = `9ce79c76…`. A newer generation is a non-destructive alternative, because superseded rows are kept.
 
-**Open items (unchanged from §9):**
+**Open items:**
 - Events 55, 56 and 57 need human visual review.
-- RECOVERED counting in the evaluation is not decided.
+- RECOVERED counting was decided on 2026-11-16: RECOVERED events are not counted as open outside events and are
+  shown on a separate line.
 - Stage 2 has not started.

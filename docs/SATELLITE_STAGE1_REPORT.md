@@ -517,7 +517,9 @@ Same procedure as the Ķekava report §9: `redetect` on a fresh copy at `22b19ed
 
 BIK-001 (negative control) still has **no event**, so the remnant rule and the compartment split have nothing to
 act on. The owner's gate for the live re-run is met on the Ķekava evaluation (recall 3/3; total outside area
-105.19 ha, not growing). The live run is recorded in the Ķekava report.
+105.19 ha, not growing). Owner decision 2026-11-16: RECOVERED events are not counted as open outside events, so the
+evaluation shows 4 open outside events (105.11 ha) and, on a separate line, 1 RECOVERED event (event 49). The live
+run (identical to the copy) is recorded in Ķekava report §10.
 
 ## Appendix A — product list (Catalog discovery 2026-08-01 … 2026-11-10, stored status)
 
