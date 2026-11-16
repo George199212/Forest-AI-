@@ -335,6 +335,7 @@
     'Changes cannot be queued: satellite.db does not have the queue schema yet. The API never changes the database schema; the worker creates it on its first run. Missing:': 'Izmaiņas nevar ierindot: satellite.db vēl nav rindas shēmas. API nekad nemaina datubāzes shēmu; to izveido apstrādes process pirmajā palaišanā. Trūkst:',
     'Changes cannot be queued: this API process has read-only access to satellite.db (deployment setting).': 'Izmaiņas nevar ierindot: šim API procesam ir tikai lasīšanas piekļuve satellite.db (izvietošanas iestatījums).',
     'Open in Forest Map': 'Atvērt Meža kartē',
+    'Language': 'Valoda',
     'Satellite monitoring data is unavailable (satellite.db).': 'Satelītu monitoringa dati nav pieejami (satellite.db).',
     'The worker has not prepared the database yet; changes cannot be queued.': 'Apstrādes process vēl nav sagatavojis datubāzi; izmaiņas nevar ierindot.',
     'Sectors with a polygon': 'Sektori ar poligonu',

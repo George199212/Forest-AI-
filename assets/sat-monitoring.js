@@ -20,8 +20,8 @@
              radar: '#e0a020'};
 
   // ── Static UI strings (EN). Every value has a Latvian entry in assets/i18n-lv.js (tested). ──────────────
-  var T = {
-    title: 'Satellite Monitoring', back: '← Satellite Monitoring', fetchNow: 'Fetch now', addSector: 'Add sector',
+  var T_EN = {
+    title: 'Satellite Monitoring', pageRefresh: 'Refresh', language: 'Language', zoomIn: 'Zoom in', zoomOut: 'Zoom out', back: '← Satellite Monitoring', fetchNow: 'Fetch now', addSector: 'Add sector',
     loading: 'Loading…', close: 'Close', error: 'Error', done: 'Done.',
     kMonitored: 'Monitored areas', kRecent: 'With recent observations', kAwaiting: 'Awaiting data',
     kOpen: 'Open suspected events', kLastSync: 'Last successful sync', kFailed: 'Failed jobs', never: 'never',
@@ -96,7 +96,7 @@
   };
 
   // ── Dynamic strings (EN). Latvian via PATTERNS in assets/i18n-lv.js (tested with these samples). ─────────
-  var TD = {
+  var TD_EN = {
     lastDays: function (n) { return 'last ' + n + ' days'; },
     recoveredNotCounted: function (n) { return '+' + n + ' recovered (not counted)'; },
     changeDetected: function (ha) { return 'Vegetation/land-cover change detected: ' + ha; },
@@ -108,9 +108,262 @@
     queuedJob: function (id) { return 'Queued as job #' + id + '.'; },
     confirmAdd: function (name) { return 'Add ' + name + ' to satellite monitoring? The last 120 days are fetched first.'; }
   };
-  var TD_SAMPLES = [TD.lastDays(14), TD.recoveredNotCounted(1), TD.changeDetected('5.97 ha'), TD.outside('0.84 ha'),
-                    TD.eventTitle(51), TD.generation(1), TD.code('b3c0fd4'), TD.risk(12), TD.queuedJob(3),
-                    TD.confirmAdd('BIK-001')];
+  var TD_SAMPLES = [TD_EN.lastDays(14), TD_EN.recoveredNotCounted(1), TD_EN.changeDetected('5.97 ha'),
+                    TD_EN.outside('0.84 ha'), TD_EN.eventTitle(51), TD_EN.generation(1), TD_EN.code('b3c0fd4'),
+                    TD_EN.risk(12), TD_EN.queuedJob(3), TD_EN.confirmAdd('BIK-001')];
+  // Latvian (default, like Meža karte and LVM GEO): :8000 runs without UI_LANGUAGE, so this section cannot rely on
+  // assets/i18n-lv.js. T_LV is generated from the tested i18n-lv.js entries (tests/test_sat_monitoring_ui.js checks
+  // that both stay identical); TD_LV mirrors its PATTERNS.
+  var T_LV = {
+    title: "Satelītu monitorings",
+    pageRefresh: "Atjaunot",
+    language: "Valoda",
+    zoomIn: "Tuvināt",
+    zoomOut: "Tālināt",
+    back: "← Satelītu monitorings",
+    fetchNow: "Ielādēt tagad",
+    addSector: "Pievienot sektoru",
+    loading: "Ielādē…",
+    close: "Aizvērt",
+    error: "Kļūda",
+    done: "Gatavs.",
+    kMonitored: "Uzraudzītās teritorijas",
+    kRecent: "Ar neseniem novērojumiem",
+    kAwaiting: "Gaida datus",
+    kOpen: "Atvērtie iespējamo izmaiņu notikumi",
+    kLastSync: "Pēdējā veiksmīgā sinhronizācija",
+    kFailed: "Neizdevušies uzdevumi",
+    never: "nekad",
+    hUsage: "Copernicus patēriņš šomēnes",
+    hPU: "Apstrādes vienības (PU)",
+    hReq: "Pieprasījumi",
+    hGuard: "drošības robeža",
+    hBudget: "budžets",
+    hLock: "Apstrādes process",
+    hRunning: "Darbojas",
+    hIdle: "Dīkstāvē",
+    hAuto: "Automātiskie riski",
+    hAutoOff: "Izslēgti — riskus izveido tikai cilvēks (Izveidot risku)",
+    thArea: "Uzraudzītā teritorija",
+    thSource: "Avots",
+    thHa: "Platība (ha)",
+    thStatus: "Statuss",
+    thLastS1: "Pēdējais S1",
+    thLastS2: "Pēdējais derīgais S2",
+    thOpen: "Atvērtie iespējamie",
+    thRecovered: "Atjaunojies",
+    thGap: "Dienas kopš derīgā S2",
+    thView: "Atvērt",
+    stOK: "Dati kārtībā",
+    stNoData: "Vēl nav datu",
+    stBackfill: "Notiek vēsturisko datu ielāde",
+    stStopped: "Apturēts",
+    srcSECTOR: "Sektors",
+    srcLVM: "LVM GEO",
+    srcEVAL: "Novērtējuma teritorija",
+    emptyAreas: "Vēl nav uzraudzītu teritoriju.",
+    emptyHint: "Pievienojiet sektoru šeit vai izmantojiet “Pievienot satelītu monitoringam” sadaļā LVM GEO.",
+    pNotConfigured: "Apstrādes process ziņoja, ka trūkst Copernicus piekļuves datu (SENTINEL_CLIENT_ID / SENTINEL_CLIENT_SECRET). Datu ielāde ir atspējota.",
+    pAuth: "Apstrādes procesā neizdevās pieteikties Copernicus",
+    pDegraded: "Apstrādes process ziņoja par Copernicus piekļuves problēmu",
+    pUnknown: "Statuss nav zināms: apstrādes process vēl nav ziņojis par Copernicus piekļuvi.",
+    pLastOk: "pēdējais veiksmīgais Copernicus pieprasījums",
+    unavailable: "Satelītu monitoringa dati nav pieejami (satellite.db).",
+    notMigrated: "Apstrādes process vēl nav sagatavojis datubāzi; izmaiņas nevar ierindot.",
+    qNotMigrated: "Izmaiņas nevar ierindot: satellite.db vēl nav rindas shēmas. API nekad nemaina datubāzes shēmu; to izveido apstrādes process pirmajā palaišanā. Trūkst:",
+    qReadOnly: "Izmaiņas nevar ierindot: šim API procesam ir tikai lasīšanas piekļuve satellite.db (izvietošanas iestatījums).",
+    openForestMap: "Atvērt Meža kartē",
+    sectorsTitle: "Sektori ar poligonu",
+    noPolygon: "Nav poligona",
+    monitored: "Tiek uzraudzīts",
+    queued: "Rindā",
+    add: "Pievienot",
+    pendingTitle: "Rindā esošās teritorijas",
+    waitingWorker: "gaida apstrādes procesu",
+    cFetch: "Ielādēt jaunus Sentinel-1/2 novērojumus visām uzraudzītajām teritorijām tagad?",
+    cStop: "Apturēt šīs teritorijas monitoringu? Vēsture tiek saglabāta.",
+    cReject: "Atzīmēt šīs iespējamās izmaiņas kā noraidītas (nav reālas izmaiņas)?",
+    cField: "Nosūtīt dispečeram lauka pārbaudes pieprasījumu Telegram?",
+    cRisk: "Izveidot risku risku sistēmā par šīm iespējamajām izmaiņām?",
+    cUndo: "Atsaukt pēdējo pārskatīšanas lēmumu?",
+    notePrompt: "Piezīme (nav obligāta):",
+    layers: "Kartes slāņi",
+    lBoundary: "Sektora robeža",
+    lBuffer: "Buferzona",
+    lChange: "Konstatētās izmaiņas (pašreizējā maska)",
+    lFootprint: "Sentinel novērojuma pārklājums",
+    lImage: "Sentinel attēls",
+    footprint: "Novērojuma pārklājums",
+    legInside: "Izmaiņas robežās",
+    legOutside: "Izmaiņas ārpus robežas",
+    eventsTitle: "Iespējamo izmaiņu notikumi",
+    thEvent: "Notikums",
+    thOnset: "Sākums",
+    thClass: "Klasifikācija",
+    thConf: "Ticamība",
+    thCurrent: "Pašlaik (ha)",
+    thOutside: "Ārpus robežas (ha)",
+    noEvents: "Nav izmaiņu notikumu.",
+    tsTitle: "Laika rinda (teritorijā, mediāna)",
+    tsS2: "Sentinel-2 indeksi",
+    tsS1: "Sentinel-1 atpakaļizkliede (dB)",
+    tsGaps: "Pārtraukumi = nav izmantojama novērojuma (mākoņi, nav derīgu pikseļu). Trūkstošas vērtības nekad netiek rādītas kā 0.",
+    evOnset: "Notikuma sākums",
+    radar: "Radara anomālija",
+    acqTitle: "Uzņēmumi",
+    thSensor: "Sensors",
+    thPlatform: "Platforma",
+    thProduct: "Produkta ID",
+    thTime: "Uzņemšanas laiks (UTC)",
+    thValid: "Derīgi % teritorijā",
+    thDetection: "Noteikšana",
+    noAcq: "Vēl nav uzņēmumu.",
+    stopMon: "Apturēt monitoringu",
+    bNoData: "Monitorings vēl nav devis datus. Pirmā vēsturisko datu ielāde notiks, kad apstrādes process paņems uzdevumu.",
+    bBackfill: "Notiek vēsturisko vai jauno datu ielāde.",
+    bStopped: "Monitorings apturēts. Vēsture saglabāta.",
+    before: "Pirms",
+    after: "Pēc",
+    change: "Izmaiņas (maska virs “pēc” attēla)",
+    sideBySide: "Blakus",
+    swipe: "Pārvilkt",
+    suspectedLine: "Iespējamas izmaiņas — automātiska noteikšana, dabā nav pārbaudīts.",
+    recoveredLine: "Atjaunojies — izmaiņas vairs nav redzamas.",
+    seasonal: "Sezonāls brīdinājums",
+    confidence: "Noteikšanas ticamība",
+    evidence: "Pierādījumu kvalitāte",
+    classification: "Klasifikācija",
+    clsLOSS: "Iespējams meža zudums",
+    clsOUT: "Iespējamas izmaiņas ārpus robežas",
+    clsSEAS: "Iespējamas sezonālas vai vides izmaiņas",
+    clsINS: "Nepietiekami pierādījumi",
+    cHigh: "Augsta",
+    cMedium: "Vidēja",
+    cLow: "Zema",
+    qGood: "Laba",
+    qLimited: "Ierobežota",
+    qPoor: "Vāja",
+    sSUSPECTED: "Iespējamas izmaiņas",
+    sRECOVERED: "Atjaunojies",
+    sCONF: "Apstiprināts pārskatīšanā",
+    sREJ: "Noraidīts pārskatīšanā",
+    sFIELD: "Pieprasīta lauka pārbaude",
+    areasTitle: "Platības",
+    aCurrent: "Pašreizējā maska",
+    aInside: "Robežās",
+    aOutside: "Ārpus robežas (buferzonā)",
+    aUnion: "Visu “pēc” attēlu apvienojums",
+    aMax: "Lielākā pašreizējā platība līdz šim",
+    aShare: "Daļa no teritorijas",
+    aDist: "Maks. attālums ārpus robežas",
+    aCluster: "Lielākais klasteris",
+    zTitle: "VMD nogabala veids (pašreizējā maska)",
+    zStand: "Mežaudze (zkat 10)",
+    zClear: "Izcirtums (zkat 14)",
+    zOther: "Citi nogabali",
+    zNone: "Ārpus nogabaliem",
+    zNA: "Nogabalu sadalījums nav pieejams",
+    ctxTitle: "Darbību konteksts",
+    ctxWork: "Novērojuma periodā reģistrēti darbi",
+    ctxNone: "Novērojuma periodā reģistrēti darbi nav atrasti",
+    ctxNote: "Tikai reģistrēto ierakstu skaits. Ierakstu trūkums nepierāda, ka darbi nav notikuši; ieraksti neizskaidro izmaiņas.",
+    ctxGps: "Darbinieku GPS punkti",
+    ctxVeh: "Transporta/tehnikas GPS signāli",
+    ctxSessions: "Darba sesijas",
+    ctxPhotos: "Lauka foto",
+    ctxTrucks: "Kokvedēju atskaites",
+    ctxTimber: "Kokmateriālu pārvietošana",
+    unknown: "nav zināms",
+    inside: "teritorijā",
+    buffer: "buferzonā",
+    goGps: "Atvērt GPS sesijas",
+    goTrucks: "Atvērt kokvedēju atskaites",
+    goTimber: "Atvērt kokmateriālus",
+    goSector: "Atvērt sektoru",
+    algTitle: "Algoritms",
+    algPipeline: "Apstrādes palaišana (koda versija nav reģistrēta)",
+    algConfig: "Konfigurācija (sliekšņi)",
+    reviewTitle: "Pārskatīšana",
+    reject: "Noraidīt",
+    fieldCheck: "Pieprasīt lauka pārbaudi",
+    createRisk: "Izveidot risku",
+    undo: "Atsaukt",
+    logTitle: "Pārskatīšanas žurnāls",
+    noReview: "Vēl nav pārskatīts.",
+    thDate: "Datums",
+    thAction: "Darbība",
+    thBy: "Kas",
+    thNote: "Piezīme",
+    superseded: "Šo notikumu aizstāja vēlākas noteikšanas paaudzes rezultāts; pārskatīšana ir atspējota.",
+    noImage: "Nav attēla",
+    validPct: "Derīgi %",
+    lvmAdd: "Pievienot satelītu monitoringam",
+    lvmMonitored: "Jau tiek uzraudzīts",
+    lvmQueued: "Rindā satelītu monitoringam",
+    lvmMulti: "Vairākdaļu poligons — pievienojiet daļas atsevišķi",
+    alreadyQueued: "Jau rindā."
+  };
+  var TD_LV = {
+    lastDays: function (n) { return 'pēdējās ' + n + ' dienās'; },
+    recoveredNotCounted: function (n) { return '+' + n + ' atjaunojies (netiek skaitīts kā atvērts)'; },
+    changeDetected: function (ha) { return 'Konstatētas veģetācijas/zemes seguma izmaiņas: ' + ha; },
+    outside: function (ha) { return ha + ' ārpus apstiprinātās robežas'; },
+    eventTitle: function (id) { return 'Notikums #' + id; },
+    generation: function (id) { return 'Noteikšanas paaudze ' + id; },
+    code: function (v) { return 'kods ' + v; },
+    risk: function (id) { return 'Risks #' + id; },
+    queuedJob: function (id) { return 'Ierindots kā uzdevums #' + id + '.'; },
+    confirmAdd: function (name) {
+      return 'Pievienot ' + name + ' satelītu monitoringam? Vispirms tiks ielādētas pēdējās 120 dienas.';
+    }
+  };
+  var LANG_KEY = 'satMonitoring.lang', LANG = 'lv', T = T_EN, TD = TD_EN;
+  function setLang(l) {
+    LANG = l === 'en' ? 'en' : 'lv';
+    T = LANG === 'lv' ? Object.assign({}, T_EN, T_LV) : T_EN;
+    TD = LANG === 'lv' ? TD_LV : TD_EN;
+  }
+  (function () {
+    var saved = null;
+    try { saved = window.localStorage && window.localStorage.getItem(LANG_KEY); } catch (e) { saved = null; }
+    setLang(saved === 'en' ? 'en' : 'lv');
+  })();
+  // Fixed English sentences written by the server/detection (stored in satellite.db: seasonal_caveat,
+  // recovered_reason, operational-context reasons). Display-only translation; the stored text is unchanged and is
+  // kept in the element's title. Unknown text is shown as stored.
+  var SERVER_LV = [
+    [/^After-image is from Oct–Apr: leaf fall\/leaf-off, frozen or wet ground and snow change optical indices and radar backscatter without any felling\.$/,
+     'Pēcattēls ir no oktobra–aprīļa: lapu krišana/bezlapu periods, sasalusi vai mitra augsne un sniegs maina optiskos indeksus un radara atstarojumu arī bez ciršanas.'],
+    [/^Snow on (\d+)% of the area in the after-image\.$/, 'Pēcattēlā sniegs klāj $1% teritorijas.'],
+    [/^Fragmented change: the largest cluster \(([\d.]+) ha\) is (\d+)% of the current area \(([\d.]+) ha\), below (\d+)%\.$/,
+     'Sadrumstalotas izmaiņas: lielākais klasteris ($1 ha) ir $2% no pašreizējās platības ($3 ha), mazāk nekā $4%.'],
+    [/^current mask ([\d.]+) ha < min_cluster_ha ([\d.]+) ha in (\d+) consecutive valid (S[12]) acquisitions \(last (\S+)\)$/,
+     'pašreizējā maska $1 ha < min_cluster_ha $2 ha $3 secīgos derīgos $4 uzņēmumos (pēdējais $5)'],
+    [/^reopened: current mask ([\d.]+) ha >= min_cluster_ha ([\d.]+) ha \((S[12]) (\S+)\)$/,
+     'atkārtoti atvērts: pašreizējā maska $1 ha >= min_cluster_ha $2 ha ($3 $4)'],
+    [/^no sector link for this area \(source is not SECTOR\)$/, 'teritorijai nav sasaistes ar sektoru (avots nav SECTOR)'],
+    [/^forest_ai\.db not readable: (\w+)$/, 'forest_ai.db nav nolasāma: $1']
+  ];
+  function trServerPart(x) {
+    var m = /^Latest after-image (\S+) \(not used for the class\): (.+)$/.exec(x);
+    if (m) return 'Jaunākais pēcattēls ' + m[1] + ' (klasei netiek izmantots): ' + trServerPart(m[2]);
+    for (var i = 0; i < SERVER_LV.length; i++) if (SERVER_LV[i][0].test(x)) return x.replace(SERVER_LV[i][0], SERVER_LV[i][1]);
+    return x;
+  }
+  function trServer(text) {
+    if (LANG !== 'lv' || !text) return text;
+    return String(text).split(' | ').map(trServerPart).join(' | ');
+  }
+  function serverText(text) {          // data span with the stored original in the title
+    return '<span data-no-i18n title="' + esc(text) + '">' + esc(trServer(text)) + '</span>';
+  }
+
+  function zoomCtl(L, map) { L.control.zoom({zoomInTitle: T.zoomIn, zoomOutTitle: T.zoomOut}).addTo(map); }
+  function pageHead() {                         // header bar of the dashboard (nav() writes the English title)
+    var pt = document.getElementById('page-title'), pr = document.getElementById('page-refresh');
+    if (pt) pt.textContent = T.title;
+    if (pr) pr.textContent = '↻ ' + T.pageRefresh;
+  }
 
   var CLS = {POTENTIAL_FOREST_LOSS: 'clsLOSS', POTENTIAL_CHANGE_OUTSIDE_BOUNDARY: 'clsOUT',
              POSSIBLE_SEASONAL_OR_ENVIRONMENTAL: 'clsSEAS', INSUFFICIENT_EVIDENCE: 'clsINS'};
@@ -202,7 +455,7 @@
 
   // ── OVERVIEW ─────────────────────────────────────────────────────────────
   async function loadOverview() {
-    S.view = 'overview'; cleanup();
+    S.view = 'overview'; cleanup(); pageHead();
     var el = root(); el.innerHTML = '<div class="empty">' + t('loading') + '</div>';
     var ov, h;
     try { var r = await Promise.all([get('/overview'), get('/health')]); ov = r[0]; h = r[1]; }
@@ -254,7 +507,7 @@
       a.onclick = function () { openArea(Number(a.getAttribute('data-area'))); };
     });
     var L = await ensureLeaflet();
-    var map = L.map('satm-ov-map'); S.maps.push(map);
+    var map = L.map('satm-ov-map', {zoomControl: false}); zoomCtl(L, map); S.maps.push(map);
     L.tileLayer(OSM, {attribution: '&copy; OpenStreetMap contributors', maxZoom: 19}).addTo(map);
     var group = L.featureGroup().addTo(map);
     ov.areas.forEach(function (a) {
@@ -292,10 +545,19 @@
     var h = S.health, disabled = h && !canQueue(h) ? ' disabled' : '';
     return '<div class="satm-head"><div class="card-head" style="margin:0">' + t('title') + '</div>' +
       (withButtons ? '<div class="satm-actions"><button class="btn" id="satm-fetch"' + disabled + '>' + t('fetchNow') +
-       '</button><button class="btn" id="satm-add-sector">' + t('addSector') + '</button></div>' : '') + '</div>';
+       '</button><button class="btn" id="satm-add-sector">' + t('addSector') + '</button>' +
+       '<select id="satm-lang" class="satm-lang" aria-label="' + esc(T.language) + '" data-no-i18n>' +
+       '<option value="lv"' + (LANG === 'lv' ? ' selected' : '') + '>LV</option>' +
+       '<option value="en"' + (LANG === 'en' ? ' selected' : '') + '>EN</option></select></div>' : '') + '</div>';
   }
   function bindHead() {
-    var f = document.getElementById('satm-fetch'), a = document.getElementById('satm-add-sector');
+    var f = document.getElementById('satm-fetch'), a = document.getElementById('satm-add-sector'),
+        lg = document.getElementById('satm-lang');
+    if (lg) lg.onchange = function () {
+      setLang(lg.value);
+      try { window.localStorage && window.localStorage.setItem(LANG_KEY, LANG); } catch (e) { /* not stored */ }
+      loadOverview();
+    };
     if (f) f.onclick = function () {
       if (!window.confirm(T.cFetch)) return;
       act(function () { return post('/fetch', {all: true}); }, loadOverview);
@@ -362,7 +624,7 @@
 
   // ── AREA ─────────────────────────────────────────────────────────────────
   async function openArea(id) {
-    S.view = 'area'; S.areaId = id; S.selAcq = null; cleanup();
+    S.view = 'area'; S.areaId = id; S.selAcq = null; cleanup(); pageHead();
     var el = root(); el.innerHTML = '<div class="empty">' + t('loading') + '</div>';
     var d;
     try { d = await get('/areas/' + id); } catch (e) { el.innerHTML = backLink() + errorBanner(e); bindBack(); return; }
@@ -410,7 +672,7 @@
     };
     drawCharts(d);
     var L = await ensureLeaflet();
-    var map = L.map('satm-area-map'); S.maps.push(map); S.areaMap = map;
+    var map = L.map('satm-area-map', {zoomControl: false}); zoomCtl(L, map); S.maps.push(map); S.areaMap = map;
     L.tileLayer(OSM, {attribution: '&copy; OpenStreetMap contributors', maxZoom: 19}).addTo(map);
     S.areaLayer = L.layerGroup().addTo(map);
     var bb = a.grid_bbox;
@@ -546,7 +808,7 @@
   }
 
   async function openEvent(id) {
-    S.view = 'event'; S.eventId = id; cleanup();
+    S.view = 'event'; S.eventId = id; cleanup(); pageHead();
     var el = root(); el.innerHTML = '<div class="empty">' + t('loading') + '</div>';
     var e;
     try { e = await get('/events/' + id); } catch (err) { el.innerHTML = backLink() + errorBanner(err); bindBack(); return; }
@@ -564,9 +826,9 @@
       '<div class="satm-line-big"><span>' + esc(TD.changeDetected(ha(e.changed_area_ha))) + '</span></div>' +
       (isNum(e.changed_area_ha_buffer) && e.changed_area_ha_buffer > 0
         ? '<div class="satm-line-big"><span>' + esc(TD.outside(ha(e.changed_area_ha_buffer))) + '</span></div>' : '') +
-      (e.status === 'RECOVERED' ? '<div>' + t('recoveredLine') + ' ' + data(e.recovered_reason || '') + '</div>'
+      (e.status === 'RECOVERED' ? '<div>' + t('recoveredLine') + ' ' + serverText(e.recovered_reason || '') + '</div>'
                                 : '<div class="satm-muted">' + t('suspectedLine') + '</div>') +
-      (e.seasonal_caveat ? '<div>' + badge('seasonal', 'b-amber') + ' ' + data(e.seasonal_caveat) + '</div>' : '') +
+      (e.seasonal_caveat ? '<div>' + badge('seasonal', 'b-amber') + ' ' + serverText(e.seasonal_caveat) + '</div>' : '') +
       '<div class="satm-muted">' + data(day(e.first_after_time_utc) + ' … ' + day(e.last_after_time_utc) + ' · ' + e.sensor_basis) +
       '</div></div>';
     html += '<div class="card satm-card"><div class="card-head"><span></span><span class="satm-actions">' +
@@ -660,7 +922,7 @@
   function swipeMap(L, imgs, area, change, focus) {
     var div = document.getElementById('satm-swipe');
     if (!div || !area.grid_bbox) return;
-    var map = L.map(div, {zoomControl: true, attributionControl: false, zoomSnap: 0.25}); S.maps.push(map);
+    var map = L.map(div, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); zoomCtl(L, map); S.maps.push(map);
     var b = bboxBounds(area.grid_bbox);
     if (imgs.before && imgs.before.quicklook_url) L.imageOverlay(imgs.before.quicklook_url, b, {pane: imagePane(map, 'satmImg', 350)}).addTo(map);
     imagePane(map, 'satmAfter', 360);
@@ -708,7 +970,7 @@
       if (!o) return data('—');
       if (key === 'pts') return o.inside === null || o.inside === undefined ? t('unknown')
         : data(o.inside) + ' ' + t('inside') + ' · ' + data(o.buffer) + ' ' + t('buffer');
-      return o.count === null || o.count === undefined ? t('unknown') + (o.reason ? ' <span class="satm-muted">' + data('(' + o.reason + ')') + '</span>' : '')
+      return o.count === null || o.count === undefined ? t('unknown') + (o.reason ? ' <span class="satm-muted">(' + serverText(o.reason) + ')</span>' : '')
         : data(o.count);
     }
     function link(target, label, name) {
@@ -815,5 +1077,6 @@
   }
 
   window.SatMonitoring = {load: loadOverview, openArea: openArea, openEvent: openEvent, lvmButton: lvmButton,
-                          _T: T, _TD_SAMPLES: TD_SAMPLES, _series: series, _lvmGeometry: lvmGeometry, _pickImages: pickImages};
+                          _T: T_EN, _T_LV: T_LV, _trServer: trServer, _TD_LV: TD_LV, _TD_SAMPLES: TD_SAMPLES, _setLang: setLang,
+                          get lang() { return LANG; }, _series: series, _lvmGeometry: lvmGeometry, _pickImages: pickImages};
 })();

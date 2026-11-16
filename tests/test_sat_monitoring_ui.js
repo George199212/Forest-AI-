@@ -87,10 +87,35 @@ test('LVM GEO button: "Already monitored" when an active area exists; one lookup
  const sat=loadSat({document,fetch,IntersectionObserver});
  const box={children:[],appendChild(n){this.children.push(n);}};
  const b=sat.lvmButton(box,{id:'vmd-42',geometry:{type:'Polygon',coordinates:[[[24,57],[24.01,57],[24.01,57.01],[24,57]]]},properties:{kvart:5,nog:12,kadastrs:'80480140048'}});
- assert.equal(box.children.length,1);assert.equal(b.textContent,'Add to satellite monitoring');assert.equal(calls.length,0);
+ assert.equal(box.children.length,1);assert.equal(b.textContent,'Pievienot satelītu monitoringam');assert.equal(calls.length,0);
  ioCb([{isIntersecting:true}]);await new Promise(r=>setTimeout(r,10));
  assert.deepEqual(calls,['/api/sat-monitoring/lookup?source=LVM_GEO&source_ref=vmd-42']);
- assert.equal(b.textContent,'Already monitored');assert.equal(b.disabled,true);
+ assert.equal(b.textContent,sat._T_LV.lvmMonitored);assert.equal(b.disabled,true);
  const m=sat.lvmButton(box,{id:'x',geometry:{type:'MultiPolygon',coordinates:[[[[24,57]]],[[[25,57]]]]}});
- assert.equal(m.disabled,true);assert.equal(m.textContent,'Multi-part polygon — add the parts separately');
+ assert.equal(m.disabled,true);assert.equal(m.textContent,sat._T_LV.lvmMulti);
+});
+
+test('Latvian is the default; T_LV / TD_LV are exactly the i18n-lv.js translations (no drift); EN on request',()=>{
+ const I=loadI18n(),sat=loadSat();
+ assert.equal(sat.lang,'lv');
+ for(const [k,v] of Object.entries(sat._T)){const want=v==='LVM GEO'?v:I.tr(v);assert.equal(sat._T_LV[k],want,k);}
+ const TD=sat._TD_LV,samples=sat._TD_SAMPLES;
+ const lv=[TD.lastDays(14),TD.recoveredNotCounted(1),TD.changeDetected('5.97 ha'),TD.outside('0.84 ha'),TD.eventTitle(51),
+  TD.generation(1),TD.code('b3c0fd4'),TD.risk(12),TD.queuedJob(3),TD.confirmAdd('BIK-001')];
+ samples.forEach((s,i)=>assert.equal(lv[i],I.trMessage?I.trMessage(s):I.tr(s),s));
+ sat._setLang('en');assert.equal(sat.lang,'en');
+});
+
+test('stored server sentences (caveats, recovery, context reasons) are shown in Latvian; unknown text unchanged',()=>{
+ const sat=loadSat(),tr=sat._trServer;
+ assert.equal(tr('Snow on 12% of the area in the after-image.'),'Pēcattēlā sniegs klāj 12% teritorijas.');
+ assert.equal(tr('no sector link for this area (source is not SECTOR)'),'teritorijai nav sasaistes ar sektoru (avots nav SECTOR)');
+ assert.equal(tr('current mask 0.08 ha < min_cluster_ha 0.3 ha in 2 consecutive valid S2 acquisitions (last 2026-11-08)'),
+  'pašreizējā maska 0.08 ha < min_cluster_ha 0.3 ha 2 secīgos derīgos S2 uzņēmumos (pēdējais 2026-11-08)');
+ const cav='After-image is from Oct–Apr: leaf fall/leaf-off, frozen or wet ground and snow change optical indices and radar backscatter without any felling.';
+ const lv=tr('Latest after-image 2026-11-08 (not used for the class): '+cav+' | Fragmented change: the largest cluster (2.00 ha) is 20% of the current area (10.00 ha), below 30%.');
+ assert.match(lv,/^Jaunākais pēcattēls 2026-11-08 \(klasei netiek izmantots\): Pēcattēls ir no oktobra–aprīļa/);
+ assert.match(lv,/ \| Sadrumstalotas izmaiņas: lielākais klasteris \(2\.00 ha\) ir 20% no pašreizējās platības \(10\.00 ha\), mazāk nekā 30%\.$/);
+ assert.equal(tr('Some new server text'),'Some new server text');
+ sat._setLang('en');assert.equal(tr('Snow on 12% of the area in the after-image.'),'Snow on 12% of the area in the after-image.');
 });
