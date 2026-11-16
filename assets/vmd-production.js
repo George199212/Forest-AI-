@@ -105,6 +105,7 @@ function render(result,designation){
   [['Kadastra apzīmējums',p.kadastrs],['Kvartāls',p.kvart],['Nogabals',p.nog],['Platība',Number(p.area_ha||0).toFixed(2)+' ha'],['Datu avots','VMD · '+p.source_layer],['Avota ID',id],['Kadastra saistība',associationLabel(p)],['Ģeometrija',p.geometry_valid?'Derīga':'Nav apstiprināta']].forEach(([key,value])=>el('div',key+': '+value,popup));
   if(p.geometry_repaired)el('p','Normalizējot labota ģeometrija — pārbaudiet pirms reģistrācijas.',popup);
   const reason=el('p','',popup),action=el('button','Atlasīt',popup);action.type='button';action.className='btn vmd-popup-action';action.onclick=event=>{event?.stopPropagation?.();toggle(id,!s.selected.has(id));};s.entries.get(id).action=action;s.entries.get(id).reason=reason;
+  window.SatMonitoring?.lvmButton?.(popup,feature); // Satellite Monitoring (Stage 3): the one LVM GEO button
   // Polygon click = inspect only: Leaflet opens the popup; selection changes only via the popup button.
   layer.bindTooltip?.(el('span','K'+p.kvart+' · N'+p.nog));layer.bindPopup(popup,{maxHeight:240});layer.on('click',()=>highlight(id,true));
  }}).addTo(s.map);
