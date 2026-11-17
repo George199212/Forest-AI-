@@ -1,0 +1,104 @@
+{
+ "_captured": "2026-11-17 from sandbox 127.0.0.1:8040 on copies of live forest_ai.db (sha 75f527a2) + satellite.db (sha 7affc129); personal/identity fields redacted",
+ "_source": "GET /api/sectors/{name} + /api/sat-monitoring/lookup",
+ "data": {
+  "sat_lookup": {
+   "area_id": null,
+   "monitored": false,
+   "queued_job_id": null
+  },
+  "sector_detail": {
+   "comments": [],
+   "employees": [],
+   "gps_sessions": [],
+   "photos": [],
+   "risks": [],
+   "sector": {
+    "approved_volume": "",
+    "area_ha": 1.08,
+    "boundary": [
+     [
+      55.88965013380008,
+      27.60857091578914
+     ],
+     [
+      55.889904192063,
+      27.608378884151627
+     ],
+     [
+      55.88998661721229,
+      27.608328757142537
+     ],
+     [
+      55.89099613675206,
+      27.607714807655146
+     ],
+     [
+      55.89105918501241,
+      27.60804412927773
+     ],
+     [
+      55.89080500181589,
+      27.609066377507848
+     ],
+     [
+      55.890874404214124,
+      27.609385507564884
+     ],
+     [
+      55.89008606853892,
+      27.609614137024494
+     ],
+     [
+      55.88975800204955,
+      27.608818136610996
+     ],
+     [
+      55.88965013380008,
+      27.60857091578914
+     ]
+    ],
+    "boundary_json": "[[55.88965013380008, 27.60857091578914], [55.889904192063, 27.608378884151627], [55.88998661721229, 27.608328757142537], [55.89099613675206, 27.607714807655146], [55.89105918501241, 27.60804412927773], [55.89080500181589, 27.609066377507848], [55.890874404214124, 27.609385507564884], [55.89008606853892, 27.609614137024494], [55.88975800204955, 27.608818136610996], [55.88965013380008, 27.60857091578914]]",
+    "boundary_plan_id": null,
+    "center_lat": 55.890277,
+    "center_lon": 27.608649,
+    "color": "#4b9d54",
+    "contractor": "",
+    "created_at": "2026-11-17T05:50:14.870514+00:00",
+    "created_by_account": "<redacted>",
+    "created_by_user_id": null,
+    "cut_plan_notes": null,
+    "data_origin": "REAL",
+    "exposure_basis": "none",
+    "exposure_high": 0,
+    "exposure_label": "€0",
+    "exposure_low": 0,
+    "id": 81,
+    "image_path": "",
+    "map_url": "",
+    "name": "LG917 — K348 N10 [nodala2454:49647440]",
+    "notes": null,
+    "object_name": null,
+    "organization_id": 1,
+    "pixel_boundary_json": null,
+    "rejected_gps": 0,
+    "responsible_first_name": "<redacted>",
+    "responsible_last_name": "<redacted>",
+    "risk_color": "green",
+    "risk_level": "LOW",
+    "risk_score": 0,
+    "satellite_file_path": null,
+    "status": "Planned",
+    "timber_miss_vol": 0.0,
+    "tree_species": null,
+    "truck_discrepancy": 0,
+    "updated_at": "2026-11-17T05:50:14.870514+00:00",
+    "vol_at_risk": 0.0
+   },
+   "snapshots": [],
+   "timber_movements": [],
+   "truck_reports": [],
+   "vehicles": []
+  }
+ }
+}
