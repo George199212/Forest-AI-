@@ -758,3 +758,104 @@ def test_truecolor_url_only_when_the_file_exists_and_the_route_serves_it(client,
     e = client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()
     assert e["before"][0]["truecolor_url"] == f"/api/sat-monitoring/file/{a0}/truecolor"
     assert client.get(f"/api/sat-monitoring/file/{a0}/other", headers=AUTH).status_code == 404
+
+
+# ── Satellite Workspace read-only additions (owner decisions 2026-11-17) ─────
+def _vmd_index(tmp_path):
+    """Tiny VMD index like compartments.sqlite: WKB geometry (WGS84) + spatial_index bbox."""
+    from shapely.geometry import box
+    p = tmp_path / "vmd_test.sqlite"
+    c = sqlite3.connect(p)
+    c.executescript("CREATE TABLE compartments (id INTEGER PRIMARY KEY, external_id TEXT, kvart TEXT, nog TEXT, "
+                    "geometry BLOB, properties TEXT);"
+                    "CREATE TABLE spatial_index (id INTEGER PRIMARY KEY, min_lon REAL, max_lon REAL, min_lat REAL, max_lat REAL);")
+    rows = [(1, "VMD:t:1", "5", "12", box(24.4995, 56.9995, 24.501, 57.0025), {"zkat": "14", "p_cirg": 2026, "p_cirp": 11}),
+            (2, "VMD:t:2", "5", "13", box(24.501, 56.9995, 24.5035, 57.0025), {"zkat": "10", "p_cirg": 0.0, "p_cirp": 0}),
+            (3, "VMD:t:3", "9", "1", box(24.60, 57.10, 24.61, 57.11), {"zkat": "10", "p_cirg": None, "p_cirp": None})]
+    for i, ext, kv, nog, g, props in rows:
+        c.execute("INSERT INTO compartments VALUES (?,?,?,?,?,?)", (i, ext, kv, nog, g.wkb, json.dumps(props)))
+        c.execute("INSERT INTO spatial_index VALUES (?,?,?,?,?)", (i, g.bounds[0], g.bounds[2], g.bounds[1], g.bounds[3]))
+    c.commit()
+    c.close()
+    return p
+
+
+def test_event_compartments_metadata_as_stored_and_cached(client, sat, tmp_path, monkeypatch):
+    pytest.importorskip("shapely")
+    from satellite_monitoring import vmd_context
+    vmd_context._cache.clear()
+    monkeypatch.setenv("SAT_FOREST_DB", str(_vmd_index(tmp_path)))
+    monkeypatch.setenv("SAT_FOREST_DB_VERSION", "test-v1")
+    e = client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()
+    st, items = e["compartments_status"], e["compartments"]
+    assert st["available"] is True and st["dataset_version"] == "test-v1" and st["cached"] is False
+    assert {i["external_id"] for i in items} == {"VMD:t:1", "VMD:t:2"}
+    by = {i["external_id"]: i for i in items}
+    assert "VMD:t:3" not in by                                            # far away: not intersecting
+    assert by["VMD:t:1"]["zkat"] == "14" and by["VMD:t:1"]["p_cirg"] == 2026 and by["VMD:t:1"]["p_cirp"] == 11
+    assert by["VMD:t:2"]["p_cirg"] == 0.0 and by["VMD:t:2"]["p_cirp"] == 0  # stored 0 passes through (UI: "nav norādīts")
+    assert all(i["ha_in_mask"] > 0 for i in items) and items == sorted(items, key=lambda x: -x["ha_in_mask"])
+    assert e["status"] == "SUSPECTED" and e["classification"] == "POTENTIAL_FOREST_LOSS"   # metadata changes nothing
+    again = client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()
+    assert again["compartments_status"]["cached"] is True and again["compartments"] == items
+
+
+def test_event_compartments_unavailable_is_reported_not_an_error(client, sat, monkeypatch):
+    from satellite_monitoring import vmd_context
+    vmd_context._cache.clear()
+    monkeypatch.setenv("SAT_FOREST_DB", "/nonexistent/compartments.sqlite")
+    r = client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["compartments"] == [] and d["compartments_status"]["available"] is False
+
+
+def test_superseded_event_reports_its_current_successor(client, sat):
+    pytest.importorskip("shapely")
+    from satellite_monitoring import vmd_context
+    vmd_context._cache.clear()
+    old = client.get(f"/api/sat-monitoring/events/{sat['old']}", headers=AUTH).json()
+    assert old["current"] is False and old["successor"]["event_id"] in (sat["open"], sat["rec"])
+    assert old["successor"]["overlap"] >= 0.3
+    cur = client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()
+    assert cur["successor"] is None
+
+
+def test_area_workspace_fields_and_geometry_flag(client, sat):
+    d = client.get(f"/api/sat-monitoring/areas/{sat['area']}", headers=AUTH).json()
+    assert d["config"] == {"min_valid_pct": config.DEFAULTS["min_valid_pct"]}
+    assert "last_successful_analysis_utc" in d                          # NULL here: the fixture has no detections
+    ev = {e["id"]: e for e in d["events"]}
+    o = ev[sat["open"]]
+    assert o["onset_acq_id"] == sat["acq"][2] and o["onset_sensor"] == "S2"
+    assert o["before_acq_ids"] == [sat["acq"][0]] and o["after_acq_ids"] == [sat["acq"][2]]
+    assert "change_geojson" in o
+    lean = client.get(f"/api/sat-monitoring/areas/{sat['area']}?geometry=0", headers=AUTH).json()
+    assert all("change_geojson" not in e for e in lean["events"]) and lean["timeline"] == d["timeline"]
+    c = sqlite3.connect(sat["db"])
+    c.execute("INSERT INTO sat_detections (acquisition_id, monitored_area_id, sensor, ran_at_utc, outcome) "
+              "VALUES (?,?, 'S2', '2026-11-17T06:18:03Z', 'NO_CHANGE')", (sat["acq"][2], sat["area"]))
+    c.commit()
+    c.close()
+    d = client.get(f"/api/sat-monitoring/areas/{sat['area']}", headers=AUTH).json()
+    assert d["last_successful_analysis_utc"] == "2026-11-17T06:18:03Z"
+
+
+def test_overview_latest_events_current_generation_only(client, sat):
+    d = client.get("/api/sat-monitoring/overview", headers=AUTH).json()
+    ids = [e["id"] for e in d["latest_events"]]
+    assert sat["old"] not in ids and set(ids) == {sat["open"], sat["rec"]} and len(ids) <= 10
+    e = next(x for x in d["latest_events"] if x["id"] == sat["open"])
+    assert e["area_name"] == "Stand A" and e["classification"] == "POTENTIAL_FOREST_LOSS" and "change_geojson" not in e
+
+
+def test_stage0_fixtures_load_gzipped_and_hold_no_user_names():
+    import sys
+    sys.path.insert(0, os.path.dirname(__file__))
+    import sat_ui_fixtures as fx
+    names = fx.names()
+    assert "area_1_bik001" in names and "event_60_current_successor_of_51" in names
+    assert fx.load("area_1_bik001")["events"] == []                      # BIK-001: negative control, no events
+    for n in names:
+        s = json.dumps(fx.load(n))
+        assert '"added_by": "<user>"' in s or '"added_by"' not in s

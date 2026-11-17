@@ -21,7 +21,8 @@ from pathlib import Path
 from . import config, db as sdb, display
 
 BUSY_TIMEOUT_MS = 5000
-RECENT_DAYS = 14                               # "with recent observations": last valid S2 or S1 within this
+RECENT_DAYS = 14
+LATEST_EVENTS = 10                             # /overview "Jaunākās izmaiņas" (current generation, across areas)                               # "with recent observations": last valid S2 or S1 within this
 API_AREA_SOURCES = ("SECTOR", "LVM_GEO")       # EVAL_BBOX stays CLI-only
 MAX_VERTICES = 5000
 REVIEW_DECISIONS = ("CONFIRM", "REJECT", "FIELD_CHECK", "CREATE_RISK", "UNDO")
@@ -283,7 +284,17 @@ def overview(now=None):
             "recovered_events": sum(s["recovered_events"] for s in active),
             "recent_days": RECENT_DAYS,
         }
+        names = {a["id"]: a["name"] for a in areas}
+        latest = []
+        for e in conn.execute("SELECT * FROM sat_change_events WHERE 1=1" + sdb.current_only(conn, "sat_change_events")
+                              + " ORDER BY detected_at_utc DESC, id DESC LIMIT ?", (LATEST_EVENTS,)):
+            e = dict(e)
+            latest.append({k: e.get(k) for k in (
+                "id", "monitored_area_id", "status", "classification", "confidence", "evidence_quality",
+                "changed_area_ha", "changed_area_ha_inside", "changed_area_ha_buffer", "first_after_time_utc",
+                "detected_at_utc", "updated_at_utc", "sensor_basis")} | {"area_name": names.get(e["monitored_area_id"])})
         return {"generated_at_utc": sdb.iso(now), "kpis": kpis, "areas": stats, "pending_area_jobs": pending,
+                "latest_events": latest,
                 "labels": {"interpretation": "automated, suspected change only", "attribution":
                            "Contains modified Copernicus Sentinel data " + str(now.year)}}
     finally:
@@ -305,7 +316,15 @@ def _event_public(ev):
     return e
 
 
-def area_detail(area_id):
+def _history_fields(e):
+    """Onset acquisition + before/after ids from the stored event history (read-only)."""
+    hist = _j(e.get("after_acq_history_json"), []) or []
+    onset = min(hist, key=lambda h: h.get("time") or "") if hist else None
+    return {"onset_acq_id": onset.get("acq_id") if onset else None, "onset_sensor": onset.get("sensor") if onset else None,
+            "before_acq_ids": _j(e.get("before_acq_ids"), []) or [], "after_acq_ids": [h.get("acq_id") for h in hist]}
+
+
+def area_detail(area_id, geometry=True):
     conn = ro()
     try:
         a = conn.execute("SELECT * FROM sat_monitored_areas WHERE id=?", (area_id,)).fetchone()
@@ -339,7 +358,9 @@ def area_detail(area_id):
         for e in conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=?"
                               + sdb.current_only(conn, "sat_change_events") + " ORDER BY id", (area_id,)):
             pub = _event_public(dict(e))
-            pub["change_geojson"] = _j(e["change_geojson"])          # CURRENT mask (zone INSIDE / BUFFER)
+            pub.update(_history_fields(dict(e)))
+            if geometry:                                              # ?geometry=0: map uses the simplified /map-layer
+                pub["change_geojson"] = _j(e["change_geojson"])      # CURRENT mask (zone INSIDE / BUFFER)
             events.append(pub)
         radar = []
         if _has_table(conn, "sat_radar_anomalies"):
@@ -347,10 +368,15 @@ def area_detail(area_id):
                 "SELECT id, acquisition_id, sensing_time_utc, orbit_direction, relative_orbit, changed_area_ha, "
                 "evidence_quality, status, promotion_rule, event_id FROM sat_radar_anomalies WHERE monitored_area_id=?"
                 + sdb.current_only(conn, "sat_radar_anomalies") + " ORDER BY sensing_time_utc", (area_id,))]
-        geometry = _j(a["geometry_geojson"])
-        return {"area": _area_stats(conn, a, sdb.utcnow()), "geometry": geometry,
-                "buffer_ring": display.buffer_ring(geometry, a["buffer_m"]) if geometry else None,
+        last_analysis = conn.execute("SELECT MAX(ran_at_utc) FROM sat_detections WHERE monitored_area_id=?"
+                                     + sdb.current_only(conn, "sat_detections"), (area_id,)).fetchone()[0]
+        geom = _j(a["geometry_geojson"])
+        return {"area": _area_stats(conn, a, sdb.utcnow()), "geometry": geom,
+                "buffer_ring": display.buffer_ring(geom, a["buffer_m"]) if geom else None,
                 "timeline": timeline, "events": events, "radar_anomalies": radar,
+                # processing time of the last current-generation detection for this area (NOT an acquisition time)
+                "last_successful_analysis_utc": last_analysis,
+                "config": {"min_valid_pct": config.DEFAULTS["min_valid_pct"]},
                 "attribution": _attribution(timeline)}
     finally:
         conn.close()

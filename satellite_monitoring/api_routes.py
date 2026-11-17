@@ -101,9 +101,9 @@ def router(verify_credentials, sender=None, database=None, recommend=None):
             return _err(e)
 
     @r.get("/areas/{area_id}")
-    def area(area_id: int):
+    def area(area_id: int, geometry: int = 1):
         try:
-            return store.area_detail(area_id)
+            return store.area_detail(area_id, geometry=bool(geometry))
         except store.StoreError as e:
             return _err(e)
 
@@ -131,9 +131,22 @@ def router(verify_credentials, sender=None, database=None, recommend=None):
     @r.get("/events/{event_id}")
     def event(event_id: int):
         try:
-            return store.event_detail(event_id)
+            d = store.event_detail(event_id)
         except store.StoreError as e:
             return _err(e)
+        # Read-only context (vmd_context): VMD compartments of the current mask (METADATA) and, for a superseded event,
+        # its current-generation successor. A failure here never breaks the event page: it is reported as unavailable.
+        from . import vmd_context
+        try:
+            d["compartments"], d["compartments_status"] = vmd_context.compartments(d)
+        except Exception as ex:                                  # noqa: BLE001 - reported, not hidden
+            d["compartments"], d["compartments_status"] = [], {"available": False, "dataset_version": None,
+                                                               "reason": f"{type(ex).__name__}", "cached": False}
+        try:
+            d["successor"] = vmd_context.successor(d)
+        except Exception as ex:                                  # noqa: BLE001
+            d["successor"], d["successor_error"] = None, type(ex).__name__
+        return d
 
     @r.post("/events/{event_id}/review")
     def review(event_id: int, body: ReviewIn, username: str = Depends(verify_credentials)):
