@@ -19,14 +19,28 @@ CATALOG_MAX_PAGES = 500
 
 # Evalscripts return raw values as FLOAT32; every index / dB is computed locally
 # so the stored GeoTIFF is the unmodified evidence.
+# 2026-11-17 (owner decision, true colour): B03 and B02 are APPENDED as bands 7-8, so bands 1-6 keep their positions
+# and every analysis reads them unchanged; rasters stored before this date have 6 bands (S2_BANDS_V1) and stay valid.
 EVALSCRIPT_S2 = """//VERSION=3
 function setup() {
-  return {input: [{bands: ["B04", "B08", "B11", "B12", "SCL", "dataMask"]}],
-          output: {id: "default", bands: 6, sampleType: "FLOAT32"}};
+  return {input: [{bands: ["B04", "B08", "B11", "B12", "SCL", "dataMask", "B03", "B02"]}],
+          output: {id: "default", bands: 8, sampleType: "FLOAT32"}};
 }
-function evaluatePixel(s) { return [s.B04, s.B08, s.B11, s.B12, s.SCL, s.dataMask]; }
+function evaluatePixel(s) { return [s.B04, s.B08, s.B11, s.B12, s.SCL, s.dataMask, s.B03, s.B02]; }
 """
-S2_BANDS = ["B04", "B08", "B11", "B12", "SCL", "dataMask"]
+S2_BANDS = ["B04", "B08", "B11", "B12", "SCL", "dataMask", "B03", "B02"]
+S2_BANDS_V1 = ["B04", "B08", "B11", "B12", "SCL", "dataMask"]
+
+# True-colour quicklook for an EXISTING acquisition (stored before B02/B03 were requested). Display only: the stored
+# 6-band evidence raster is never replaced; only a *_tc.png is written.
+EVALSCRIPT_TRUECOLOR = """//VERSION=3
+function setup() {
+  return {input: [{bands: ["B04", "B03", "B02", "dataMask"]}],
+          output: {id: "default", bands: 4, sampleType: "FLOAT32"}};
+}
+function evaluatePixel(s) { return [s.B04, s.B03, s.B02, s.dataMask]; }
+"""
+TRUECOLOR_BANDS = ["B04", "B03", "B02", "dataMask"]
 
 EVALSCRIPT_S1 = """//VERSION=3
 function setup() {
@@ -141,7 +155,7 @@ def group_datatakes(products, max_gap_s=120):
     return sorted(out, key=lambda x: x.sensing_time_utc)
 
 
-def estimate_pu(sensor, width, height, cfg=None):
+def estimate_pu(sensor, width, height, cfg=None, input_bands=None):
     """Processing-unit estimate following the Sentinel Hub PU rules
     (https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Overview/ProcessingUnit.html):
       area factor   = width*height / 512^2, minimum 0.01
@@ -152,7 +166,8 @@ def estimate_pu(sensor, width, height, cfg=None):
     no x-processingunits-spent header; stored with pu_is_estimate=1."""
     cfg = cfg or config.DEFAULTS
     area = max(width * height / (512.0 * 512.0), 0.01)
-    bands = (5 if sensor == "S2" else 2) / 3.0
+    # counted input bands (dataMask excluded): S2 = B04 B08 B11 B12 SCL B03 B02 (7), S1 = VV VH (2), true colour 3
+    bands = (input_bands if input_bands is not None else (7 if sensor == "S2" else 2)) / 3.0
     pu = area * bands * 2.0
     if sensor == "S1" and cfg["s1_orthorectify"]:
         pu *= 2.0
@@ -200,7 +215,7 @@ class SentinelHubProvider:
         self.last_pages = pages
         return group_datatakes(products)
 
-    def request_body(self, sensor, product, grid):
+    def request_body(self, sensor, product, grid, evalscript=None):
         t = parse_time(product.sensing_time_utc)
         t0 = (t - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
         t1 = (t + timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -217,8 +232,20 @@ class SentinelHubProvider:
             "input": {"bounds": {"bbox": grid["bbox"], "properties": {"crs": grid["crs"]}}, "data": [source]},
             "output": {"width": grid["width"], "height": grid["height"],
                        "responses": [{"identifier": "default", "format": {"type": "image/tiff"}}]},
-            "evalscript": EVALSCRIPT_S2 if sensor == "S2" else EVALSCRIPT_S1,
+            "evalscript": evalscript or (EVALSCRIPT_S2 if sensor == "S2" else EVALSCRIPT_S1),
         }
+
+    def fetch_truecolor(self, product, grid):
+        """B04/B03/B02/dataMask for an existing S2 acquisition (display quicklook only)."""
+        body = self.request_body("S2", product, grid, evalscript=EVALSCRIPT_TRUECOLOR)
+        r = self.client.post_json("PROCESS", cdse.PROCESS_URL, body, accept="image/tiff", timeout=120)
+        hdr = r.headers.get("x-processingunits-spent")
+        try:
+            pu, est = float(hdr), False
+        except (TypeError, ValueError):
+            pu, est = estimate_pu("S2", grid["width"], grid["height"], self.cfg, input_bands=3), True
+        return FetchResult(raw=r.content, pu_spent=pu, pu_is_estimate=est,
+                           params={"evalscript_bands": TRUECOLOR_BANDS, "purpose": "true colour quicklook"})
 
     def fetch_area_raster(self, sensor, product, grid):
         body = self.request_body(sensor, product, grid)

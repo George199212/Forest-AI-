@@ -81,7 +81,7 @@ def npy(arr):
 
 def decoder(raw, expected_shape=None, bands=None):
     arr = np.load(io.BytesIO(raw))
-    assert arr.shape[:2] == tuple(expected_shape) and arr.shape[2] == bands
+    assert arr.shape[:2] == tuple(expected_shape) and arr.shape[2] in (bands if isinstance(bands, tuple) else (bands,))
     return arr
 
 
@@ -401,9 +401,10 @@ def test_datatake_grouping_merges_tiles():
 
 
 def test_pu_estimate():
-    assert prov.estimate_pu("S2", 512, 512) == pytest.approx(5 / 3 * 2, rel=1e-3)
+    # S2 counts 7 input bands since 2026-11-17 (B04 B08 B11 B12 SCL + B03 B02; dataMask not counted), was 5
+    assert prov.estimate_pu("S2", 512, 512) == pytest.approx(7 / 3 * 2, rel=1e-3)
     assert prov.estimate_pu("S1", 512, 512) == pytest.approx(2 / 3 * 2 * 2, rel=1e-3)
-    assert prov.estimate_pu("S2", 10, 10) == pytest.approx(0.01 * 5 / 3 * 2, rel=1e-3)   # minimum area factor
+    assert prov.estimate_pu("S2", 10, 10) == pytest.approx(0.01 * 7 / 3 * 2, rel=1e-3)   # minimum area factor
 
 
 # ── pipeline ────────────────────────────────────────────────────────────────
@@ -1589,3 +1590,106 @@ def test_fragmentation_rule_reclassifies_scattered_change_with_low_confidence():
     # missing area never becomes a class
     assert det.fragmentation(None, 10.0, cfg) == (False, None) and det.fragmentation(1.0, 0.0, cfg) == (False, None)
     assert "fragmentation_min_largest_share" in config.thresholds_snapshot()
+
+
+# ── True colour (owner decision 2026-11-17) ──────────────────────────────────
+def _with_rgb(a8):
+    h, w = a8.shape[:2]
+    extra = np.zeros((h, w, 2), dtype=np.float32)
+    extra[..., 0], extra[..., 1] = 0.05, 0.04                    # B03, B02
+    return np.concatenate([a8, extra], axis=2)
+
+
+def test_s2_request_appends_b03_b02_and_old_6band_rasters_stay_valid():
+    assert prov.S2_BANDS[:6] == prov.S2_BANDS_V1 and prov.S2_BANDS[6:] == ["B03", "B02"]
+    assert 'bands: 8' in prov.EVALSCRIPT_S2 and "s.B03, s.B02]" in prov.EVALSCRIPT_S2
+    assert prov.TRUECOLOR_BANDS == ["B04", "B03", "B02", "dataMask"]
+    # PU estimate counts input bands without dataMask: S2 7, true colour 3
+    assert prov.estimate_pu("S2", 512, 512) == round(7 / 3 * 2, 4)
+    assert prov.estimate_pu("S2", 512, 512, input_bands=3) == 2.0
+
+
+def test_8band_s2_gives_same_metrics_and_a_truecolor_quicklook(env, tmp_path):
+    from satellite_monitoring import raster
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=4)
+    r6 = run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    m6 = [tuple(r) for r in env["conn"].execute("SELECT metric, zone, median FROM sat_area_metrics ORDER BY rowid")]
+    rows6 = [dict(r) for r in env["conn"].execute("SELECT * FROM sat_acquisitions WHERE sensor='S2' ORDER BY id")]
+    assert all(not raster.truecolor_path(r["quicklook_path"]).exists() for r in rows6)   # 6 bands: no true colour
+    b = make_area(env["conn"], name="TST-002", ref="2")
+    prods8 = [P("S2", p.product_id + "_8", p.sensing_time_utc, scene_cloud_pct=5.0) for p in prods]
+    rasters8 = {p.product_id + "_8": _with_rgb(rasters[p.product_id]) for p in prods}
+    run(env, FakeProvider(prods8, rasters8), sensors=("S2",), area_ids=[b["id"]])
+    rows8 = [dict(r) for r in env["conn"].execute("SELECT * FROM sat_acquisitions WHERE monitored_area_id=? ORDER BY id",
+                                                  (b["id"],))]
+    assert [r["status"] for r in rows8] == [r["status"] for r in rows6]
+    assert [r["valid_pct_inside"] for r in rows8] == [r["valid_pct_inside"] for r in rows6]
+    assert all(raster.truecolor_path(r["quicklook_path"]).is_file() for r in rows8)
+    m8 = [tuple(r) for r in env["conn"].execute(
+        "SELECT m.metric, m.zone, m.median FROM sat_area_metrics m JOIN sat_acquisitions q ON q.id=m.acquisition_id "
+        "WHERE q.monitored_area_id=? ORDER BY m.rowid", (b["id"],))]
+    assert m8 == m6[:len(m8)]                                    # bands 1-6 read exactly as before
+
+
+def test_truecolor_png_common_stretch_and_grey_invalid():
+    from satellite_monitoring import raster
+    from PIL import Image
+    r = np.full((4, 4), 0.10, np.float32); g = np.full((4, 4), 0.05, np.float32); bl = np.full((4, 4), 0.02, np.float32)
+    r[0, 0] = 0.30
+    valid = np.ones((4, 4), bool); valid[3, 3] = False
+    img = np.asarray(Image.open(io.BytesIO(raster.truecolor_png(r, g, bl, valid))))
+    assert tuple(img[3, 3]) == (128, 128, 128)
+    assert img[1, 1, 0] > img[1, 1, 1] > img[1, 1, 2]           # colour balance kept (common stretch)
+    assert raster.truecolor_path("/x/2026-08-21_S2B.png").name == "2026-08-21_S2B_tc.png"
+
+
+def test_truecolor_backfill_selects_only_open_event_images_and_writes_only_tc_png(env):
+    from satellite_monitoring import raster, truecolor
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=5)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    c = env["conn"]
+    evs = [dict(r) for r in c.execute("SELECT id, status FROM sat_change_events WHERE superseded_at_utc IS NULL")]
+    assert evs, "fixture should produce an event"
+    shown = truecolor.select(c, "shown")
+    every = truecolor.select(c, "all")
+    assert 1 <= len(shown) <= 2 * len(evs) and len(every) >= len(shown)
+    est = truecolor.estimate(c, shown)
+    assert est["requests"] == len(shown) and est["pu_estimate_rule"] > 0
+    before = {r["id"]: r["raster_sha256"] for r in c.execute("SELECT id, raster_sha256 FROM sat_acquisitions")}
+    n_req = c.execute("SELECT COUNT(*) FROM sat_request_log").fetchone()[0]
+
+    class Client:
+        on_request = None
+        def post_json(self, kind, url, body, accept=None, timeout=None):
+            assert "B03" in body["evalscript"] and "B08" not in body["evalscript"]
+            self.on_request("PROCESS", 200, FakeResp(0.05))
+            class R:
+                headers = {"x-processingunits-spent": "0.05"}
+                content = npy(np.dstack([np.full((a["grid"]["height"], a["grid"]["width"]), v, np.float32)
+                                         for v in (0.1, 0.05, 0.02, 1.0)]))
+            return R()
+    res = truecolor.fetch(c, shown, client=Client(), lock_file=env["tmp"] / "lock", decoder=decoder)
+    assert res["status"] == "OK" and len(res["done"]) == len(shown) and res["requests"] == len(shown)
+    assert c.execute("SELECT COUNT(*) FROM sat_request_log").fetchone()[0] == n_req + len(shown)
+    assert {r["id"]: r["raster_sha256"] for r in c.execute("SELECT id, raster_sha256 FROM sat_acquisitions")} == before
+    for acq, _ in shown:
+        assert raster.truecolor_path(acq["quicklook_path"]).is_file()
+    assert truecolor.select(c, "shown") == []                    # already done -> skipped
+    run_row = dict(c.execute("SELECT * FROM sat_runs WHERE id=?", (res["run_id"],)).fetchone())
+    assert run_row["trigger"] == "MANUAL" and run_row["status"] == "OK" and run_row["requests_made"] == len(shown)
+
+
+def test_decode_tiff_accepts_6_or_8_s2_bands_and_rejects_others():
+    tifffile = pytest.importorskip("tifffile")      # worker venv only
+    from satellite_monitoring import raster
+    for n in (6, 8):
+        arr = np.random.default_rng(n).random((5, 4, n)).astype(np.float32)
+        b = io.BytesIO()
+        tifffile.imwrite(b, np.moveaxis(arr, -1, 0), photometric="minisblack", planarconfig="separate")
+        assert np.allclose(raster.decode_tiff(b.getvalue(), expected_shape=(5, 4), bands=raster.band_count("S2")), arr)
+    b = io.BytesIO()
+    tifffile.imwrite(b, np.zeros((5, 4, 7), np.float32), photometric="minisblack", planarconfig="contig")
+    with pytest.raises(ValueError, match="expected 6 or 8"):
+        raster.decode_tiff(b.getvalue(), expected_shape=(5, 4), bands=raster.band_count("S2"))

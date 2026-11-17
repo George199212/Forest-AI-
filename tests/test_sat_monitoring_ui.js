@@ -136,10 +136,14 @@ test('worker badge: Not installed / Running / Idle / Timers off / Status unknown
  assert.equal(sat._T_LV.wTimersOff,'Taimeri izslēgti');assert.equal(sat._T_LV.wUnknown,'Statuss nav zināms');
 });
 
-test('event images say what the colours are; true colour is stated as unavailable (B02/B03 not stored)',()=>{
+test('event images: true colour (default) only when both images have it; false colour otherwise, with a note',()=>{
  const src=read('assets/sat-monitoring.js'),prov=read('satellite_monitoring/provider.py'),sat=loadSat();
- assert.match(prov,/S2_BANDS = \["B04", "B08", "B11", "B12", "SCL", "dataMask"\]/);   // if B02/B03 are ever stored, revisit
+ assert.match(prov,/S2_BANDS = \["B04", "B08", "B11", "B12", "SCL", "dataMask", "B03", "B02"\]/);   // B03/B02 appended
+ assert.match(src,/function hasTrue\(imgs\) \{ return !!\(imgs\.before && imgs\.before\.truecolor_url && imgs\.after && imgs\.after\.truecolor_url\); \}/);
+ assert.match(src,/colour: 'true'\}/);
+ assert.equal((src.match(/L\.imageOverlay\(imgUrl\(/g)||[]).length,3);
  assert.match(src,/bandNote\(imgs\) \+ '<\/div>';/);
- assert.match(sat._T_LV.bandNoTrue,/^Patiesās krāsas \(B04 \/ B03 \/ B02\) nav pieejamas/);
+ assert.equal(sat._T_LV.colourTrue,'Patiesās krāsas');assert.equal(sat._T_LV.colourFalse,'Viltus krāsas');
+ assert.match(sat._T_LV.bandNoTrue,/^Patiesās krāsas \(B04 \/ B03 \/ B02\) šiem attēliem nav ielādētas/);
  assert.match(sat._T_LV.bandS2,/^Sentinel-2 viltus krāsas \(B11 \/ B08 \/ B04\)/);
 });

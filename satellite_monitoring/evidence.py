@@ -19,8 +19,7 @@ def _arr(acq, grid):
     raw = Path(acq["raster_path"]).read_bytes()
     if raster.sha256_bytes(raw) != acq["raster_sha256"]:
         raise ValueError(f"raster sha256 mismatch for acquisition {acq['id']}")
-    bands = 6 if acq["sensor"] == "S2" else 3
-    return raster.decode_tiff(raw, expected_shape=(grid["height"], grid["width"]), bands=bands)
+    return raster.decode_tiff(raw, expected_shape=(grid["height"], grid["width"]), bands=raster.band_count(acq["sensor"]))
 
 
 def mask_series(conn, area, mask, sensor="S2", cfg=None):

@@ -21,13 +21,44 @@ def decode_tiff(raw, expected_shape=None, bands=None):
     arr = np.asarray(arr, dtype=np.float32)
     if arr.ndim == 2:
         arr = arr[:, :, None]
-    if arr.ndim == 3 and bands is not None and arr.shape[0] == bands and arr.shape[2] != bands:
+    ok = None if bands is None else ((bands,) if isinstance(bands, int) else tuple(bands))
+    if arr.ndim == 3 and ok is not None and arr.shape[0] in ok and arr.shape[2] not in ok:
         arr = np.moveaxis(arr, 0, -1)          # planar config -> band-last
     if expected_shape is not None and arr.shape[:2] != tuple(expected_shape):
         raise ValueError(f"raster shape {arr.shape[:2]} != grid {tuple(expected_shape)}")
-    if bands is not None and arr.shape[2] != bands:
-        raise ValueError(f"raster has {arr.shape[2]} bands, expected {bands}")
+    if ok is not None and arr.shape[2] not in ok:
+        raise ValueError(f"raster has {arr.shape[2]} bands, expected {' or '.join(map(str, ok))}")
     return arr
+
+
+S2_BAND_COUNTS = (6, 8)       # 6 = stored before 2026-11-17, 8 = + B03, B02 (appended)
+
+
+def band_count(sensor):
+    return S2_BAND_COUNTS if sensor == "S2" else 3
+
+
+def truecolor_path(quicklook_path):
+    """<stem>.png -> <stem>_tc.png (next to the false-colour quicklook; no DB column needed)."""
+    p = Path(quicklook_path)
+    return p.with_name(p.stem + "_tc.png")
+
+
+def truecolor_png(red, green, blue, valid):
+    """PROCESSED visual only (not evidence): true colour B04/B03/B02 with ONE common 2-98 % stretch over the three
+    bands (keeps the colour balance). Invalid pixels mid grey."""
+    from PIL import Image
+    rgb = np.zeros(red.shape + (3,), dtype=np.uint8)
+    if valid.any():
+        stack = np.concatenate([red[valid], green[valid], blue[valid]])
+        lo, hi = np.percentile(stack, [2, 98])
+        hi = hi if hi > lo else lo + 1e-6
+        for i, b in enumerate((red, green, blue)):
+            rgb[:, :, i] = (np.clip((np.nan_to_num(b, nan=lo) - lo) / (hi - lo), 0, 1) * 255).astype(np.uint8)
+    rgb[~valid] = (128, 128, 128)
+    buf = io.BytesIO()
+    Image.fromarray(rgb, "RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
 
 
 def safe_name(product_id):

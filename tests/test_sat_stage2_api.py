@@ -742,3 +742,19 @@ def test_worker_state_not_installed_idle_running_timers_off_unknown(client, monk
     monkeypatch.setattr(store, "_systemctl_show", lambda unit, props: None)
     assert store.worker_state()["state"] == "UNKNOWN"
     assert store._utc_iso("") is None and store._utc_iso("n/a") is None
+
+
+def test_truecolor_url_only_when_the_file_exists_and_the_route_serves_it(client, sat):
+    a0 = sat["acq"][0]
+    d = client.get(f"/api/sat-monitoring/areas/{sat['area']}", headers=AUTH).json()
+    row = next(t for t in d["timeline"] if t["acq_id"] == a0)
+    assert row["truecolor_url"] is None                                   # not fetched -> not offered
+    assert client.get(f"/api/sat-monitoring/file/{a0}/truecolor", headers=AUTH).status_code == 404
+    (sat["root"] / "satellite" / str(sat["area"]) / "ql_1_tc.png").write_bytes(PNG)
+    d = client.get(f"/api/sat-monitoring/areas/{sat['area']}", headers=AUTH).json()
+    assert next(t for t in d["timeline"] if t["acq_id"] == a0)["truecolor_url"] == f"/api/sat-monitoring/file/{a0}/truecolor"
+    r = client.get(f"/api/sat-monitoring/file/{a0}/truecolor", headers=AUTH)
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    e = client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()
+    assert e["before"][0]["truecolor_url"] == f"/api/sat-monitoring/file/{a0}/truecolor"
+    assert client.get(f"/api/sat-monitoring/file/{a0}/other", headers=AUTH).status_code == 404

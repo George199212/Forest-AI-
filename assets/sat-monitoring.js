@@ -94,7 +94,9 @@
     superseded: 'This event was superseded by a later detection generation; review is disabled.',
     noImage: 'No image', validPct: 'Valid %', imgLoading: 'Loading image…', imgFailed: 'The image could not be loaded.',
     bandS2: 'Sentinel-2 false colour (B11 / B08 / B04): healthy forest green, clear-cut or bare soil magenta/brown.',
-    bandNoTrue: 'True colour (B04 / B03 / B02) is not available: bands B03 and B02 are not stored.',
+    bandNoTrue: 'True colour (B04 / B03 / B02) has not been fetched for these images.',
+    bandTrue: 'Sentinel-2 true colour (B04 / B03 / B02), as the eye would see it.',
+    colourTrue: 'True colour', colourFalse: 'False colour',
     bandS1: 'Sentinel-1: VH radar backscatter, grey scale −25 … −5 dB.',
     lvmAdd: 'Add to satellite monitoring', lvmMonitored: 'Already monitored', lvmQueued: 'Queued for satellite monitoring',
     lvmMulti: 'Multi-part polygon — add the parts separately', alreadyQueued: 'Already queued.'
@@ -311,7 +313,10 @@
     imgLoading: "Ielādē attēlu…",
     imgFailed: "Attēlu neizdevās ielādēt.",
     bandS2: "Sentinel-2 viltus krāsas (B11 / B08 / B04): veselīgs mežs — zaļš, izcirtums vai kaila augsne — violets/brūns.",
-    bandNoTrue: "Patiesās krāsas (B04 / B03 / B02) nav pieejamas: kanāli B03 un B02 netiek saglabāti.",
+    bandNoTrue: "Patiesās krāsas (B04 / B03 / B02) šiem attēliem nav ielādētas.",
+    bandTrue: "Sentinel-2 patiesās krāsas (B04 / B03 / B02), kā to redzētu acs.",
+    colourTrue: "Patiesās krāsas",
+    colourFalse: "Viltus krāsas",
     bandS1: "Sentinel-1: VH radara atpakaļizkliede, pelēktoņu skala −25 … −5 dB.",
     lvmAdd: "Pievienot satelītu monitoringam",
     lvmMonitored: "Jau tiek uzraudzīts",
@@ -392,7 +397,7 @@
 
   var S = {view: 'overview', areaId: null, eventId: null, maps: [], charts: [], health: null, imgMode: 'side',
            layers: {boundary: true, buffer: true, change: true, footprint: true, image: false}, selAcq: null,
-           area: null, event: null, msg: null};
+           area: null, event: null, msg: null, colour: 'true'};
 
   // ── helpers ──────────────────────────────────────────────────────────────
   function esc(v) {
@@ -866,11 +871,17 @@
     html += '<div class="card satm-card"><div class="card-head"><span></span><span class="satm-actions">' +
       '<button class="filter-btn' + (S.imgMode === 'side' ? ' active' : '') + '" data-mode="side">' + t('sideBySide') + '</button>' +
       '<button class="filter-btn' + (S.imgMode === 'swipe' ? ' active' : '') + '" data-mode="swipe">' + t('swipe') + '</button>' +
+      (hasTrue(imgs) ? '<span class="satm-colour"> ' +
+        '<button class="filter-btn' + (useTrue(imgs) ? ' active' : '') + '" data-colour="true">' + t('colourTrue') + '</button>' +
+        '<button class="filter-btn' + (!useTrue(imgs) ? ' active' : '') + '" data-colour="false">' + t('colourFalse') + '</button></span>' : '') +
       '</span></div>' + (S.imgMode === 'side' ? sideBySide(imgs) : swipeBox(imgs)) + bandNote(imgs) + '</div>';
     html += '<div class="satm-grid">' + areasCard(e) + zkatCard(e) + '</div>';
     html += '<div class="satm-grid">' + contextCard(e) + algorithmCard(e) + '</div>';
     html += reviewCard(e);
     el.innerHTML = html; bindBack(ar.id);
+    el.querySelectorAll('[data-colour]').forEach(function (b) {
+      b.onclick = function () { S.colour = b.getAttribute('data-colour'); openEvent(id); };
+    });
     el.querySelectorAll('[data-mode]').forEach(function (b) {
       b.onclick = function () { S.imgMode = b.getAttribute('data-mode'); openEvent(id); };
     });
@@ -888,9 +899,9 @@
     var L = await ensureLeaflet();
     var focus = focusBounds(L, ar, e.change_geojson);
     if (S.imgMode === 'side') {
-      var ms3 = [imgMap(L, 'satm-img-before', imgs.before, ar, null, focus),
-                 imgMap(L, 'satm-img-after', imgs.after, ar, null, focus),
-                 imgMap(L, 'satm-img-change', imgs.after, ar, e.change_geojson, focus)].filter(Boolean);
+      var ms3 = [imgMap(L, 'satm-img-before', imgs.before, ar, null, focus, imgs),
+                 imgMap(L, 'satm-img-after', imgs.after, ar, null, focus, imgs),
+                 imgMap(L, 'satm-img-change', imgs.after, ar, e.change_geojson, focus, imgs)].filter(Boolean);
       syncMaps(ms3);
     } else swipeMap(L, imgs, ar, e.change_geojson, focus);
   }
@@ -903,11 +914,15 @@
   }
   // UI review item 7: stored S2 rasters hold B04, B08, B11, B12, SCL, dataMask only (provider.S2_BANDS), so a true
   // colour view (B04/B03/B02) cannot be made without new Copernicus requests. Say what the colours mean instead.
+  // True colour only when BOTH shown images have it (never a true/false mix); default true colour (owner, 2026-11-17).
+  function hasTrue(imgs) { return !!(imgs.before && imgs.before.truecolor_url && imgs.after && imgs.after.truecolor_url); }
+  function useTrue(imgs) { return S.colour === 'true' && hasTrue(imgs); }
+  function imgUrl(img, imgs) { return useTrue(imgs) && img.truecolor_url ? img.truecolor_url : img.quicklook_url; }
   function bandNote(imgs) {
     var s = [imgs.before, imgs.after].filter(Boolean).map(function (x) { return x.sensor; });
     if (!s.length) return '';
-    return '<div class="satm-muted satm-bandnote">' +
-      (s.indexOf('S2') >= 0 ? t('bandS2') + ' ' + t('bandNoTrue') : '') + (s.indexOf('S1') >= 0 ? ' ' + t('bandS1') : '') + '</div>';
+    var s2 = s.indexOf('S2') >= 0 ? (useTrue(imgs) ? t('bandTrue') : t('bandS2') + (hasTrue(imgs) ? '' : ' ' + t('bandNoTrue'))) : '';
+    return '<div class="satm-muted satm-bandnote">' + s2 + (s.indexOf('S1') >= 0 ? ' ' + t('bandS1') : '') + '</div>';
   }
   function sideBySide(imgs) {
     return '<div class="satm-imgs">' +
@@ -956,13 +971,13 @@
     overlay.on('error', function () { st.innerHTML = t('imgFailed'); st.className += ' satm-img-failed'; div.setAttribute('data-img', 'failed'); });
     return overlay;
   }
-  function imgMap(L, elId, img, area, change, focus) {
+  function imgMap(L, elId, img, area, change, focus, imgs) {
     var div = document.getElementById(elId);
     if (!div || !area.grid_bbox) return null;
     var map = L.map(div, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); S.maps.push(map);
     var b = bboxBounds(area.grid_bbox);
     map.fitBounds(focus || b);                       // view first, then layers (as in the area map)
-    if (img && img.quicklook_url) imgStatus(div, L.imageOverlay(img.quicklook_url, b, {pane: imagePane(map, 'satmImg', 350)})).addTo(map);
+    if (img && img.quicklook_url) imgStatus(div, L.imageOverlay(imgUrl(img, imgs || {}), b, {pane: imagePane(map, 'satmImg', 350)})).addTo(map);
     if (area.buffer_ring) L.geoJSON(area.buffer_ring, {style: {color: COL.buffer, weight: 1, dashArray: '5 4', fill: false}}).addTo(map);
     if (area.geometry) L.geoJSON(area.geometry, {style: {color: COL.boundary, weight: 2, fill: false}}).addTo(map);
     if (change) changeLayer(L, change).addTo(map);
@@ -973,10 +988,10 @@
     if (!div || !area.grid_bbox) return;
     var map = L.map(div, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); zoomCtl(L, map); S.maps.push(map);
     var b = bboxBounds(area.grid_bbox);
-    if (imgs.before && imgs.before.quicklook_url) imgStatus(div, L.imageOverlay(imgs.before.quicklook_url, b, {pane: imagePane(map, 'satmImg', 350)})).addTo(map);
+    if (imgs.before && imgs.before.quicklook_url) imgStatus(div, L.imageOverlay(imgUrl(imgs.before, imgs), b, {pane: imagePane(map, 'satmImg', 350)})).addTo(map);
     imagePane(map, 'satmAfter', 360);
     var pane = map.getPane('satmAfter');
-    if (imgs.after && imgs.after.quicklook_url) imgStatus(div, L.imageOverlay(imgs.after.quicklook_url, b, {pane: 'satmAfter'})).addTo(map);
+    if (imgs.after && imgs.after.quicklook_url) imgStatus(div, L.imageOverlay(imgUrl(imgs.after, imgs), b, {pane: 'satmAfter'})).addTo(map);
     if (change) changeLayer(L, change).addTo(map);
     if (area.geometry) L.geoJSON(area.geometry, {style: {color: COL.boundary, weight: 2, fill: false}}).addTo(map);
     var range = document.getElementById('satm-swipe-range');

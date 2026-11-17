@@ -333,6 +333,7 @@ def area_detail(area_id):
                 # NULL gaps are kept: a metric missing for this acquisition is reported with its reason
                 "metrics_inside": met.get(r["id"], {}), "detection": det.get(r["id"]),
                 "quicklook_url": (f"/api/sat-monitoring/file/{r['id']}/quicklook" if r["quicklook_path"] else None),
+                "truecolor_url": _truecolor_url(r["id"], r["quicklook_path"]),
             })
         events = []
         for e in conn.execute("SELECT * FROM sat_change_events WHERE monitored_area_id=?"
@@ -372,7 +373,8 @@ def _acq_brief(conn, acq_id):
             "orbit_direction": r["orbit_direction"], "relative_orbit": r["relative_orbit"],
             "sensing_time_utc": r["sensing_time_utc"],
             "status": r["status"], "valid_pct_inside": r["valid_pct_inside"],
-            "quicklook_url": f"/api/sat-monitoring/file/{r['id']}/quicklook" if r["quicklook_path"] else None}
+            "quicklook_url": f"/api/sat-monitoring/file/{r['id']}/quicklook" if r["quicklook_path"] else None,
+            "truecolor_url": _truecolor_url(r["id"], r["quicklook_path"])}
 
 
 def _algorithm(conn, ev):
@@ -422,7 +424,7 @@ def event_detail(event_id):
 def quicklook_file(acq_id, kind):
     """Path for GET /file/{acq_id}/{kind}. Only 'quicklook'; the path is taken from the DB, never from the
     request, and must resolve inside the raster root (symlinks and '..' resolved)."""
-    if kind != "quicklook":
+    if kind not in ("quicklook", "truecolor"):
         raise StoreError(404, "not found")
     conn = ro()
     try:
@@ -435,6 +437,8 @@ def quicklook_file(acq_id, kind):
     p = Path(r["quicklook_path"])
     if not p.is_absolute():
         p = Path(os.getcwd()) / p
+    if kind == "truecolor":
+        p = _tc_path(p)
     p = p.resolve()
     if root not in p.parents or p.suffix.lower() != ".png" or not p.is_file():
         raise StoreError(404, "not found")
@@ -494,6 +498,22 @@ def worker_state(lock=None):
     else:
         state = "TIMERS_OFF"
     return {"state": state, "units": units}
+
+
+def _tc_path(quicklook_path):
+    """Same rule as raster.truecolor_path (raster imports numpy; the API stays stdlib-only)."""
+    p = Path(quicklook_path)
+    return p.with_name(p.stem + "_tc.png")
+
+
+def _truecolor_url(acq_id, quicklook_path):
+    """URL of the true-colour quicklook (B04/B03/B02) when that file exists; None otherwise (shown as unavailable)."""
+    if not quicklook_path:
+        return None
+    try:
+        return f"/api/sat-monitoring/file/{acq_id}/truecolor" if _tc_path(quicklook_path).is_file() else None
+    except OSError:
+        return None
 
 
 def health(now=None):

@@ -215,8 +215,9 @@ class Runner:
                 try:
                     res = self.provider.fetch_area_raster(row["sensor"], p, a["grid"])
                     sdb.provider_status(self.conn, "process", True)
-                    bands = 6 if row["sensor"] == "S2" else 3
-                    arr = self.decode(res.raw, expected_shape=(a["grid"]["height"], a["grid"]["width"]), bands=bands)
+                    from . import raster as _r
+                    arr = self.decode(res.raw, expected_shape=(a["grid"]["height"], a["grid"]["width"]),
+                                      bands=_r.band_count(row["sensor"]))
                 except cdse.CdseError as e:
                     if e.kind in ("NOT_CONFIGURED", "AUTH"):
                         sdb.provider_status(self.conn, "token", False, str(e))
@@ -252,6 +253,9 @@ class Runner:
         tif, png = raster.raster_paths(a["id"], row["sensor"], row["sensing_time_utc"], row["product_id"])
         tif_sha = raster.write_file(tif, res.raw)                                      # RAW, unmodified
         png_sha = raster.write_file(png, raster.quicklook_png(row["sensor"], arr, layers["valid"]))
+        if row["sensor"] == "S2" and arr.shape[2] >= 8:         # B03/B02 present (requested since 2026-11-17)
+            dm = arr[:, :, 5] == 1
+            raster.write_file(raster.truecolor_path(png), raster.truecolor_png(arr[:, :, 0], arr[:, :, 6], arr[:, :, 7], dm))
         vp_in = met.valid_pct(layers["valid"], inside)
         vp_buf = met.valid_pct(layers["valid"], buffer)
         self._write_metrics(row["id"], met.metric_rows(row["sensor"], layers, inside, buffer))
@@ -314,8 +318,8 @@ class Detector:
         raw = Path(acq["raster_path"]).read_bytes()
         if raster.sha256_bytes(raw) != acq["raster_sha256"]:
             raise ValueError(f"raster sha256 mismatch for acquisition {acq['id']}")
-        bands = 6 if acq["sensor"] == "S2" else 3
-        arr = self.r.decode(raw, expected_shape=(self.a["grid"]["height"], self.a["grid"]["width"]), bands=bands)
+        arr = self.r.decode(raw, expected_shape=(self.a["grid"]["height"], self.a["grid"]["width"]),
+                            bands=raster.band_count(acq["sensor"]))
         return met.s2_layers(arr, self.cfg) if acq["sensor"] == "S2" else met.s1_layers(arr)
 
     def _usable(self, acq):
