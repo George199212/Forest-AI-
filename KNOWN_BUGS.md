@@ -4,6 +4,13 @@
   manual GPS pings sent via the Telegram bot's "🚛 Vehicle GPS" flow, not from a continuous
   live track. Points appear only when a driver explicitly sends a location for that vehicle.
 
+- **P1 — API startup has side effects (found 2026-11-17, NOT fixed).** `api.py` startup hook runs `init_db()`, which
+  writes to the DB at `DB_PATH` (default `data/forest_ai.db` → via the release `data` symlink the PRODUCTION DB), and
+  `risk_ai_worker.start()`, which picks up risks with `ai_status` NULL/REQUESTED and calls Anthropic when
+  `ANTHROPIC_API_KEY` is set. Any extra uvicorn (sandbox, rollback proof) therefore touches prod data and AI spend unless
+  the env is stripped (DB copies, no credentials — as done for the rollback8band proof on :8099). Fix: env flags to
+  skip `init_db()` writes and to disable `risk_ai_worker`.
+
 - `requirements.txt` is missing `python-multipart`. FastAPI refuses to start without it
   ("Form data requires python-multipart"). Production works only because the package is
   installed system-wide. A clean install from `requirements.txt` fails. Found 2026-10-13.

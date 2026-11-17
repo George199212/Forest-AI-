@@ -26,7 +26,8 @@ Verified on NEW 2026-11-17 16:35–16:50 UTC:
 ### Restarts on NEW, 2026-11-17 (journal + migration changelog)
 
 After boot, the services were restarted once, by hand, by the owner's ams3-migration session (root SSH session from
-12:29 UTC; changelog `/root/forest_ai/docs/MIGRATION_CHANGELOG_20261117.md`, untracked file in the repo root), each with
+12:29 UTC; changelog `docs/MIGRATION_CHANGELOG_20261117.md`, committed to `master` as `2404561` on 2026-11-17 16:57 UTC, docs only, secret-scanned; the
+file in the repo root `/root/forest_ai` is still untracked there), each with
 an explicit owner OK in that session. Each restart was preceded by `daemon-reload`; all clean stops, `NRestarts=0`:
 
 | UTC | unit | why (changelog task) |
@@ -384,6 +385,9 @@ remain in place.
   `/areas/4` 200, `/events/66` 200, `/file/693/quicklook` (8-band acquisition) 200 `image/png`, byte-identical to the
   stored PNG; `/file/357/truecolor` 404 (expected: no true colour in the rollback); unauthenticated 401; log without
   tracebacks. Stopped afterwards; :8000 (PID 43619), units and timers untouched; no `__pycache__` in the release folder.
+  **Scope of this proof:** API code only, on DB copies and with no credentials (see KNOWN_BUGS P1 on startup side
+  effects). The rollback worker units (`forest-satellite-{jobs,sync}.service` from this folder) and the switch commands
+  above have **NOT been executed**.
   Folder `/root/forest_ai/releases/forest-api-satellite-monitoring-rollback8band-20261117T0831Z` = `…20261116T1545Z` (code `7bd2bbb`) + 3 files from branch
   `feature/sat-rollback-8band` @ `e0c9c84`: `satellite_monitoring/{raster,pipeline,evidence}.py` — stored S2 rasters with
   6 OR 8 bands are read via `raster.read_stored()` (bands 0-5 by index), so this rollback code works on the 8-band
