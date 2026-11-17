@@ -1,0 +1,5151 @@
+{
+ "area": {
+  "id": 1,
+  "source": "SECTOR",
+  "source_ref": "26",
+  "name": "BIK-001",
+  "area_ha": 50.4881,
+  "buffer_m": 100.0,
+  "added_by": "<user>",
+  "added_at_utc": "2026-11-10T13:20:07Z",
+  "removed_at_utc": null,
+  "active": true,
+  "geometry": {
+   "coordinates": [
+    [
+     [
+      24.1958,
+      56.968
+     ],
+     [
+      24.213,
+      56.965
+     ],
+     [
+      24.213,
+      56.9615
+     ],
+     [
+      24.1988,
+      56.9617
+     ],
+     [
+      24.1958,
+      56.968
+     ]
+    ]
+   ],
+   "type": "Polygon"
+  },
+  "grid_bbox": [
+   24.19398741,
+   56.960511858,
+   24.214914585,
+   56.969045814
+  ],
+  "data_status": "OK",
+  "recent_observation": true,
+  "last_s1_utc": "2026-11-14T04:34:09Z",
+  "last_valid_s2_utc": "2026-11-06T09:44:43.447Z",
+  "last_valid_s2_valid_pct": 99.841,
+  "last_s2_any": {
+   "sensing_time_utc": "2026-11-16T09:44:43.122Z",
+   "status": "SKIPPED_CLOUD",
+   "valid_pct_inside": null
+  },
+  "open_suspected_events": 0,
+  "recovered_events": 0,
+  "reviewed_events": 0,
+  "gaps": {
+   "days_since_last_valid_s2": 11.0,
+   "days_since_last_s1": 3.2,
+   "max_gap_days_valid_s2_window": 13.0,
+   "window_days": 120
+  },
+  "open_jobs": []
+ },
+ "geometry": {
+  "coordinates": [
+   [
+    [
+     24.1958,
+     56.968
+    ],
+    [
+     24.213,
+     56.965
+    ],
+    [
+     24.213,
+     56.9615
+    ],
+    [
+     24.1988,
+     56.9617
+    ],
+    [
+     24.1958,
+     56.968
+    ]
+   ]
+  ],
+  "type": "Polygon"
+ },
+ "buffer_ring": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     24.194172450277517,
+     56.96785956944115
+    ],
+    [
+     24.19415515131846,
+     56.96794617743571
+    ],
+    [
+     24.194153322965303,
+     56.96803329165778
+    ],
+    [
+     24.19416698241459,
+     56.96812009275555
+    ],
+    [
+     24.194196001192537,
+     56.96820576432223
+    ],
+    [
+     24.19424010636334,
+     56.96828950057489
+    ],
+    [
+     24.19429888309631,
+     56.96837051393313
+    ],
+    [
+     24.194371778567547,
+     56.96844804242671
+    ],
+    [
+     24.19445810715951,
+     56.96852135686225
+    ],
+    [
+     24.194557056909584,
+     56.96858976768164
+    ],
+    [
+     24.194667697147008,
+     56.968652631447696
+    ],
+    [
+     24.194788987246262,
+     56.96870935689597
+    ],
+    [
+     24.194919786414676,
+     56.96875941049588
+    ],
+    [
+     24.19505886442213,
+     56.96880232146886
+    ],
+    [
+     24.195204913171985,
+     56.968837686216226
+    ],
+    [
+     24.195356559004345,
+     56.96886517211525
+    ],
+    [
+     24.195512375616037,
+     56.968884520647606
+    ],
+    [
+     24.195670897475654,
+     56.968895549830904
+    ],
+    [
+     24.19583063360763,
+     56.96889815593027
+    ],
+    [
+     24.195990081615548,
+     56.968892314434065
+    ],
+    [
+     24.19614774181295,
+     56.968878080284426
+    ],
+    [
+     24.196302131328626,
+     56.96885558736049
+    ],
+    [
+     24.213502131328628,
+     56.96585558736049
+    ],
+    [
+     24.213651784735973,
+     56.96582505034597
+    ],
+    [
+     24.2137953089004,
+     56.96578675473616
+    ],
+    [
+     24.21393135415165,
+     56.96574106065467
+    ],
+    [
+     24.214058641149556,
+     56.96568839779881
+    ],
+    [
+     24.214175972914678,
+     56.96562926139868
+    ],
+    [
+     24.214282246084426,
+     56.965564207560234
+    ],
+    [
+     24.21437646128886,
+     56.96549384803572
+    ],
+    [
+     24.214457732548546,
+     56.96541884447091
+    ],
+    [
+     24.214525295606098,
+     56.965339902183125
+    ],
+    [
+     24.214578515113118,
+     56.965257763528605
+    ],
+    [
+     24.214616890604848,
+     56.96517320092153
+    ],
+    [
+     24.214640061206453,
+     56.96508700957037
+    ],
+    [
+     24.214647809026598,
+     56.965
+    ],
+    [
+     24.214647809026598,
+     56.961499999999994
+    ],
+    [
+     24.214639611495087,
+     56.961410506992536
+    ],
+    [
+     24.214615100462833,
+     56.96132190440591
+    ],
+    [
+     24.21457451980513,
+     56.96123507380162
+    ],
+    [
+     24.214518273283836,
+     56.96115087911062
+    ],
+    [
+     24.214446920530108,
+     56.961070158037565
+    ],
+    [
+     24.214361171476266,
+     56.96099371372591
+    ],
+    [
+     24.214261879292266,
+     56.96092230676703
+    ],
+    [
+     24.214150031896956,
+     56.96085664763257
+    ],
+    [
+     24.21402674212871,
+     56.96079738960554
+    ],
+    [
+     24.213893236673062,
+     56.96074512228041
+    ],
+    [
+     24.213750843857714,
+     56.960700365696866
+    ],
+    [
+     24.213600980436137,
+     56.960663565165625
+    ],
+    [
+     24.21344513749148,
+     56.96063508683774
+    ],
+    [
+     24.2132848656008,
+     56.96061521406158
+    ],
+    [
+     24.21312175940748,
+     56.960604144563575
+    ],
+    [
+     24.212957441755112,
+     56.96060198848097
+    ],
+    [
+     24.198757441755106,
+     56.960801988480966
+    ],
+    [
+     24.198594337778662,
+     56.96080871296822
+    ],
+    [
+     24.19843326030259,
+     56.96082421978551
+    ],
+    [
+     24.1982757965098,
+     56.96084835613579
+    ],
+    [
+     24.198123497975654,
+     56.96088088419065
+    ],
+    [
+     24.197977865379436,
+     56.96092148343369
+    ],
+    [
+     24.197840333717362,
+     56.96096975381876
+    ],
+    [
+     24.197712258162802,
+     56.9610252197118
+    ],
+    [
+     24.197594900713,
+     56.961087334577584
+    ],
+    [
+     24.197489417753967,
+     56.96115548636495
+    ],
+    [
+     24.197396848665974,
+     56.96122900353773
+    ],
+    [
+     24.19731810558199,
+     56.96130716169172
+    ],
+    [
+     24.19725396439992,
+     56.961389190692636
+    ],
+    [
+     24.197205057137296,
+     56.96147428226465
+    ],
+    [
+     24.194205057137296,
+     56.96777428226466
+    ],
+    [
+     24.194172450277517,
+     56.96785956944115
+    ]
+   ],
+   [
+    [
+     24.1988,
+     56.9617
+    ],
+    [
+     24.213,
+     56.961499999999994
+    ],
+    [
+     24.213,
+     56.965
+    ],
+    [
+     24.1958,
+     56.968
+    ],
+    [
+     24.1988,
+     56.9617
+    ]
+   ]
+  ]
+ },
+ "timeline": [
+  {
+   "acq_id": 68,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-01T09:44:37.95Z",
+   "product_id": "S2B_MSIL2A_20260801T094029_N0512_R036_T34VFJ_20260801T115251.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.65,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.7%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.7%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.7%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.7%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.7%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 69,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-01T09:54:52.004Z",
+   "product_id": "S2A_MSIL2A_20260801T095051_N0512_R079_T34VFJ_20260801T180209.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 98.06,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 1,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-01T16:11:22Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260801T161122_20260801T161147_008804_011743_EE44_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.425346374511719,
+     "mean": -13.766884682876992
+    },
+    "VV_DB": {
+     "median": -8.710570335388184,
+     "mean": -8.873513668312587
+    }
+   },
+   "detection": "NO_BASELINE",
+   "quicklook_url": "/api/sat-monitoring/file/1/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 2,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-02T16:03:28Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260802T160328_20260802T160353_003949_007286_BAB2_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.156100749969482,
+     "mean": -13.482512391800899
+    },
+    "VV_DB": {
+     "median": -8.152441024780273,
+     "mean": -8.306780775051298
+    }
+   },
+   "detection": "NO_BASELINE",
+   "quicklook_url": "/api/sat-monitoring/file/2/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 3,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-03T04:42:11Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260803T044211_20260803T044236_008826_011816_D07A_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.894554138183594,
+     "mean": -14.281247445250669
+    },
+    "VV_DB": {
+     "median": -8.68738079071045,
+     "mean": -8.950017834708074
+    }
+   },
+   "detection": "NO_BASELINE",
+   "quicklook_url": "/api/sat-monitoring/file/3/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 4,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-04T04:34:20Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260804T043420_20260804T043445_003971_007356_0D87_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.96,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.96,
+     "mean": 99.96
+    },
+    "VH_DB": {
+     "median": -14.13316822052002,
+     "mean": -14.47062836844837
+    },
+    "VV_DB": {
+     "median": -9.235943794250488,
+     "mean": -9.481750428928965
+    }
+   },
+   "detection": "NO_BASELINE",
+   "quicklook_url": "/api/sat-monitoring/file/4/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 70,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-04T09:54:34.136Z",
+   "product_id": "S2B_MSIL2A_20260804T095029_N0512_R079_T34VFJ_20260804T121325.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 17.3,
+   "valid_pct_inside": 48.536,
+   "valid_pct_buffer": 52.423,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6122328042984009,
+     "mean": 0.5243612560103936
+    },
+    "NDMI": {
+     "median": 0.36370354890823364,
+     "mean": 0.3128863890424323
+    },
+    "NDVI": {
+     "median": 0.7875688076019287,
+     "mean": 0.6969289362895278
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 48.536,
+     "mean": 48.536
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/70/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 71,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-06T09:44:38.05Z",
+   "product_id": "S2C_MSIL2A_20260806T094031_N0512_R036_T34VFJ_20260806T131403.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 96.19,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 96.2%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 96.2%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 96.2%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 96.2%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 96.2%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 5,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-07T16:11:34Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260807T161134_20260807T161159_004022_00750A_614A_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.586005210876465,
+     "mean": -13.747416110229643
+    },
+    "VV_DB": {
+     "median": -8.664281845092773,
+     "mean": -8.853066360846896
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/5/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 72,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-08T09:44:54.581Z",
+   "product_id": "S2A_MSIL2A_20260808T094051_N0512_R036_T34VFJ_20260808T162111.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 56.17,
+   "valid_pct_inside": 25.851,
+   "valid_pct_buffer": 36.796,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6698388457298279,
+     "mean": 0.665895463666306
+    },
+    "NDMI": {
+     "median": 0.4049809128046036,
+     "mean": 0.40196220363233415
+    },
+    "NDVI": {
+     "median": 0.744734913110733,
+     "mean": 0.7329595428080699
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 25.851,
+     "mean": 25.851
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/72/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 6,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-08T16:03:16Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260808T160316_20260808T160341_008906_011AA5_D028_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.437437057495117,
+     "mean": -13.70931936454735
+    },
+    "VV_DB": {
+     "median": -8.257758140563965,
+     "mean": -8.405550727592155
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/6/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 7,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-09T04:42:24Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260809T044224_20260809T044249_004044_0075C8_2363_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 99.97,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -14.19474172592163,
+     "mean": -14.595008521725932
+    },
+    "VV_DB": {
+     "median": -9.042627334594727,
+     "mean": -9.28062367788349
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/7/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 73,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-09T09:54:34.02Z",
+   "product_id": "S2C_MSIL2A_20260809T095031_N0512_R079_T34VFJ_20260809T131207.SAFE",
+   "status": "NO_VALID_PIXELS",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 28.79,
+   "valid_pct_inside": 0.0,
+   "valid_pct_buffer": 0.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    }
+   },
+   "detection": null,
+   "quicklook_url": "/api/sat-monitoring/file/73/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 8,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-10T04:34:08Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260810T043408_20260810T043433_008928_011B65_1690_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.94,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.94,
+     "mean": 99.94
+    },
+    "VH_DB": {
+     "median": -14.52491044998169,
+     "mean": -14.895446353720782
+    },
+    "VV_DB": {
+     "median": -9.32143259048462,
+     "mean": -9.653755123656126
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/8/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 74,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-11T09:44:36.21Z",
+   "product_id": "S2B_MSIL2A_20260811T094029_N0512_R036_T34VFJ_20260811T115425.SAFE",
+   "status": "NO_VALID_PIXELS",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 40.36,
+   "valid_pct_inside": 0.0,
+   "valid_pct_buffer": 0.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    }
+   },
+   "detection": null,
+   "quicklook_url": "/api/sat-monitoring/file/74/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 75,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-11T09:54:50.657Z",
+   "product_id": "S2A_MSIL2A_20260811T095101_N0512_R079_T34VFJ_20260811T163220.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 35.66,
+   "valid_pct_inside": 27.903,
+   "valid_pct_buffer": 33.495,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.7056132555007935,
+     "mean": 0.6908858484621136
+    },
+    "NDMI": {
+     "median": 0.43689319491386414,
+     "mean": 0.42193365191225146
+    },
+    "NDVI": {
+     "median": 0.8243825435638428,
+     "mean": 0.8130000631227228
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 27.903,
+     "mean": 27.903
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/75/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 9,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-13T16:11:23Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260813T161123_20260813T161148_008979_011D13_1A84_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.786162376403809,
+     "mean": -14.021291919496282
+    },
+    "VV_DB": {
+     "median": -8.760221481323242,
+     "mean": -8.93045007316531
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/9/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 76,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-14T09:54:32.097Z",
+   "product_id": "S2B_MSIL2A_20260814T095029_N0512_R079_T34VFJ_20260814T121106.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 48.57,
+   "valid_pct_inside": 99.841,
+   "valid_pct_buffer": 99.879,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6490740776062012,
+     "mean": 0.5878105233571543
+    },
+    "NDMI": {
+     "median": 0.38208866119384766,
+     "mean": 0.34426929874601414
+    },
+    "NDVI": {
+     "median": 0.8059149980545044,
+     "mean": 0.7546514886021376
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 99.841,
+     "mean": 99.841
+    }
+   },
+   "detection": "NO_BASELINE",
+   "quicklook_url": "/api/sat-monitoring/file/76/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 10,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-14T16:03:29Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260814T160329_20260814T160354_004124_007891_CC48_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 99.97,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.229756355285645,
+     "mean": -13.591033540303963
+    },
+    "VV_DB": {
+     "median": -8.385370254516602,
+     "mean": -8.61395517164077
+    }
+   },
+   "detection": "RADAR_ANOMALY",
+   "quicklook_url": "/api/sat-monitoring/file/10/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 11,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-15T04:42:12Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260815T044212_20260815T044237_009001_011DDA_5E57_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.070558547973633,
+     "mean": -14.42700070343367
+    },
+    "VV_DB": {
+     "median": -8.776878356933594,
+     "mean": -9.080667623840132
+    }
+   },
+   "detection": "RADAR_ANOMALY",
+   "quicklook_url": "/api/sat-monitoring/file/11/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 12,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-16T04:34:21Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260816T043421_20260816T043446_004146_00795C_2AEB_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.129477500915527,
+     "mean": -14.505396513605564
+    },
+    "VV_DB": {
+     "median": -8.80364990234375,
+     "mean": -8.999793176542024
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/12/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 77,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-16T09:44:35.734Z",
+   "product_id": "S2C_MSIL2A_20260816T094031_N0512_R036_T34VFJ_20260816T133909.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 89.41,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 89.4%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 89.4%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 89.4%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 89.4%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 89.4%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 78,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-18T09:44:52.571Z",
+   "product_id": "S2A_MSIL2A_20260818T094121_N0512_R036_T34VFJ_20260818T161811.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.07,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.1%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.1%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.1%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.1%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.1%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 79,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-19T09:54:31.401Z",
+   "product_id": "S2C_MSIL2A_20260819T095031_N0512_R079_T34VFJ_20260819T131410.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 13.69,
+   "valid_pct_inside": 79.128,
+   "valid_pct_buffer": 82.617,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6323217749595642,
+     "mean": 0.5539732971823336
+    },
+    "NDMI": {
+     "median": 0.35850387811660767,
+     "mean": 0.31281764374969945
+    },
+    "NDVI": {
+     "median": 0.8228621482849121,
+     "mean": 0.7384617190208899
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 79.128,
+     "mean": 79.128
+    }
+   },
+   "detection": "PENDING_CONFIRMATION",
+   "quicklook_url": "/api/sat-monitoring/file/79/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 13,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-19T16:11:35Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260819T161135_20260819T161200_004197_007B0D_D58F_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.436059951782227,
+     "mean": -13.641398561686971
+    },
+    "VV_DB": {
+     "median": -8.661837577819824,
+     "mean": -8.763988336047028
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/13/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 14,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-20T16:03:17Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260820T160317_20260820T160342_009081_012067_E3BE_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.442672729492188,
+     "mean": -13.68616374862358
+    },
+    "VV_DB": {
+     "median": -8.124817848205566,
+     "mean": -8.342124345737775
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/14/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 15,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-21T04:42:25Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260821T044225_20260821T044250_004219_007BE0_0E03_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.113923072814941,
+     "mean": -14.53943705383085
+    },
+    "VV_DB": {
+     "median": -8.660202026367188,
+     "mean": -8.867868663661154
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/15/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 80,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-21T09:44:33.821Z",
+   "product_id": "S2B_MSIL2A_20260821T094029_N0512_R036_T34VFJ_20260821T115427.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 50.17,
+   "valid_pct_inside": 98.088,
+   "valid_pct_buffer": 87.129,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6523297429084778,
+     "mean": 0.5858711819963407
+    },
+    "NDMI": {
+     "median": 0.3792193830013275,
+     "mean": 0.3383097208634156
+    },
+    "NDVI": {
+     "median": 0.8171612024307251,
+     "mean": 0.7568525173110405
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 98.088,
+     "mean": 98.088
+    }
+   },
+   "detection": "PENDING_CONFIRMATION",
+   "quicklook_url": "/api/sat-monitoring/file/80/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 81,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-21T09:54:48.868Z",
+   "product_id": "S2A_MSIL2A_20260821T095041_N0512_R079_T34VFJ_20260821T175657.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 52.46,
+   "valid_pct_inside": 86.218,
+   "valid_pct_buffer": 87.129,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6565743684768677,
+     "mean": 0.6030293822812207
+    },
+    "NDMI": {
+     "median": 0.37503889203071594,
+     "mean": 0.34315261466728053
+    },
+    "NDVI": {
+     "median": 0.8239189386367798,
+     "mean": 0.770326446823571
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 86.218,
+     "mean": 86.218
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/81/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 16,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-22T04:34:08Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260822T043408_20260822T043433_009103_012129_FF6B_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -14.421027183532715,
+     "mean": -14.784273070453173
+    },
+    "VV_DB": {
+     "median": -9.263175964355469,
+     "mean": -9.488122037804104
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/16/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 82,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-24T09:54:30.856Z",
+   "product_id": "S2B_MSIL2A_20260824T095029_N0512_R079_T34VFJ_20260824T121326.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 60.9,
+   "valid_pct_inside": 1.255,
+   "valid_pct_buffer": 1.242,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.3578766882419586,
+     "mean": 0.3538079787755296
+    },
+    "NDMI": {
+     "median": 0.2300739586353302,
+     "mean": 0.22848829423772202
+    },
+    "NDVI": {
+     "median": 0.3999057710170746,
+     "mean": 0.488762256645021
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 1.255,
+     "mean": 1.255
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/82/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 17,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-25T16:11:23Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260825T161123_20260825T161148_009154_0122E5_FEDB_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.697885513305664,
+     "mean": -13.94952802376974
+    },
+    "VV_DB": {
+     "median": -8.972813606262207,
+     "mean": -9.06613064458042
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/17/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 83,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-26T09:44:35.173Z",
+   "product_id": "S2C_MSIL2A_20260826T094031_N0512_R036_T34VFJ_20260826T130356.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 42.79,
+   "valid_pct_inside": 9.062,
+   "valid_pct_buffer": 9.903,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.2619783282279968,
+     "mean": 0.2569162207205299
+    },
+    "NDMI": {
+     "median": 0.18888889253139496,
+     "mean": 0.18175249317671163
+    },
+    "NDVI": {
+     "median": 0.38575848937034607,
+     "mean": 0.38880515488294454
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 9.062,
+     "mean": 9.062
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/83/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 18,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-26T16:03:30Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260826T160330_20260826T160355_004299_007EB0_18E4_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.273503303527832,
+     "mean": -13.629206758666324
+    },
+    "VV_DB": {
+     "median": -8.560857772827148,
+     "mean": -8.74080438746874
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/18/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 19,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-27T04:42:12Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260827T044212_20260827T044237_009176_0123A8_35D5_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.94,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.94,
+     "mean": 99.94
+    },
+    "VH_DB": {
+     "median": -14.068974018096924,
+     "mean": -14.449458665038163
+    },
+    "VV_DB": {
+     "median": -8.680126667022705,
+     "mean": -8.926604654261343
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/19/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 20,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-28T04:34:22Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260828T043422_20260828T043447_004321_007F80_2C7F_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 99.97,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.404682159423828,
+     "mean": -14.740282704217147
+    },
+    "VV_DB": {
+     "median": -9.237274169921875,
+     "mean": -9.496407327317689
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/20/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 84,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-28T09:44:52.662Z",
+   "product_id": "S2A_MSIL2A_20260828T094051_N0512_R036_T34VFJ_20260828T161023.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 41.74,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.653268039226532,
+     "mean": 0.5928028551882337
+    },
+    "NDMI": {
+     "median": 0.3690629005432129,
+     "mean": 0.3312708088979447
+    },
+    "NDVI": {
+     "median": 0.8520971536636353,
+     "mean": 0.7937521309156125
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/84/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 85,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-29T09:54:31.983Z",
+   "product_id": "S2C_MSIL2A_20260829T095031_N0512_R079_T34VFJ_20260829T132320.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 100.0,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 86,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-31T09:44:34.87Z",
+   "product_id": "S2B_MSIL2A_20260831T094029_N0512_R036_T34VFJ_20260831T120647.SAFE",
+   "status": "NO_VALID_PIXELS",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 75.3,
+   "valid_pct_inside": 0.0,
+   "valid_pct_buffer": 0.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    }
+   },
+   "detection": null,
+   "quicklook_url": "/api/sat-monitoring/file/86/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 87,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-08-31T09:54:49.237Z",
+   "product_id": "S2A_MSIL2A_20260831T095101_N0512_R079_T34VFJ_20260831T162308.SAFE",
+   "status": "NO_VALID_PIXELS",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 77.42,
+   "valid_pct_inside": 0.0,
+   "valid_pct_buffer": 0.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    }
+   },
+   "detection": null,
+   "quicklook_url": "/api/sat-monitoring/file/87/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 21,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-08-31T16:11:35Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260831T161135_20260831T161200_004372_00813B_45F5_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.287250518798828,
+     "mean": -13.485024385826447
+    },
+    "VV_DB": {
+     "median": -8.449670791625977,
+     "mean": -8.630607375204029
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/21/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 22,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-01T16:03:17Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260901T160317_20260901T160342_009256_012648_1A66_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.039520263671875,
+     "mean": -13.290786461297365
+    },
+    "VV_DB": {
+     "median": -7.99397087097168,
+     "mean": -8.151257730366058
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/22/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 23,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-02T04:42:25Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260902T044225_20260902T044250_004394_008200_EDF7_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.514892578125,
+     "mean": -13.916486966422392
+    },
+    "VV_DB": {
+     "median": -8.492645263671875,
+     "mean": -8.683547869857398
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/23/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 24,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-03T04:34:09Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260903T043409_20260903T043434_009278_01270B_F4A2_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.525408744812012,
+     "mean": -14.83558110444343
+    },
+    "VV_DB": {
+     "median": -9.320123672485352,
+     "mean": -9.645126253989702
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/24/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 88,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-03T09:54:31.483Z",
+   "product_id": "S2B_MSIL2A_20260903T095029_N0512_R079_T34VFJ_20260903T133554.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 47.56,
+   "valid_pct_inside": 0.697,
+   "valid_pct_buffer": 2.847,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.5541731715202332,
+     "mean": 0.5473237650735038
+    },
+    "NDMI": {
+     "median": 0.37808486819267273,
+     "mean": 0.3846242410796029
+    },
+    "NDVI": {
+     "median": 0.28987395763397217,
+     "mean": 0.28729935671601975
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.697,
+     "mean": 0.697
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/88/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 89,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-05T09:44:35.427Z",
+   "product_id": "S2C_MSIL2A_20260905T094031_N0512_R036_T34VFJ_20260905T132900.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 95.8,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.8%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.8%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.8%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.8%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.8%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 25,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-06T16:11:24Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260906T161124_20260906T161149_009329_0128CD_96D7_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.60047435760498,
+     "mean": -13.7926728064927
+    },
+    "VV_DB": {
+     "median": -8.761445999145508,
+     "mean": -8.899257564456832
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/25/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 90,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-07T09:44:52.189Z",
+   "product_id": "S2A_MSIL2A_20260907T094121_N0512_R036_T34VFJ_20260907T161656.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 31.11,
+   "valid_pct_inside": 82.553,
+   "valid_pct_buffer": 83.586,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6513544917106628,
+     "mean": 0.587096345907193
+    },
+    "NDMI": {
+     "median": 0.37398087978363037,
+     "mean": 0.33322087953307256
+    },
+    "NDVI": {
+     "median": 0.8403100967407227,
+     "mean": 0.7775085550192541
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 82.553,
+     "mean": 82.553
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/90/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 26,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-07T16:03:30Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260907T160330_20260907T160355_004474_0084CD_16AC_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.9,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.9,
+     "mean": 99.9
+    },
+    "VH_DB": {
+     "median": -13.241436004638672,
+     "mean": -13.570367803699092
+    },
+    "VV_DB": {
+     "median": -8.617277145385742,
+     "mean": -8.730579864174318
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/26/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 27,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-08T04:42:12Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260908T044212_20260908T044237_009351_012992_B30B_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.147891998291016,
+     "mean": -14.493602786399387
+    },
+    "VV_DB": {
+     "median": -8.818046569824219,
+     "mean": -8.99877660684295
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/27/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 91,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-08T09:54:31.884Z",
+   "product_id": "S2C_MSIL2A_20260908T095031_N0512_R079_T34VFJ_20260908T132920.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 91.61,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.6%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.6%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.6%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.6%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.6%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 28,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-09T04:34:22Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260909T043422_20260909T043447_004496_00859F_BD67_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.043926239013672,
+     "mean": -14.43980141964312
+    },
+    "VV_DB": {
+     "median": -8.899046897888184,
+     "mean": -9.200601587018223
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/28/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 92,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-10T09:44:34.62Z",
+   "product_id": "S2B_MSIL2A_20260910T094029_N0512_R036_T34VFJ_20260910T120137.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 92.37,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.4%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.4%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.4%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.4%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.4%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 93,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-10T09:54:48.429Z",
+   "product_id": "S2A_MSIL2A_20260910T095041_N0512_R079_T34VFJ_20260910T164204.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 91.43,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.4%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.4%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.4%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.4%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 91.4%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 29,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-12T16:11:36Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260912T161136_20260912T161201_004547_008753_E392_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.479942321777344,
+     "mean": -13.778844269070818
+    },
+    "VV_DB": {
+     "median": -8.720115661621094,
+     "mean": -8.881446157305916
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/29/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 94,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-13T09:54:30.378Z",
+   "product_id": "S2B_MSIL2A_20260913T095029_N0512_R079_T34VFJ_20260913T133543.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.98,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 30,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-13T16:03:18Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260913T160318_20260913T160343_009431_012C1F_D7C6_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.518243312835693,
+     "mean": -13.822796585645333
+    },
+    "VV_DB": {
+     "median": -8.479661464691162,
+     "mean": -8.655016536753907
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/30/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 31,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-14T04:42:26Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260914T044226_20260914T044251_004569_008819_4799_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -14.188831806182861,
+     "mean": -14.554165447660651
+    },
+    "VV_DB": {
+     "median": -8.827609539031982,
+     "mean": -9.009655327744692
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/31/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 32,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-15T04:34:09Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260915T043409_20260915T043434_009453_012CDD_1D41_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -14.840022087097168,
+     "mean": -15.073258987650929
+    },
+    "VV_DB": {
+     "median": -9.433558940887451,
+     "mean": -9.627071314840856
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/32/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 95,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-15T09:44:36.46Z",
+   "product_id": "S2C_MSIL2A_20260915T094031_N0512_R036_T34VFJ_20260915T125911.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 35.09,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6468915939331055,
+     "mean": 0.5799110227461566
+    },
+    "NDMI": {
+     "median": 0.36599424481391907,
+     "mean": 0.32525663945305106
+    },
+    "NDVI": {
+     "median": 0.83158940076828,
+     "mean": 0.7661989950677879
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    }
+   },
+   "detection": "PENDING_CONFIRMATION",
+   "quicklook_url": "/api/sat-monitoring/file/95/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 96,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-17T09:44:50.792Z",
+   "product_id": "S2A_MSIL2A_20260917T094041_N0512_R036_T34VFJ_20260917T150503.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 93.2,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.2%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.2%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.2%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.2%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.2%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 97,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-18T09:54:33.712Z",
+   "product_id": "S2C_MSIL2A_20260918T095031_N0512_R079_T34VFJ_20260918T130419.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 98.08,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.1%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 33,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-18T16:11:24Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260918T161124_20260918T161149_009504_012E90_1D19_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.785886764526367,
+     "mean": -13.986561813669788
+    },
+    "VV_DB": {
+     "median": -9.1337308883667,
+     "mean": -9.329600761632857
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/33/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 34,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-19T16:03:30Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260919T160330_20260919T160355_004649_008AD8_ACD2_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 99.97,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.658883094787598,
+     "mean": -13.945869128542592
+    },
+    "VV_DB": {
+     "median": -8.714252948760986,
+     "mean": -8.860835950830543
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/34/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 35,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-20T04:42:13Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260920T044213_20260920T044238_009526_012F4A_01B1_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -14.145907878875732,
+     "mean": -14.493987460060424
+    },
+    "VV_DB": {
+     "median": -8.821049690246582,
+     "mean": -9.155005433977363
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/35/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 98,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-20T09:44:36.506Z",
+   "product_id": "S2B_MSIL2A_20260920T094029_N0512_R036_T34VFJ_20260920T133734.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 90.11,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 90.1%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 90.1%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 90.1%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 90.1%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 90.1%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 99,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-20T09:54:47.6Z",
+   "product_id": "S2A_MSIL2A_20260920T095051_N0512_R079_T34VFJ_20260920T162657.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 81.43,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 81.4%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 81.4%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 81.4%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 81.4%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 81.4%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 36,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-21T04:34:22Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260921T043422_20260921T043447_004671_008BA2_0DC6_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -14.133174419403076,
+     "mean": -14.443291449356838
+    },
+    "VV_DB": {
+     "median": -8.992727279663086,
+     "mean": -9.231035829765121
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/36/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 100,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-23T09:54:33.477Z",
+   "product_id": "S2B_MSIL2A_20260923T095029_N0513_R079_T34VFJ_20260923T135047.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.84,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 37,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-24T16:11:36Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260924T161136_20260924T161201_004722_008D59_47D5_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.359566688537598,
+     "mean": -13.597316133194866
+    },
+    "VV_DB": {
+     "median": -8.629712104797363,
+     "mean": -8.76604685899604
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/37/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 101,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-25T09:44:38.379Z",
+   "product_id": "S2C_MSIL2A_20260925T094031_N0513_R036_T34VFJ_20260925T131916.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.99,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 38,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-25T16:03:18Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260925T160318_20260925T160343_009606_0131E0_C227_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.96,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.96,
+     "mean": 99.96
+    },
+    "VH_DB": {
+     "median": -12.672935485839844,
+     "mean": -13.030556990678008
+    },
+    "VV_DB": {
+     "median": -7.910542964935303,
+     "mean": -8.005473172048289
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/38/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 39,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-26T04:42:26Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20260926T044226_20260926T044251_004744_008E16_7826_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.42953109741211,
+     "mean": -13.762193235648105
+    },
+    "VV_DB": {
+     "median": -8.340946674346924,
+     "mean": -8.569166948453363
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/39/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 40,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-27T04:34:09Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260927T043409_20260927T043434_009628_0132A0_71BD_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 99.97,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.017337799072266,
+     "mean": -14.417705313662234
+    },
+    "VV_DB": {
+     "median": -8.613632202148438,
+     "mean": -8.91481109582269
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/40/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 102,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-27T09:44:51.171Z",
+   "product_id": "S2A_MSIL2A_20260927T094121_N0513_R036_T34VFJ_20260927T161814.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 52.37,
+   "valid_pct_inside": 0.757,
+   "valid_pct_buffer": 4.724,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.5729319453239441,
+     "mean": 0.5789137874778948
+    },
+    "NDMI": {
+     "median": 0.3970680683851242,
+     "mean": 0.4010520875453949
+    },
+    "NDVI": {
+     "median": 0.5998169481754303,
+     "mean": 0.5988557919075614
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.757,
+     "mean": 0.757
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/102/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 103,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-28T09:54:35.305Z",
+   "product_id": "S2C_MSIL2A_20260928T095031_N0513_R079_T34VFJ_20260928T131313.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 9.5,
+   "valid_pct_inside": 62.239,
+   "valid_pct_buffer": 62.75,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6662020683288574,
+     "mean": 0.6173042577309906
+    },
+    "NDMI": {
+     "median": 0.3837753236293793,
+     "mean": 0.35028519796807317
+    },
+    "NDVI": {
+     "median": 0.845703125,
+     "mean": 0.8090487038846313
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 62.239,
+     "mean": 62.239
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/103/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 104,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-30T09:44:37.338Z",
+   "product_id": "S2B_MSIL2A_20260930T094029_N0513_R036_T34VFJ_20260930T133458.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 100.0,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 105,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-09-30T09:54:47.618Z",
+   "product_id": "S2A_MSIL2A_20260930T095041_N0513_R079_T34VFJ_20260930T145647.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 100.0,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 41,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-09-30T16:11:24Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20260930T161124_20260930T161149_009679_013455_93D2_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.509160995483398,
+     "mean": -13.738963605018043
+    },
+    "VV_DB": {
+     "median": -8.657381057739258,
+     "mean": -8.850975063067242
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/41/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 42,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-01T16:03:30Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261001T160330_20261001T160355_004824_0090EF_1385_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.94,
+   "valid_pct_buffer": 99.939,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.94,
+     "mean": 99.94
+    },
+    "VH_DB": {
+     "median": -13.53920316696167,
+     "mean": -13.835207476184491
+    },
+    "VV_DB": {
+     "median": -8.684603691101074,
+     "mean": -8.854130284159176
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/42/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 43,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-02T04:42:13Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261002T044213_20261002T044238_009701_01351C_8A3F_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.227073669433594,
+     "mean": -14.488324240274435
+    },
+    "VV_DB": {
+     "median": -9.104120254516602,
+     "mean": -9.29785812825849
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/43/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 44,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-03T04:34:22Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261003T043422_20261003T043447_004846_0091BB_BEA0_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.312983512878418,
+     "mean": -14.662728071925033
+    },
+    "VV_DB": {
+     "median": -8.993483543395996,
+     "mean": -9.204976492468472
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/44/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 106,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-03T09:54:33.776Z",
+   "product_id": "S2B_MSIL2A_20261003T095029_N0513_R079_T34VFJ_20261003T133632.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 65.94,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6092157959938049,
+     "mean": 0.548508690239389
+    },
+    "NDMI": {
+     "median": 0.34581494331359863,
+     "mean": 0.30635192741005923
+    },
+    "NDVI": {
+     "median": 0.8019281625747681,
+     "mean": 0.7558181744437606
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/106/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 107,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-05T09:44:39.139Z",
+   "product_id": "S2C_MSIL2A_20261005T094031_N0513_R036_T34VFJ_20261005T132005.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.95,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 45,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-06T16:11:36Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261006T161136_20261006T161201_004897_009372_E3C5_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.200864791870117,
+     "mean": -13.49825156378428
+    },
+    "VV_DB": {
+     "median": -8.492195129394531,
+     "mean": -8.68850622283845
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/45/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 108,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-07T09:44:50.321Z",
+   "product_id": "S2A_MSIL2A_20261007T094041_N0513_R036_T34VFJ_20261007T144706.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 12.09,
+   "valid_pct_inside": 97.73,
+   "valid_pct_buffer": 92.974,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.5868708491325378,
+     "mean": 0.5270339179777559
+    },
+    "NDMI": {
+     "median": 0.31087470054626465,
+     "mean": 0.27606769713832296
+    },
+    "NDVI": {
+     "median": 0.7946767210960388,
+     "mean": 0.7353175659182846
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 97.73,
+     "mean": 97.73
+    }
+   },
+   "detection": "PENDING_CONFIRMATION",
+   "quicklook_url": "/api/sat-monitoring/file/108/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 46,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-07T16:03:18Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261007T160318_20261007T160343_009781_0137B4_F45E_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.96,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.96,
+     "mean": 99.96
+    },
+    "VH_DB": {
+     "median": -13.68177318572998,
+     "mean": -13.98340188528252
+    },
+    "VV_DB": {
+     "median": -8.604832649230957,
+     "mean": -8.742613782405165
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/46/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 47,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-08T04:42:26Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261008T044226_20261008T044251_004919_00943F_D214_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -14.263580799102783,
+     "mean": -14.59210897413383
+    },
+    "VV_DB": {
+     "median": -9.081720352172852,
+     "mean": -9.361268091486744
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/47/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 109,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-08T09:54:35.736Z",
+   "product_id": "S2C_MSIL2A_20261008T095031_N0513_R079_T34VFJ_20261008T132403.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 88.42,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 88.4%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 88.4%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 88.4%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 88.4%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 88.4%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 48,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-09T04:34:09Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261009T043409_20261009T043434_009803_013871_90EA_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.916549682617188,
+     "mean": -14.260959906027136
+    },
+    "VV_DB": {
+     "median": -8.611914157867432,
+     "mean": -8.852380844487612
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/48/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 110,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-10T09:44:36.972Z",
+   "product_id": "S2B_MSIL2A_20261010T094029_N0513_R036_T34VFJ_20261010T133655.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 76.71,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 99.425,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.5018255710601807,
+     "mean": 0.4702305289676792
+    },
+    "NDMI": {
+     "median": 0.29132744669914246,
+     "mean": 0.2744798701509655
+    },
+    "NDVI": {
+     "median": 0.6556662321090698,
+     "mean": 0.6218461979078929
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    }
+   },
+   "detection": "PENDING_CONFIRMATION",
+   "quicklook_url": "/api/sat-monitoring/file/110/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 111,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-10T09:54:46.435Z",
+   "product_id": "S2A_MSIL2A_20261010T095051_N0513_R079_T34VFJ_20261010T144103.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 79.95,
+   "valid_pct_inside": 6.831,
+   "valid_pct_buffer": 6.965,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.32436883449554443,
+     "mean": 0.3322382909042147
+    },
+    "NDMI": {
+     "median": 0.20822733640670776,
+     "mean": 0.20734306736021105
+    },
+    "NDVI": {
+     "median": 0.5317726135253906,
+     "mean": 0.5378868446058157
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 6.831,
+     "mean": 6.831
+    }
+   },
+   "detection": "NOT_USABLE",
+   "quicklook_url": "/api/sat-monitoring/file/111/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 49,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-12T16:11:24Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261012T161124_20261012T161149_009854_013A3D_F362_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.605636596679688,
+     "mean": -13.805044873257932
+    },
+    "VV_DB": {
+     "median": -8.813077926635742,
+     "mean": -8.939116366538506
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/49/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 112,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-13T09:54:33.147Z",
+   "product_id": "S2B_MSIL2A_20261013T095029_N0513_R079_T34VFJ_20261013T134417.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.4,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.4%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.4%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.4%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.4%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.4%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 50,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-13T16:03:30Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261013T160330_20261013T160355_004999_00970F_CCA5_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.521803855895996,
+     "mean": -13.861477309977051
+    },
+    "VV_DB": {
+     "median": -8.656587600708008,
+     "mean": -8.78869724270417
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/50/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 51,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-14T04:42:13Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261014T044213_20261014T044238_009876_013B09_C04B_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.79550838470459,
+     "mean": -14.1396996295445
+    },
+    "VV_DB": {
+     "median": -8.917074203491211,
+     "mean": -9.149670119566691
+    }
+   },
+   "detection": "RADAR_ANOMALY",
+   "quicklook_url": "/api/sat-monitoring/file/51/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 52,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-15T04:34:22Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261015T043422_20261015T043447_005021_0097D8_5CBA_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.957383632659912,
+     "mean": -14.340417133859429
+    },
+    "VV_DB": {
+     "median": -8.94084644317627,
+     "mean": -9.112329028895221
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/52/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 113,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-15T09:44:38.658Z",
+   "product_id": "S2C_MSIL2A_20261015T094031_N0513_R036_T34VFJ_20261015T112410.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 98.79,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.8%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.8%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.8%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.8%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 98.8%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 114,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-17T09:44:48.047Z",
+   "product_id": "S2A_MSIL2A_20261017T094111_N0513_R036_T34VFJ_20261017T163803.SAFE",
+   "status": "NO_VALID_PIXELS",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 79.21,
+   "valid_pct_inside": 0.0,
+   "valid_pct_buffer": 0.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    }
+   },
+   "detection": null,
+   "quicklook_url": "/api/sat-monitoring/file/114/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 115,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-18T09:54:38.607Z",
+   "product_id": "S2C_MSIL2A_20261018T095031_N0513_R079_T34VFJ_20261018T134609.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 8.29,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6392988562583923,
+     "mean": 0.5777867860636074
+    },
+    "NDMI": {
+     "median": 0.36640554666519165,
+     "mean": 0.3232013308377282
+    },
+    "NDVI": {
+     "median": 0.848747193813324,
+     "mean": 0.795630330805628
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/115/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 53,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-18T16:11:36Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261018T161136_20261018T161201_005072_009987_68D2_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.59007453918457,
+     "mean": -13.859931263451651
+    },
+    "VV_DB": {
+     "median": -8.895207405090332,
+     "mean": -9.071310641153167
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/53/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 54,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-19T16:03:18Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261019T160318_20261019T160343_009956_013D93_6022_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.94,
+   "valid_pct_buffer": 99.97,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.94,
+     "mean": 99.94
+    },
+    "VH_DB": {
+     "median": -13.840760707855225,
+     "mean": -14.165866173420735
+    },
+    "VV_DB": {
+     "median": -8.884911060333252,
+     "mean": -9.091471400998321
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/54/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 55,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-20T04:42:26Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261020T044226_20261020T044251_005094_009A43_DE2F_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -14.421818733215332,
+     "mean": -14.79856650268889
+    },
+    "VV_DB": {
+     "median": -9.521685600280762,
+     "mean": -9.718268191645969
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/55/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 116,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-20T09:54:43.611Z",
+   "product_id": "S2A_MSIL2A_20261020T095041_N0513_R079_T34VFJ_20261020T150311.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 50.09,
+   "valid_pct_inside": 96.674,
+   "valid_pct_buffer": 99.334,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.5778416991233826,
+     "mean": 0.5173820515323476
+    },
+    "NDMI": {
+     "median": 0.312117263674736,
+     "mean": 0.27165487786077624
+    },
+    "NDVI": {
+     "median": 0.7515661418437958,
+     "mean": 0.6958394183853636
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 96.674,
+     "mean": 96.674
+    }
+   },
+   "detection": "PENDING_CONFIRMATION",
+   "quicklook_url": "/api/sat-monitoring/file/116/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 56,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-21T04:34:09Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261021T043409_20261021T043434_009978_013E60_8D5F_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.96,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.96,
+     "mean": 99.96
+    },
+    "VH_DB": {
+     "median": -14.52120590209961,
+     "mean": -14.952124857859774
+    },
+    "VV_DB": {
+     "median": -9.77841567993164,
+     "mean": -10.031011864587496
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/56/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 117,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-23T09:54:34.258Z",
+   "product_id": "S2B_MSIL2A_20261023T095049_N0513_R079_T34VFJ_20261023T134641.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.99,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 57,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-24T16:11:23Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261024T161123_20261024T161148_010029_014036_4420_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.696776390075684,
+     "mean": -13.94938423471654
+    },
+    "VV_DB": {
+     "median": -8.761557579040527,
+     "mean": -8.941295227858323
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/57/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 118,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-25T09:44:36.57Z",
+   "product_id": "S2C_MSIL2A_20261025T094051_N0513_R036_T34VFJ_20261025T112504.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 86.02,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 86.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 86.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 86.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 86.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 86.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 58,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-25T16:03:30Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261025T160330_20261025T160355_005174_009D10_423E_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.267095565795898,
+     "mean": -13.487078144540824
+    },
+    "VV_DB": {
+     "median": -8.465110778808594,
+     "mean": -8.64261138997972
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/58/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 59,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-26T04:42:12Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261026T044212_20261026T044237_010051_0140F7_7B5D_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.802959442138672,
+     "mean": -14.137238432035767
+    },
+    "VV_DB": {
+     "median": -8.865277290344238,
+     "mean": -9.076297533862906
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/59/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 119,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-27T09:44:44.138Z",
+   "product_id": "S2A_MSIL2A_20261027T094041_N0513_R036_T34VFJ_20261027T144648.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 21.74,
+   "valid_pct_inside": 96.833,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.5878896415233612,
+     "mean": 0.527119066833826
+    },
+    "NDMI": {
+     "median": 0.3204232007265091,
+     "mean": 0.275948286605798
+    },
+    "NDVI": {
+     "median": 0.7829011976718903,
+     "mean": 0.7212655126469241
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 96.833,
+     "mean": 96.833
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/119/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 120,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-28T09:54:32.257Z",
+   "product_id": "S2C_MSIL2A_20261028T095121_N0513_R079_T34VFJ_20261028T132804.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 93.59,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.6%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.6%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.6%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.6%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 93.6%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 121,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-30T09:44:38.326Z",
+   "product_id": "S2B_MSIL2A_20261030T094129_N0513_R036_T34VFJ_20261030T120901.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.77,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.8%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 122,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-10-30T09:54:40.165Z",
+   "product_id": "S2A_MSIL2A_20261030T095051_N0513_R079_T34VFJ_20261030T143406.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.92,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.9%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.9%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.9%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.9%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 99.9%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 60,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-30T16:11:36Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261030T161136_20261030T161201_005247_009F80_58E4_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.272077560424805,
+     "mean": -13.484781127032045
+    },
+    "VV_DB": {
+     "median": -8.304811477661133,
+     "mean": -8.477996438246809
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/60/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 61,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-10-31T16:03:17Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261031T160317_20261031T160342_010131_014387_D61E_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.198474884033203,
+     "mean": -13.510016942594156
+    },
+    "VV_DB": {
+     "median": -8.297098636627197,
+     "mean": -8.45383088002167
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/61/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 62,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-01T04:42:25Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261101T044225_20261101T044250_005269_00A04F_CCCA_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.65191650390625,
+     "mean": -13.948069940641853
+    },
+    "VV_DB": {
+     "median": -8.826826095581055,
+     "mean": -9.054733570342377
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/62/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 63,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-02T04:34:09Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261102T043409_20261102T043434_010153_014440_0BD9_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.31356430053711,
+     "mean": -14.702711707922216
+    },
+    "VV_DB": {
+     "median": -9.605995178222656,
+     "mean": -9.863568612600472
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/63/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 123,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-11-04T09:44:33.133Z",
+   "product_id": "S2C_MSIL2A_20261104T094151_N0513_R036_T34VFJ_20261104T112603.SAFE",
+   "status": "NO_VALID_PIXELS",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 54.62,
+   "valid_pct_inside": 0.0,
+   "valid_pct_buffer": 0.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    }
+   },
+   "detection": null,
+   "quicklook_url": "/api/sat-monitoring/file/123/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 64,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-05T16:11:24Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261105T161124_20261105T161149_010204_0145F9_A73F_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.422147750854492,
+     "mean": -13.641165145481994
+    },
+    "VV_DB": {
+     "median": -8.81794548034668,
+     "mean": -8.973955083572397
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/64/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 124,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-11-06T09:44:43.447Z",
+   "product_id": "S2A_MSIL2A_20261106T094121_N0513_R036_T34VFJ_20261106T143053.SAFE",
+   "status": "OK",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 54.52,
+   "valid_pct_inside": 99.841,
+   "valid_pct_buffer": 94.337,
+   "metrics_inside": {
+    "NBR": {
+     "median": 0.6115404367446899,
+     "mean": 0.5318770378695633
+    },
+    "NDMI": {
+     "median": 0.34249264001846313,
+     "mean": 0.28640849491355574
+    },
+    "NDVI": {
+     "median": 0.778643012046814,
+     "mean": 0.7042595071790737
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 99.841,
+     "mean": 99.841
+    }
+   },
+   "detection": "CANDIDATE_BELOW_MIN",
+   "quicklook_url": "/api/sat-monitoring/file/124/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 65,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-06T16:03:30Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261106T160330_20261106T160355_005349_00A30A_9FFD_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 99.939,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.519739151000977,
+     "mean": -13.803045144714556
+    },
+    "VV_DB": {
+     "median": -8.744420051574707,
+     "mean": -8.926996711424161
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/65/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 66,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-07T04:42:12Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261107T044212_20261107T044237_010226_0146C0_159D_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.96,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.96,
+     "mean": 99.96
+    },
+    "VH_DB": {
+     "median": -14.142681121826172,
+     "mean": -14.437049457290112
+    },
+    "VV_DB": {
+     "median": -9.253311157226562,
+     "mean": -9.494101373411597
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/66/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 125,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-11-07T09:54:29.891Z",
+   "product_id": "S2C_MSIL2A_20261107T095211_N0513_R079_T34VFJ_20261107T113610.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 92.61,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.6%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.6%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.6%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.6%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 92.6%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 67,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-08T04:34:22Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261108T043422_20261108T043447_005371_00A3DA_39FB_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 99.98,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 99.98,
+     "mean": 99.98
+    },
+    "VH_DB": {
+     "median": -13.953997611999512,
+     "mean": -14.29279391974567
+    },
+    "VV_DB": {
+     "median": -9.337737560272217,
+     "mean": -9.577483826187027
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/67/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 126,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-11-09T09:44:38.076Z",
+   "product_id": "S2B_MSIL2A_20261109T094129_N0513_R036_T34VFJ_20261109T132808.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 100.0,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 127,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-11-09T09:54:39.731Z",
+   "product_id": "S2A_MSIL2A_20261109T095131_N0513_R079_T34VFJ_20261109T145803.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 100.0,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 381,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-11T16:11:35Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261111T161135_20261111T161200_005422_00A58C_CDA7_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 131,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.586832046508789,
+     "mean": -13.830976992863341
+    },
+    "VV_DB": {
+     "median": -9.03609848022461,
+     "mean": -9.224453781318722
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/381/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 394,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-11-12T09:54:34.188Z",
+   "product_id": "S2B_MSIL2A_20261112T095149_N0513_R079_T34VFJ_20261112T133854.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2b",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 99.99,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 100.0%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 382,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-12T16:03:17Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261112T160317_20261112T160342_010306_01494F_5A5D_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 99.97,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.846783638000488,
+     "mean": -14.162886702760332
+    },
+    "VV_DB": {
+     "median": -8.934770584106445,
+     "mean": -9.102955100202058
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/382/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 383,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-13T04:42:25Z",
+   "product_id": "S1D_IW_GRDH_1SDV_20261113T044225_20261113T044250_005444_00A652_0F8B_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1d",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -13.954423904418945,
+     "mean": -14.195021400839131
+    },
+    "VV_DB": {
+     "median": -8.996990203857422,
+     "mean": -9.17882082333391
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/383/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 384,
+   "sensor": "S1",
+   "sensing_time_utc": "2026-11-14T04:34:09Z",
+   "product_id": "S1C_IW_GRDH_1SDV_20261114T043409_20261114T043434_010328_014A13_5FC6_COG.SAFE",
+   "status": "OK",
+   "platform": "sentinel-1c",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 80,
+   "scene_cloud_pct": null,
+   "valid_pct_inside": 100.0,
+   "valid_pct_buffer": 100.0,
+   "metrics_inside": {
+    "VALID_PCT": {
+     "median": 100.0,
+     "mean": 100.0
+    },
+    "VH_DB": {
+     "median": -14.415802955627441,
+     "mean": -14.764809394020455
+    },
+    "VV_DB": {
+     "median": -9.662363052368164,
+     "mean": -9.867392690408233
+    }
+   },
+   "detection": "SINGLE_DROP",
+   "quicklook_url": "/api/sat-monitoring/file/384/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 395,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-11-14T09:44:35.474Z",
+   "product_id": "S2C_MSIL2A_20261114T094241_N0513_R036_T34VFJ_20261114T112702.SAFE",
+   "status": "NO_VALID_PIXELS",
+   "platform": "sentinel-2c",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 79.56,
+   "valid_pct_inside": 0.0,
+   "valid_pct_buffer": 0.0,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "NO_VALID_PIXELS"
+    },
+    "SNOW_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    },
+    "VALID_PCT": {
+     "median": 0.0,
+     "mean": 0.0
+    }
+   },
+   "detection": null,
+   "quicklook_url": "/api/sat-monitoring/file/395/quicklook",
+   "truecolor_url": null
+  },
+  {
+   "acq_id": 396,
+   "sensor": "S2",
+   "sensing_time_utc": "2026-11-16T09:44:43.122Z",
+   "product_id": "S2A_MSIL2A_20261116T094201_N0513_R036_T34VFJ_20261116T123456.SAFE",
+   "status": "SKIPPED_CLOUD",
+   "platform": "sentinel-2a",
+   "orbit_direction": null,
+   "relative_orbit": null,
+   "scene_cloud_pct": 95.25,
+   "valid_pct_inside": null,
+   "valid_pct_buffer": null,
+   "metrics_inside": {
+    "NBR": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.2%)"
+    },
+    "NDMI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.2%)"
+    },
+    "NDVI": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.2%)"
+    },
+    "SNOW_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.2%)"
+    },
+    "VALID_PCT": {
+     "median": null,
+     "mean": null,
+     "null_reason": "SKIPPED_CLOUD (scene 95.2%)"
+    }
+   },
+   "detection": null,
+   "quicklook_url": null,
+   "truecolor_url": null
+  }
+ ],
+ "events": [],
+ "radar_anomalies": [
+  {
+   "id": 194,
+   "acquisition_id": 10,
+   "sensing_time_utc": "2026-08-14T16:03:29Z",
+   "orbit_direction": "ASCENDING",
+   "relative_orbit": 58,
+   "changed_area_ha": 0.38,
+   "evidence_quality": "LIMITED",
+   "status": "RADAR_ANOMALY",
+   "promotion_rule": null,
+   "event_id": null
+  },
+  {
+   "id": 195,
+   "acquisition_id": 11,
+   "sensing_time_utc": "2026-08-15T04:42:12Z",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "changed_area_ha": 0.38,
+   "evidence_quality": "LIMITED",
+   "status": "RADAR_ANOMALY",
+   "promotion_rule": null,
+   "event_id": null
+  },
+  {
+   "id": 196,
+   "acquisition_id": 51,
+   "sensing_time_utc": "2026-10-14T04:42:13Z",
+   "orbit_direction": "DESCENDING",
+   "relative_orbit": 153,
+   "changed_area_ha": 0.32,
+   "evidence_quality": "GOOD",
+   "status": "RADAR_ANOMALY",
+   "promotion_rule": null,
+   "event_id": null
+  }
+ ],
+ "attribution": "Contains modified Copernicus Sentinel data 2026"
+}

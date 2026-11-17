@@ -1,0 +1,98 @@
+{
+ "last_run": {
+  "id": 8,
+  "trigger": "BACKFILL",
+  "started_at": "2026-11-17T08:03:13Z",
+  "finished_at": "2026-11-17T08:04:14Z",
+  "status": "OK",
+  "areas": "[4]",
+  "date_from": "2026-07-20",
+  "date_to": "2026-11-17",
+  "sensors": "S1,S2",
+  "new_acquisitions": 149,
+  "requests_made": 117,
+  "pu_spent": 3.8067,
+  "pu_includes_estimates": 0,
+  "stop_reason": null,
+  "errors": []
+ },
+ "last_successful_sync": {
+  "id": 8,
+  "trigger": "BACKFILL",
+  "finished_at": "2026-11-17T08:04:14Z"
+ },
+ "month": {
+  "requests": 541,
+  "pu": 893.2072788284723,
+  "pu_includes_estimates": false,
+  "pu_budget": 2000.0,
+  "request_budget": 6000,
+  "guard_stop_fraction": 0.8,
+  "pu_guard": 1600.0,
+  "request_guard": 4800
+ },
+ "provider_status": [
+  {
+   "key": "catalog",
+   "last_ok_utc": "2026-11-17T08:03:14Z",
+   "last_error_utc": null,
+   "last_error": null
+  },
+  {
+   "key": "process",
+   "last_ok_utc": "2026-11-17T08:04:12Z",
+   "last_error_utc": null,
+   "last_error": null
+  }
+ ],
+ "lock": {
+  "locked": false
+ },
+ "worker": {
+  "state": "IDLE",
+  "units": {
+   "jobs": {
+    "installed": true,
+    "timer_active": true,
+    "timer_enabled": true,
+    "next_run_utc": null,
+    "last_trigger_utc": "2026-11-17T09:12:06Z",
+    "service_active": false,
+    "last_exit_utc": "2026-11-17T09:12:06Z",
+    "last_result": "success",
+    "last_exit_status": "0"
+   },
+   "sync": {
+    "installed": true,
+    "timer_active": true,
+    "timer_enabled": true,
+    "next_run_utc": "2026-11-18T05:35:08Z",
+    "last_trigger_utc": "2026-11-17T05:38:49Z",
+    "service_active": false,
+    "last_exit_utc": "2026-11-17T05:40:08Z",
+    "last_result": "success",
+    "last_exit_status": "0"
+   }
+  }
+ },
+ "jobs": {
+  "DONE": 2
+ },
+ "failed_jobs": 0,
+ "recent_failed_jobs": [],
+ "schema_stage2": true,
+ "queue": {
+  "state": "READY",
+  "missing": [],
+  "api_can_write": true
+ },
+ "provider": {
+  "state": "OK",
+  "last_ok_utc": "2026-11-17T08:04:12Z",
+  "at_utc": "2026-11-17T08:04:12Z",
+  "source": "provider",
+  "error": null,
+  "auth_failure": false
+ },
+ "auto_risk_enabled": false
+}
