@@ -90,7 +90,10 @@ these are committed, a release built from git alone would revert them.
   forest-api-lvm-geo-lv-ui-20261110T0858Z        was active on :8000 2026-11-10 09:16 – 10:32 UTC
                                                  (release/2026-11-10-lvm-geo-lv-ui beb09d0; geo-1ae5a85bfd23)
   forest-api-forest-map-contrast-20261110T0949Z  was active 2026-11-10 10:32 – 2026-11-16 15:52 UTC
-  forest-api-satellite-monitoring-20261116T1021Z status UNKNOWN (not documented)
+  forest-api-satellite-monitoring-20261116T1021Z PREPARED 2026-11-16 10:21 UTC, NEVER ACTIVE, SUPERSEDED by …1545Z — do not activate
+                                                 (= d71ba07: 95 files identical, only its own release-manifest.json differs; manifest:
+                                                 production_activated false, steps a-c only; no systemd unit, nginx or process
+                                                 references it, checked 2026-11-17 16:50 UTC on NEW). Pre-bc8c428 code: 6-band S2 decoder.
   forest-api-satellite-monitoring-20261116T1545Z DO NOT ROLL BACK: cannot read 8-band S2 (was active 2026-11-16 15:52 – 2026-11-17 07:11)
   forest-api-satellite-monitoring-20261117T0521Z ACTIVE on :8000 + satellite worker units since 2026-11-17 07:11 UTC (bc8c428)
   forest-api-satellite-monitoring-rollback8band-20261117T0831Z  ONLY valid rollback target for 0521Z (7bd2bbb + e0c9c84)
@@ -374,6 +377,13 @@ remain in place.
   The `…1545Z` decoder on acq 693: `ValueError: raster has 8 bands, expected 6`.
   On NEW the `99-bind-localhost.conf` drop-in only overrides `ExecStart` (127.0.0.1), so the commands below are unchanged;
   after them also check `ss -ltnp | grep ':8000 '` → `127.0.0.1:8000`.
+  Runtime proof without activation (2026-11-17 16:52 UTC, NEW): a hash-identical copy of the folder (scratch dir,
+  `diff -rq` = 0 except `data`) ran on 127.0.0.1:8099 with copies of forest_ai.db and satellite.db (startup `init_db()`
+  and `risk_ai_worker` write → copies only; no ANTHROPIC/TELEGRAM/SENTINEL/JOHN_DEERE/INTEGRATION credentials in its env),
+  rasters read in place. Results: `/health` 200 (last_run 8 OK, provider OK, queue READY, no `worker` key = old code),
+  `/areas/4` 200, `/events/66` 200, `/file/693/quicklook` (8-band acquisition) 200 `image/png`, byte-identical to the
+  stored PNG; `/file/357/truecolor` 404 (expected: no true colour in the rollback); unauthenticated 401; log without
+  tracebacks. Stopped afterwards; :8000 (PID 43619), units and timers untouched; no `__pycache__` in the release folder.
   Folder `/root/forest_ai/releases/forest-api-satellite-monitoring-rollback8band-20261117T0831Z` = `…20261116T1545Z` (code `7bd2bbb`) + 3 files from branch
   `feature/sat-rollback-8band` @ `e0c9c84`: `satellite_monitoring/{raster,pipeline,evidence}.py` — stored S2 rasters with
   6 OR 8 bands are read via `raster.read_stored()` (bands 0-5 by index), so this rollback code works on the 8-band
