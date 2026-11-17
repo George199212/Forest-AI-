@@ -2,6 +2,15 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-17 16:50 UTC — NEW host verification (no code deployed, no restart)
+
+- Production confirmed on NEW host 64.225.79.80 (snapshot of OLD ~10:30 UTC); `docs/DEPLOY_RELEASES.md` gets a
+  "Host" section, the list of restarts on NEW (14:59–15:12 UTC, migration T5/T9) and a corrected "kept their PIDs" line.
+- Rollback: `…20261116T1545Z` marked DO NOT ROLL BACK (37 8-band S2 rasters stored by run 8, 08:03 UTC);
+  `…rollback8band-20261117T0831Z` re-verified on NEW and named the only valid rollback target. Not activated.
+- New read-only script `scripts/verify_satellite_daily_run.py` for the 2026-11-18 05:37 UTC daily run (runs, PU vs
+  `x-processingunits-spent`, band count, true colour, old 6-band readability, events, risks, journal). Not scheduled.
+
 ## 2026-11-17 07:11 UTC — DEPLOYED: `forest-api-satellite-monitoring-20261117T0521Z` (`bc8c428`, `geo-d7081327a3d2`)
 
 - forest-api and both satellite worker units run the new folder. Includes: Latvian Satellite Monitoring section,

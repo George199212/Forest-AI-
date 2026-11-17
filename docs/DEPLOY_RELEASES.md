@@ -7,6 +7,41 @@ live systemd files are in `deploy/systemd/` (the `70-`/`90-`/`95-` drop-ins belo
 modify or delete existing ones. Production never runs from a worktree path. Activation (drop-in
 change + restart) only after an explicit human OK in the chat.
 
+## Host (since 2026-11-17)
+
+Production runs on the **NEW host `forest-ai-production-ams3`, 64.225.79.80**, restored from a snapshot of the OLD
+host 164.90.188.136 taken ~10:30 UTC 2026-11-17. OLD is unreachable (SSH/80/443 closed); nothing is synced from it.
+Verified on NEW 2026-11-17 16:35–16:50 UTC:
+
+- Boot 12:27:23 UTC (`last reboot`). DNS `app.forestaisystems.com` and `forestaisystems.com` → 64.225.79.80
+  (cutover done; DNS switched by the owner, verified 14:36 UTC per `/root/forest_ai/docs/MIGRATION_CHANGELOG_20261117.md`).
+- :8000 runs the release folder `…satellite-monitoring-20261117T0521Z` (97 files byte-identical to `bc8c428`); since
+  15:06 UTC all four uvicorn units bind 127.0.0.1 only (`99-bind-localhost.conf`), nginx proxies.
+- satellite.db: last written 08:04:14 UTC (run 8, on OLD, before the snapshot); `integrity_check` ok. No satellite run
+  has happened on NEW yet; first one: `forest-satellite-sync.timer` 2026-11-18 05:37:20 UTC.
+- **Snapshot gap (UNKNOWN):** anything done on OLD after ~10:30 UTC and not pushed to origin. Every satellite branch
+  (`feature/satellite-monitoring` af4e97d, `feature/satellite-workspace` 3068e99, `feature/sat-rollback-8band` e0c9c84)
+  equals origin.
+
+### Restarts on NEW, 2026-11-17 (journal + migration changelog)
+
+After boot, the services were restarted once, by hand, by the owner's ams3-migration session (root SSH session from
+12:29 UTC; changelog `/root/forest_ai/docs/MIGRATION_CHANGELOG_20261117.md`, untracked file in the repo root), each with
+an explicit owner OK in that session. Each restart was preceded by `daemon-reload`; all clean stops, `NRestarts=0`:
+
+| UTC | unit | why (changelog task) |
+|---|---|---|
+| 14:59:26 | forest-review-api | T5: new `99-bind-localhost.conf` (bind 127.0.0.1:8003), file written 14:59:10 |
+| 15:02:51 | forest-rm-api | T5: `99-bind-localhost.conf` (127.0.0.1:8002), written 15:02:37 |
+| 15:03:44 | forest-ai-ingka | T5: `99-bind-localhost.conf` (127.0.0.1:8004), written 15:03:27 |
+| 15:06:00 | forest-api | T5: `99-bind-localhost.conf` (127.0.0.1:8000), written 15:05:39; WorkingDirectory unchanged (0521Z) |
+| 15:10:12 | forest-bot | T9: `DASHBOARD_PUBLIC_URL` in `.env` + `bot.py` (files written 15:09:53; backups `*.bak-20261117T1509Z`) |
+| 15:10:56 | forest-ai-rigas-telegram | T9: same, `/root/forest_ai_rm` |
+| 15:11:57 | forest-ai-ingka-telegram | T9: same, `/root/forest_ai_ingka` |
+
+The satellite timers were not touched (active since boot 12:27:30). The `bot.py` change (and the uncommitted
+tenant-router hook) is on local branch `vps-migration-2026-11-17` @ `20bb021` / working tree of `/root/forest_ai`, not on origin.
+
 ## Which code runs on each port
 
 | port | unit | code location | git |
@@ -52,8 +87,13 @@ these are committed, a release built from git alone would revert them.
   forest-api-lvm-geo-finish-20261110T0825Z       PREPARED, NOT ACTIVE, SUPERSEDED — do not activate (feature/lvm-geo-finish
                                                  e74b624 only; geo-ac8f6bf9b054). Kept because existing folders are never
                                                  modified or deleted.
-  forest-api-lvm-geo-lv-ui-20261110T0858Z        ACTIVE on :8000 since 2026-11-10 09:16 UTC
+  forest-api-lvm-geo-lv-ui-20261110T0858Z        was active on :8000 2026-11-10 09:16 – 10:32 UTC
                                                  (release/2026-11-10-lvm-geo-lv-ui beb09d0; geo-1ae5a85bfd23)
+  forest-api-forest-map-contrast-20261110T0949Z  was active 2026-11-10 10:32 – 2026-11-16 15:52 UTC
+  forest-api-satellite-monitoring-20261116T1021Z status UNKNOWN (not documented)
+  forest-api-satellite-monitoring-20261116T1545Z DO NOT ROLL BACK: cannot read 8-band S2 (was active 2026-11-16 15:52 – 2026-11-17 07:11)
+  forest-api-satellite-monitoring-20261117T0521Z ACTIVE on :8000 + satellite worker units since 2026-11-17 07:11 UTC (bc8c428)
+  forest-api-satellite-monitoring-rollback8band-20261117T0831Z  ONLY valid rollback target for 0521Z (7bd2bbb + e0c9c84)
 ```
 
 ### History of :8000
@@ -86,6 +126,9 @@ these are committed, a release built from git alone would revert them.
 - **Git tag:** `prod-2026-11-17-satellite-monitoring` (annotated, object `1a7426f5`) → commit `bc8c428`, pushed.
   Verified 2026-11-17 07:57 UTC: 97 files of the release folder byte-identical to `bc8c428` (`git hash-object`);
   not in git: `pre-activation-check.sh` (release helper inherited from an older folder) and the `data` symlink.
+  Re-verified on NEW 2026-11-17 ~16:45 UTC: tag object `1a7426f5` → `bc8c428` locally and on origin (`git ls-remote`);
+  97 files identical to `bc8c428`, `release-manifest.json` differs (the folder's own manifest, its
+  `production_activated: false` was written before activation), `pre-activation-check.sh` not in git. No second tag.
 
 - `/root/forest_ai/releases/forest-api-satellite-monitoring-20261117T0521Z` = active `98-` folder
   (`…20261116T1545Z`) + `git archive bc8c428` of `api.py index.html assets satellite_monitoring` (44 files identical
@@ -102,7 +145,9 @@ these are committed, a release built from git alone would revert them.
   (online backup, integrity ok), plus the drop-in list and both worker unit files; mode 600.
 - `98-satellite-monitoring-release.conf` → this folder; `WorkingDirectory` of `forest-satellite-jobs.service` and
   `forest-satellite-sync.service` → this folder (`systemd-analyze verify` ok); `daemon-reload`; restart of
-  `forest-api` only (07:11:37). Timers not restarted; RM / Ingka / review / bot / Telegram workers kept their PIDs.
+  `forest-api` only (07:11:37). Timers not restarted; RM / Ingka / review / bot / Telegram workers kept their PIDs
+  **on OLD at the time of this activation**. No longer true on NEW: every unit started at boot 12:27 UTC and all were
+  restarted by hand 14:59–15:12 UTC (see "Restarts on NEW" above).
 - Smoke: 50 GET routes same status/shape as before the switch (only `/api/sat-monitoring/health` + `worker`; the 4
   pre-existing non-200 unchanged); `/health` queue READY, provider OK, worker IDLE, auto_risk false; overview 3 areas,
   8 open + 1 recovered; events 61 and 64 200; true-colour images 200 `image/png`; map-layer 15 features / 139,661 B,
@@ -318,7 +363,17 @@ Roll back code only. Do **not** restore the DB backup over live user writes unle
 data recovery has been separately approved. All schema changes are additive and can
 remain in place.
 
-- **forest-api-satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-rollback8band-20261117T0831Z (CURRENT rollback target, built 2026-11-17 08:31 UTC, owner OK):**
+- **forest-api-satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-rollback8band-20261117T0831Z — the ONLY valid rollback target (built 2026-11-17 08:31 UTC on OLD, owner OK):**
+  Re-verified on NEW 2026-11-17 ~16:45 UTC (read-only, not activated): folder = 96 files byte-identical to `e0c9c84`
+  (+ `pre-activation-check.sh`, not in git; `release-manifest.json` is the folder's own); vs `7bd2bbb` exactly
+  `satellite_monitoring/{evidence,pipeline,raster}.py` differ; `diff -r` vs `…1545Z` = those 3 files + manifest; no
+  `__pycache__` (never imported). Tests of `e0c9c84` on a `git archive` copy (sandbox env paths): system Python
+  `155 passed, 2 skipped`; worker venv2 `101 passed, 1 skipped` (test_satellite_monitoring + test_sat_stage2_api +
+  test_sat_stage2_worker). Real files read with the folder's `raster.read_stored()`: acq 693 (area 4, 8 bands,
+  24×37) → 6 bands, identical to bands 0–5 from the active 0521Z decoder; acq 546 (area 3, 6 bands, 43×32) → identical.
+  The `…1545Z` decoder on acq 693: `ValueError: raster has 8 bands, expected 6`.
+  On NEW the `99-bind-localhost.conf` drop-in only overrides `ExecStart` (127.0.0.1), so the commands below are unchanged;
+  after them also check `ss -ltnp | grep ':8000 '` → `127.0.0.1:8000`.
   Folder `/root/forest_ai/releases/forest-api-satellite-monitoring-rollback8band-20261117T0831Z` = `…20261116T1545Z` (code `7bd2bbb`) + 3 files from branch
   `feature/sat-rollback-8band` @ `e0c9c84`: `satellite_monitoring/{raster,pipeline,evidence}.py` — stored S2 rasters with
   6 OR 8 bands are read via `raster.read_stored()` (bands 0-5 by index), so this rollback code works on the 8-band
@@ -339,9 +394,12 @@ remain in place.
   true colour (toggle falls back to false colour; existing `*_tc.png` stay on disk), real worker state, Latvian
   section default, image loading state, fragmentation rule for NEW detections (rows already in generation 2 stay).
   satellite.db stays as is (no migration in either direction). Saved unit files: `/root/backups/satellite_before_release_20261117_20261117T071051Z.forest-satellite-{jobs,sync}.service`.
-- **forest-api-satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-20261116T1545Z (NOT recommended any more):** the old folder decodes stored S2 rasters with exactly 6 bands;
-  from the 2026-11-18 daily run on it would fail on the 8-band files (detection baselines, redetect, evidence). Use it
-  only before that run, or disable `forest-satellite-sync.timer` after switching to it.
+- **forest-api-satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-20261116T1545Z: DO NOT ROLL BACK — cannot read 8-band S2.**
+  Already unsafe, not only from the 2026-11-18 run on: run 8 (BACKFILL of area 4, 2026-11-17 08:03–08:04 UTC, job #2,
+  0521Z code) stored **37 8-band S2 rasters** (all from run 8: 14 OK + 23 NO_VALID_PIXELS; verified on disk with
+  tifffile 2026-11-17 16:40 UTC, next to 115 6-band files). The 1545Z decoder accepts exactly 6 bands
+  (`ValueError: raster has 8 bands, expected 6`), so detection baselines, redetect and evidence for area 4 would fail.
+  Use `…rollback8band-20261117T0831Z` instead.
 - **satellite-monitoring → forest-map-contrast (older rollback target, 2026-11-16):**
   ```sh
   systemctl disable --now forest-satellite-sync.timer forest-satellite-jobs.timer
