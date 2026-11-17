@@ -361,7 +361,7 @@ remain in place.
   It checks `releases/forest-api-baseline-.../api.py` has SHA-256 `dfbf12fe…`, installs
   `rollback-release.conf` over `50-meza-karte-release.conf`, runs `daemon-reload`, restarts
   `forest-api` and checks it is active.
-- **lvm-geo-lv-ui → forest-map-violations (current rollback target):**
+- **lvm-geo-lv-ui → forest-map-violations (historical, 2026-11-10):**
   ```sh
   rm -f /etc/systemd/system/forest-api.service.d/95-lvm-geo-lv-ui-release.conf
   systemctl daemon-reload && systemctl restart forest-api
