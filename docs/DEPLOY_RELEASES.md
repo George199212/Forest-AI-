@@ -318,24 +318,30 @@ Roll back code only. Do **not** restore the DB backup over live user writes unle
 data recovery has been separately approved. All schema changes are additive and can
 remain in place.
 
-- **Rollback-safety patch (proposed, NOT released):** branch `feature/sat-rollback-8band` @ `e0c9c84` = `7bd2bbb`
-  (code of `…1545Z`) + `raster.read_stored()`: stored S2 rasters with 6 or 8 bands, bands 0-5 by index (3 files,
-  ~15 lines; fresh fetches of that code stay 6-band). Tests 155 + 88 (venv) pass, incl. 8-band stored baselines →
-  same events as 6-band, real GeoTIFF 6/8 band. Releasing it = a NEW rollback folder (`…1545Z` + the 3 files), no
-  service restart; needs the owner's OK.
-- **satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-20261116T1545Z (current rollback target, 2026-11-17):**
+- **forest-api-satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-rollback8band-20261117T0831Z (CURRENT rollback target, built 2026-11-17 08:31 UTC, owner OK):**
+  Folder `/root/forest_ai/releases/forest-api-satellite-monitoring-rollback8band-20261117T0831Z` = `…20261116T1545Z` (code `7bd2bbb`) + 3 files from branch
+  `feature/sat-rollback-8band` @ `e0c9c84`: `satellite_monitoring/{raster,pipeline,evidence}.py` — stored S2 rasters with
+  6 OR 8 bands are read via `raster.read_stored()` (bands 0-5 by index), so this rollback code works on the 8-band
+  files the current release writes from the 2026-11-18 daily run on. Its own fetches stay 6-band (no true colour).
+  Verified: 96 files identical to `e0c9c84`, only those 3 files differ from `…1545Z`, no migration; worker venv and
+  system Python import it; a real stored Ķekava raster (acq 375, 631 × 624) read as 6-band and as 8-band gives identical
+  arrays and NDVI/NBR/valid layers. Tests on the branch: 155 (system Python) + 88 (worker venv) passed.
   ```sh
-  printf '[Service]\nWorkingDirectory=/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z\n' \
+  printf '[Service]\nWorkingDirectory=/root/forest_ai/releases/forest-api-satellite-monitoring-rollback8band-20261117T0831Z\n' \
     > /etc/systemd/system/forest-api.service.d/98-satellite-monitoring-release.conf
-  sed -i 's|^WorkingDirectory=/root/forest_ai/releases/forest-api-satellite-monitoring-20261117T0521Z$|WorkingDirectory=/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z|' \
+  sed -i 's|^WorkingDirectory=/root/forest_ai/releases/forest-api-satellite-monitoring-20261117T0521Z$|WorkingDirectory=/root/forest_ai/releases/forest-api-satellite-monitoring-rollback8band-20261117T0831Z|' \
     /etc/systemd/system/forest-satellite-jobs.service /etc/systemd/system/forest-satellite-sync.service
   systemctl daemon-reload && systemctl restart forest-api
-  readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd   # → …/forest-api-satellite-monitoring-20261116T1545Z
+  readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd        # → …/forest-api-satellite-monitoring-rollback8band-20261117T0831Z
+  systemctl show -p WorkingDirectory --value forest-satellite-sync.service  # → …/forest-api-satellite-monitoring-rollback8band-20261117T0831Z
   ```
-  Saved unit files: `/root/backups/satellite_before_release_20261117_20261117T071051Z.forest-satellite-{jobs,sync}.service`. No migration in this release, so satellite.db
-  stays. **Warning:** `…1545Z` decodes S2 rasters with exactly 6 bands. S2 rasters stored by this release (from the
-  2026-11-18 daily run on) have 8 bands, so after a rollback the old worker fails on them (as baselines in detection,
-  and in redetect / evidence). After a rollback, disable `forest-satellite-sync.timer` until this release is back.
+  The timers can stay enabled (no need to disable `forest-satellite-sync.timer`). What is lost in this rollback:
+  true colour (toggle falls back to false colour; existing `*_tc.png` stay on disk), real worker state, Latvian
+  section default, image loading state, fragmentation rule for NEW detections (rows already in generation 2 stay).
+  satellite.db stays as is (no migration in either direction). Saved unit files: `/root/backups/satellite_before_release_20261117_20261117T071051Z.forest-satellite-{jobs,sync}.service`.
+- **forest-api-satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-20261116T1545Z (NOT recommended any more):** the old folder decodes stored S2 rasters with exactly 6 bands;
+  from the 2026-11-18 daily run on it would fail on the 8-band files (detection baselines, redetect, evidence). Use it
+  only before that run, or disable `forest-satellite-sync.timer` after switching to it.
 - **satellite-monitoring → forest-map-contrast (older rollback target, 2026-11-16):**
   ```sh
   systemctl disable --now forest-satellite-sync.timer forest-satellite-jobs.timer
