@@ -8,6 +8,60 @@ release folders or in the live DBs was changed. All data queries ran on checksum
 Prompt: "FOREST AI — SECTORS AS SATELLITE-FIRST WORKSPACE, v2". `CODING_RULES.md` does not exist in the repo (the
 Stage 5 Stage 0 found the same).
 
+## v3 — re-verification on the NEW server (64.225.79.80), 2026-11-17 16:10–16:30 UTC
+
+Prompt v3 (= v2 + server migration). The v2 Stage 0 below was written on OLD at ~10:20 UTC, before the snapshot
+(~10:30), and it is present on NEW (worktree clean, commit 000f235, branch **not pushed**). Every fact was re-checked on NEW,
+read-only. Result: **all v2 findings still hold, with one correction (85 sectors, not 68).**
+
+| Check (prompt §10 Stage 0) | Result on NEW |
+|---|---|
+| Host | `forest-ai-production-ams3`, eth0 **64.225.79.80**; / 154 G, 101 G used (65 %), 54 G free |
+| forest-api | active since 15:06 UTC; cwd `releases/forest-api-satellite-monitoring-20261117T0521Z` (drop-in 98-); new drop-in **99-bind-localhost** → `--host 127.0.0.1`; `data` → `/root/forest_ai/data` symlink; SAT_* env from 97- |
+| Listeners | 127.0.0.1 only: 8000, 8002, 8003, 8004 |
+| `curl 127.0.0.1:8000/` | **401** ✓ |
+| `/api/sat-monitoring/health` (Basic Auth from .env, not printed) | **200**, 77 ms; provider OK; queue READY; 0 failed jobs; month 541 req / 893 PU of 2000 |
+| Release vs tag `prod-2026-11-17-satellite-monitoring` (= bc8c428) | 89 runtime files: **0 drift, 0 untracked** (same as on OLD) |
+| DNS | `app.forestaisystems.com` → 64.225.79.80 already (Stage 4 can curl the public URL directly) |
+| Last sat_runs row | id 8, BACKFILL area 4, 08:03–08:04 UTC, OK (pre-snapshot) |
+| Daily sync on NEW | **not run yet**. sync timer next = **2026-11-18 05:37:20 UTC** (prompt says 05:39; RandomizedDelay); "last trigger 05:38 today" is the OLD run carried in the snapshot. jobs timer runs every 5 min, last OK 16:11 |
+| Open events | areas 1/3/4 (real sectors / LVM GEO): **0 current**. Area 2 (Ķekava EVAL_BBOX): 8 SUSPECTED + 1 RECOVERED current. sat_review_log: 0 rows. Unchanged from v2 |
+| satellite.db | sha256 `7affc129…` = **identical** to the v2 copy; mtime 08:04; WAL mode; 14 tables |
+| forest_ai.db | journal=delete, 45 tables (+ sqlite_sequence). sha changed (mtime 15:19). Per-table diff vs Codex's pre-flight backup `/root/forest_ai_backups/object-sync-0521-final-preflight-20261117T095128Z/`: **only `john_deere_sessions` 2 → 1 rows**. Sector-related tables are unchanged, so the §6 inventory and the fixtures remain valid |
+| Missing references | `reports/MIGRATION_AUDIT_20261117.md` and `claude/SATELLITE_WORKSPACE_PROMPT_v2.md` **do not exist on NEW** (searched all of /). The §0a facts were re-verified directly instead |
+
+**Correction to v2.** There are **85 sectors** (all org 1): 17 legacy/demo/test (ids 1–5, 9, 12–21, 26) + **68 LVM GEO/VMD
+registrations** (ids 30–97, each with a `geodata_sources` row). v2 wrote "68 sectors" in §1 and §6 (the fixture
+`sectors_list.json` already has 85 rows). Re-measured on live :8000: `GET /api/sectors` **1.56 s, 124 KB @ 85 sectors**;
+`/sat-monitoring/sectors` 19 ms, `/overview` 31 ms. A linear extrapolation to 1,000 sectors gives ≈ 18 s. That is an
+estimate; the measurement is a Stage 3 item. The case for the summary endpoint (D6) still holds.
+
+**Stage 5 status on NEW: NOT released.** `/root/wt/satellite-workspace` is now **committed and clean** at 3068e99
+(the Stage 1 prototype 71d2737 that was uncommitted on OLD is now committed). It is **5 commits ahead of
+origin/feature/satellite-workspace (not pushed)**. Relative to bc8c428 it changes `assets/sat-workspace.{js,css}` (new),
+`index.html` (+2), `satellite_monitoring/{api_routes,store,vmd_context}.py`. The mount evidence (§3) was re-checked in the
+committed file: `root()` → `#satm-root` (l.266), `pageHead()` (l.303), Back `pushState` (l.477), event links
+`location.hash` (l.752), 24 `getElementById`, `_worstColour` exported (l.979). **Stage 2 of this task stays blocked.**
+
+**Uncommitted work by others on NEW (not touched):** `/root/forest_ai` (branch `vps-migration-2026-11-17`, HEAD 20bb021
+15:15 UTC; 9 modified incl. api.py, index.html, bot.py, database.py + 84 untracked), `forest_ai_navfix` (2),
+`forest-ai-native-isolation` (13), `forest-map-basemap-contrast` (3), `forest-map-polish` (1), **`hide-integrations` (4, based
+on bc8c428, edits index.html nav: a third parallel change to the sidebar/router besides navfix and Stage 5)**,
+`lvm-geo-registration-fix` (7, Codex). Note: the main checkout is not on master and is dirty. The release workflow
+(DEPLOY_RELEASES.md) builds from tags/worktrees, so this does not block Stages 0–3. For Stage 4 the owner should know the
+VPS-migration commit 20bb021 is not in the live release.
+
+**Lost-write window (§0a).** Satellite side: nothing after 08:04 exists on NEW. If OLD ran a job or a review between
+10:30 and going offline, it is missing. sat_review_log is empty on NEW. Main DB: unknown for OLD. §8 writes stay blocked
+until the owner closes the OLD reconciliation.
+
+**Out-of-scope items observed (reported, not fixed):** none blocks this task. The 99-bind-localhost drop-in and UFW are
+already in place; the prompt does not list LVM GEO WMS reachability from NEW (TCP timeout to the geoserver, seen by the
+object-sync work), but it affects §9 only if the registration flow needs live WMS. Cadastral search is local-only.
+
+Decisions D1–D9 (§10) are unchanged. Add **D10**: who pushes `feature/sectors-workspace` (000f235 + this v3 commit) and
+`feature/satellite-workspace` (5 unpushed commits). The only copy of both is this droplet.
+
 ## 0. Production state and drift
 
 | Check | Result |
@@ -47,7 +101,7 @@ Parallel work that touches the same code:
 | Provenance | `assets/lvm-geodata.js:224 loadLvmSource` → `/api/geodata/sectors/{id}/source` (table `geodata_sources`) | LVM GEO file; do not touch |
 | Meža karte sectors | `GET /api/geodata/forest-map/sectors`; forest-map.js popup has only "Atvērt Sektori" → `nav('sectors')` (the list, not the sector) | |
 
-Measured on the sandbox (68 sectors, 3 runs): `GET /api/sectors` **1.52–1.72 s, 124 KB**. Other calls:
+Measured on the sandbox (85 sectors — v2 said 68, see v3 correction; 3 runs): `GET /api/sectors` **1.52–1.72 s, 124 KB**. Other calls:
 `/api/sat-monitoring/overview` 17–52 ms, `/sat-monitoring/sectors` 10–20 ms, `/areas/{id}` 63–125 ms (~100 KB each),
 `/api/sectors/BIK-001` 39–53 ms. The list cost grows linearly with the number of sectors; a straight extrapolation to 1,000
 is ≈ 22 s (not measured; the measurement is a Stage 3 item). **The list needs a light summary endpoint** (§7).
@@ -162,7 +216,7 @@ deleted.
 
 ## 6. Sector inventory (§8 steps 1–2, read-only) — proposal, owner classifies
 
-68 sectors, all `organization_id=1`, `data_origin` = REAL except A-005 (SIMULATED). References are by **free-text name**
+85 sectors (v3 correction; v2 said 68), all `organization_id=1`, `data_origin` = REAL except A-005 (SIMULATED). References are by **free-text name**
 in 21 tables, plus `geodata_sources` / `geodata_boundary_history` by `sector_id` (`geodata_sources` has an FK with
 **ON DELETE CASCADE**, a further reason never to hard-delete). Full per-sector counts: scratch `inventory.json`; the
 non-zero ones:
@@ -192,7 +246,7 @@ from the prompt. Nothing is prepared or written in Stage 0.
 | Need | Existing | Gap / smallest addition |
 |---|---|---|
 | Card route by id | `/api/sectors` has **no id**; detail is by name (duplicates exist) | add `id` to the list SELECT; route `#sectors/{id}`, resolved to the name via the list (detail stays name-keyed; duplicate-name sectors stay ambiguous for name-keyed data, shown as a warning) |
-| One list request, 1,000 sectors | `/api/sectors` 1.5 s @68, N+1 risk score | **new read-only `GET /api/sectors/cards`**: id, name, area_ha, status, created_at, provenance (`geodata_sources.provider/source_feature_id/imported_at`), centroid/bbox, simplified ring; **no risk score**; plus `GET /api/sat-monitoring/sector-summaries` (one query per table on satellite.db, Basic Auth) |
+| One list request, 1,000 sectors | `/api/sectors` 1.5 s @85, N+1 risk score | **new read-only `GET /api/sectors/cards`**: id, name, area_ha, status, created_at, provenance (`geodata_sources.provider/source_feature_id/imported_at`), centroid/bbox, simplified ring; **no risk score**; plus `GET /api/sat-monitoring/sector-summaries` (one query per table on satellite.db, Basic Auth) |
 | Identifier | in the name text / `geodata_sources.source_feature_id`; cadastral number in `source_properties` | in `/cards` (stored values only) |
 | area ha | `sectors.area_ha` (stored; for VMD it is computed at registration, from the source polygon) | label "saglabātā vērtība" |
 | Monitoring status | `/sat-monitoring/sectors` (monitored_area_id, queued_job_id) + overview `data_status` | summary: SECTOR link + **LVM_GEO link via source_feature_id**; Netiek monitorēts / Gaida pirmos datus (`NO_DATA_YET`, `BACKFILL…`, queued job) / Monitorēts / Apturēts (`STOPPED`) |
@@ -213,7 +267,7 @@ from the prompt. Nothing is prepared or written in Stage 0.
 - The latest true-colour for area 4 (acq 693, 2026-11-04) has **valid_pct_inside 7.4 %** (mostly cloud). "Latest" must mean
   latest OK acquisition with `valid_pct_inside ≥ min_valid_pct`, or the card shows a cloud.
 - The quicklooks are tiny: 37×24 px (0.21 ha sector), 127×95 px (BIK-001 50 ha), at 10 m pixels including the buffer. On a
-  card they will look blocky and need `image-rendering: pixelated` plus a "10 m pikseļi" note. Most of the 68 sectors are
+  card they will look blocky and need `image-rendering: pixelated` plus a "10 m pikseļi" note. Most of the 68 LVM GEO sectors are
   under 3 ha. Owner decides (D4).
 
 ## 8. Fixtures (`tests/fixtures/sectors_ui/`, 6 JSON files, 493 KB)
