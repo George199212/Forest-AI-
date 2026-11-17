@@ -80,6 +80,20 @@ these are committed, a release built from git alone would revert them.
 - **The geodata manifest** comes from the drop-in `geodata.conf`
   (`FOREST_GEODATA_MANIFEST=/root/forest_ai/data/geodata/nationwide/active.json`).
 
+## Prepared (NOT active): satellite-monitoring-20261117T0521Z
+
+- `/root/forest_ai/releases/forest-api-satellite-monitoring-20261117T0521Z` = active `98-` folder
+  (`…20261116T1545Z`) + `git archive bc8c428` of `api.py index.html assets satellite_monitoring` (44 files identical
+  to git; no unversioned live edit lost). Changed vs active: `index.html`, `assets/{sat-monitoring.js,.css,i18n-lv.js}`,
+  `satellite_monitoring/{config,detection,evidence,pipeline,provider,raster,store,truecolor}.py`. No DB migration.
+- Sandbox check 2026-11-17 (127.0.0.1:8030, release code, copies of the live gen-2 satellite.db, forest_ai.db and
+  rasters): 50 GET routes vs :8000 — same status and shape except `/api/sat-monitoring/health` (+`worker`, intended)
+  and the John Deere routes (sandbox env has no JD credentials; `api.py` unchanged); LV pages, events 61/64, area 3,
+  Forest Map from event 61 checked in headless Chromium, no console errors.
+- Activation (after "approved release"): replace the `98-` drop-in path, `daemon-reload`, restart `forest-api`; also
+  re-point `WorkingDirectory` of `forest-satellite-{jobs,sync}.service` to the new folder (`daemon-reload`), so new S2
+  acquisitions get B03/B02. Rollback: point `98-` and the two units back to `…20261116T1545Z`.
+
 ## Activation record: satellite-monitoring (2026-11-16 15:52 UTC, Stage 4, owner "approved release")
 
 - Release `/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z` = active `96-` folder (`forest-map-contrast`) + `git archive 7bd2bbb`

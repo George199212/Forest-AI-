@@ -2,6 +2,14 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-17 — live data operation + next release prepared (code NOT deployed)
+
+- Live satellite.db: fragmentation rule applied by an approved redetect (generation 2, 0 PU, events 58–66);
+  recall 3/3. :8000 code unchanged (`7bd2bbb`).
+- Branch `bc8c428`: true colour (B03/B02 appended to S2 requests, toggle, `satellite_monitoring.truecolor` with
+  dry-run), worker state, Latvian section, image loading state. Release folder
+  `forest-api-satellite-monitoring-20261117T0521Z` prepared, not active.
+
 ## 2026-11-16 (evening) — `feature/satellite-monitoring`: UI review fixes (not deployed)
 
 - Detection: fragmentation rule (largest cluster < 30 % of the current area → POSSIBLE_SEASONAL_OR_ENVIRONMENTAL,

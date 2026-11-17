@@ -62,7 +62,7 @@
 
 ### Satellite Monitoring — UI review 2026-11-16 (post-release work on `feature/satellite-monitoring`, NOT deployed)
 Status 2026-11-16 evening; :8000 still runs `7bd2bbb` (Stage 4 release). Next deployment needs the owner's "approved release".
-1. **Fragmentation rule — done on the branch (`eaac5d4`), NOT applied to the live satellite.db.** Offline re-run on a
+1. **Fragmentation rule — APPLIED to the live satellite.db on 2026-11-17 (generation 2, events 58–66; Ķekava §13).** Was: done on the branch (`eaac5d4`), first offline only. Offline re-run on a
    copy (0 PU, generation 2): gate MET (recall 3/3, open outside 4 = 105.11 ha, masks identical); 5 events become
    POSSIBLE_SEASONAL_OR_ENVIRONMENTAL / LOW, event 55 (12 %) included. Details `docs/SATELLITE_POSITIVE_CONTROL_KEKAVA.md`
    §12. Open: live redetect (new event ids 58–66; links to 49–57 then open superseded rows) needs approval + backup.
@@ -78,7 +78,7 @@ Status 2026-11-16 evening; :8000 still runs `7bd2bbb` (Stage 4 release). Next de
    popup open); after_05 was taken 0 s after the click. English "Forest Map" / "Refresh" during loading → Latvian.
 6. **Worker status — done (`e5a6826`).** From systemd: Nav uzstādīts / Darbojas / Dīkstāvē / Taimeri izslēgti /
    Statuss nav zināms, plus next daily run and last queue check.
-7. **True / false colour toggle — NOT possible from stored data.** Stored S2 bands: B04, B08, B11, B12, SCL,
+7. **True colour — implemented on the branch (`bc8c428`, not deployed): B03/B02 appended to new S2 requests; existing images of open events need the owner's OK to fetch (dry-run 2026-11-17: scope shown 4 requests ≈ 12.0 PU, scope all 11 ≈ 33.0 PU).** Earlier note: NOT possible from stored data. Stored S2 bands: B04, B08, B11, B12, SCL,
    dataMask. True colour needs B03 + B02. What it would take (owner decision, not done):
    - add B02, B03 to `EVALSCRIPT_S2` / `S2_BANDS` (8 output bands), adapt the raster decode/indices and
      `quicklook_png` (second, true-colour quicklook);
@@ -90,3 +90,8 @@ Status 2026-11-16 evening; :8000 still runs `7bd2bbb` (Stage 4 release). Next de
 8. **Closed** (2026-11-16): the "HTTP 401 invalid_client" banner was a synthetic sandbox state; live satellite.db has
    no token failure (302 requests, all HTTP 200, last 2026-11-11). A real token request on 2026-11-16 ~15:44 UTC
    returned 200.
+
+- Satellite Monitoring (open, 2026-11-17): links / bookmarks to events 49–57 now open superseded rows (generation 2
+  replaced them with 58–66 on the live DB); the page shows the superseded banner and no map button. The Forest Map
+  layer returns 404 for superseded ids.
+- Satellite worker (observation, 2026-11-17): first daily run peaked at 552 MB (preflight measured 424 MB); limit 2 GB.

@@ -7,6 +7,18 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-17 07:00 UTC — first daily run OK; fragmentation rule live; next release prepared (NOT active)
+
+- First daily TIMER run (run 4) 05:38–05:40 UTC: OK, 14 new acquisitions, 12 requests, 21.67 PU (catch-up
+  11-11…11-14), provider OK (token/catalog/process). Expected afterwards ≈ 3.5 PU/day (≈ 3.9 with B02/B03).
+- Area 3 "VMD 348-21 (60620022173)" (LVM_GEO, 0.53 ha) added by the dashboard user via LVM GEO at 05:53 (job #1),
+  backfilled by the worker (run 5: 106 requests, 2.91 PU). First real use of the queue.
+- Live satellite.db: generation 2 (fragmentation rule) since 06:18 UTC — events 58–66; backup
+  `/root/backups/satellite_before_gen2_fragmentation_20261117T060147Z.db.raw`. Recall 3/3 (Ķekava §13).
+- Next release `/root/forest_ai/releases/forest-api-satellite-monitoring-20261117T0521Z` (`bc8c428`) built and
+  checked in the sandbox 127.0.0.1:8030; waits for the owner's "approved release". True-colour fetch for open events
+  waits for the owner's OK (4 requests ≈ 12 PU).
+
 ## Update 2026-11-16 evening — UI review fixes on the branch (NOT deployed)
 
 - :8000 unchanged (`7bd2bbb`, Stage 4). Branch has the 7 UI review fixes (see KNOWN_BUGS "UI review 2026-11-16");
