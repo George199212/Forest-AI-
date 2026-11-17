@@ -7,6 +7,16 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-17 07:20 UTC — release `forest-api-satellite-monitoring-20261117T0521Z` LIVE on :8000
+
+- :8000 and the satellite worker units run `/root/forest_ai/releases/forest-api-satellite-monitoring-20261117T0521Z` (`bc8c428`, `geo-d7081327a3d2`)
+  since 07:11 UTC. Rollback target `…20261116T1545Z` (commands in `docs/DEPLOY_RELEASES.md`; read the 8-band note).
+- Live satellite.db: generation 2 (fragmentation rule), events 58–66; true-colour quicklooks for acq 299, 331, 357,
+  370 (open events 59–66 show true colour). November: 424 requests / 889.4 PU (guard 1,600 PU).
+- Next daily run 2026-11-18 05:35 UTC — first S2 request with B03/B02 (≈ +40 % PU per S2 request; ≈ 3.9 PU/day
+  expected). To check: run status, PU, that new S2 rasters have 8 bands and a *_tc.png.
+- Smoke after the switch: all checks passed (DEPLOY_RELEASES activation record).
+
 ## Update 2026-11-17 07:00 UTC — first daily run OK; fragmentation rule live; next release prepared (NOT active)
 
 - First daily TIMER run (run 4) 05:38–05:40 UTC: OK, 14 new acquisitions, 12 requests, 21.67 PU (catch-up

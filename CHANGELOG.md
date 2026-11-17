@@ -2,6 +2,14 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-17 07:11 UTC — DEPLOYED: `forest-api-satellite-monitoring-20261117T0521Z` (`bc8c428`, `geo-d7081327a3d2`)
+
+- forest-api and both satellite worker units run the new folder. Includes: Latvian Satellite Monitoring section,
+  real worker state, image loading/error state, Forest Map Latvian first paint, fragmentation rule in detection,
+  true colour (B03/B02 appended to new S2 requests; toggle "Patiesās krāsas" / "Viltus krāsas", default true colour).
+- True-colour quicklooks fetched for the 4 images shown on open events: 4 requests, 12.02 PU (actual).
+- No database migration. Rollback commands in `docs/DEPLOY_RELEASES.md`.
+
 ## 2026-11-17 — live data operation + next release prepared (code NOT deployed)
 
 - Live satellite.db: fragmentation rule applied by an approved redetect (generation 2, 0 PU, events 58–66);
