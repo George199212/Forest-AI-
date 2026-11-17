@@ -81,7 +81,7 @@ def npy(arr):
 
 def decoder(raw, expected_shape=None, bands=None):
     arr = np.load(io.BytesIO(raw))
-    assert arr.shape[:2] == tuple(expected_shape) and arr.shape[2] == bands
+    assert arr.shape[:2] == tuple(expected_shape) and arr.shape[2] in (bands if isinstance(bands, tuple) else (bands,))
     return arr
 
 
@@ -1567,3 +1567,67 @@ def test_compartment_split_does_not_change_detection(env, monkeypatch):
     assert (ev["changed_area_ha"], ev["n_changed_pixels"], ev["classification"], ev["confidence"]) == with_split[0]
     assert json.loads(ev["compartment_split_json"]) == {"unavailable": "test: classes off"}
 
+
+
+# ── Rollback safety: stored 8-band S2 rasters (written by release bc8c428) ───
+def _append_rgb(a6):
+    extra = np.zeros(a6.shape[:2] + (2,), dtype=np.float32)
+    extra[..., 0], extra[..., 1] = 0.05, 0.04                    # B03, B02 appended
+    return np.concatenate([a6, extra], axis=2)
+
+
+def test_read_stored_accepts_8_band_s2_and_returns_bands_0_to_5():
+    from satellite_monitoring import raster
+    grid = {"height": 4, "width": 5}
+    a6 = np.random.default_rng(3).random((4, 5, 6)).astype(np.float32)
+    for arr in (a6, _append_rgb(a6)):
+        out = raster.read_stored(decoder, npy(arr), "S2", (4, 5))
+        assert out.shape == (4, 5, 6) and np.array_equal(out, a6)
+    with pytest.raises(AssertionError):                          # 7 bands: not an accepted layout
+        raster.read_stored(decoder, npy(np.zeros((4, 5, 7), np.float32)), "S2", (4, 5))
+    s1 = np.zeros((4, 5, 3), np.float32)
+    assert raster.read_stored(decoder, npy(s1), "S1", (4, 5)).shape == (4, 5, 3)
+
+
+def test_detection_on_stored_8_band_baselines_matches_6_band(env):
+    """Old worker after a rollback: S2 rasters STORED by the new release have 8 bands; redetect (and daily detection,
+    which reads the same stored baselines via _layers) must give the same events as with 6-band files."""
+    from satellite_monitoring import redetect
+    a = make_area(env["conn"])
+    prods, rasters = s2_series(a, n=5)
+    run(env, FakeProvider(prods, rasters), sensors=("S2",))
+    ev6 = [tuple(r) for r in env["conn"].execute(
+        "SELECT classification, changed_area_ha, confidence FROM sat_change_events ORDER BY id")]
+    b = make_area(env["conn"], name="TST-002", ref="2")
+    prods8 = [P("S2", p.product_id + "_8", p.sensing_time_utc, scene_cloud_pct=5.0) for p in prods]
+    rasters8 = {p.product_id + "_8": _append_rgb(rasters[p.product_id]) for p in prods}
+
+    def new_release_fetch_decoder(raw, expected_shape=None, bands=None):   # what release bc8c428 stored
+        return np.load(io.BytesIO(raw))
+    pipeline.run("BACKFILL", conn=env["conn"], provider=FakeProvider(prods8, rasters8), decoder=new_release_fetch_decoder,
+                 lock_file=env["tmp"] / "lock", date_from="2026-05-01", date_to="2026-10-31", sensors=("S2",),
+                 area_ids=[b["id"]])
+    from pathlib import Path
+    stored = [np.load(io.BytesIO(Path(r[0]).read_bytes())).shape[2] for r in env["conn"].execute(
+        "SELECT raster_path FROM sat_acquisitions WHERE monitored_area_id=? AND raster_path IS NOT NULL", (b["id"],))]
+    assert stored and set(stored) == {8}
+    # old code path with the strict test decoder: read_stored must accept 8 and hand bands 0-5 to the analysis
+    redetect.redetect(env["conn"], [b["id"]], "rollback test", decoder=decoder, lock_file=env["tmp"] / "lock")
+    ev8 = [tuple(r) for r in env["conn"].execute(
+        "SELECT classification, changed_area_ha, confidence FROM sat_change_events WHERE monitored_area_id=? "
+        "AND superseded_at_utc IS NULL ORDER BY id", (b["id"],))]
+    assert ev8 and ev8 == ev6
+
+
+def test_real_geotiff_8_band_s2_read_stored_gives_bands_0_to_5():
+    tifffile = pytest.importorskip("tifffile")      # worker venv only
+    from satellite_monitoring import raster
+    a8 = np.random.default_rng(8).random((5, 4, 8)).astype(np.float32)
+    for planar, data in (("separate", np.moveaxis(a8, -1, 0)), ("contig", a8)):
+        b = io.BytesIO()
+        tifffile.imwrite(b, data, photometric="minisblack", planarconfig=planar)
+        out = raster.read_stored(raster.decode_tiff, b.getvalue(), "S2", (5, 4))
+        assert out.shape == (5, 4, 6) and np.allclose(out, a8[:, :, :6])
+    b = io.BytesIO()
+    tifffile.imwrite(b, a8[:, :, :6], photometric="minisblack", planarconfig="contig")
+    assert np.allclose(raster.read_stored(raster.decode_tiff, b.getvalue(), "S2", (5, 4)), a8[:, :, :6])

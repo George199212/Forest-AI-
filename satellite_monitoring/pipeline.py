@@ -314,8 +314,7 @@ class Detector:
         raw = Path(acq["raster_path"]).read_bytes()
         if raster.sha256_bytes(raw) != acq["raster_sha256"]:
             raise ValueError(f"raster sha256 mismatch for acquisition {acq['id']}")
-        bands = 6 if acq["sensor"] == "S2" else 3
-        arr = self.r.decode(raw, expected_shape=(self.a["grid"]["height"], self.a["grid"]["width"]), bands=bands)
+        arr = raster.read_stored(self.r.decode, raw, acq["sensor"], (self.a["grid"]["height"], self.a["grid"]["width"]))
         return met.s2_layers(arr, self.cfg) if acq["sensor"] == "S2" else met.s1_layers(arr)
 
     def _usable(self, acq):

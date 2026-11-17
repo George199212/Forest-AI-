@@ -14,20 +14,33 @@ def sha256_bytes(b):
     return hashlib.sha256(b).hexdigest()
 
 
+# Rollback safety (2026-11-17): from release bc8c428 on, stored S2 rasters may have 8 bands (B03, B02 APPENDED after
+# the original 6). Readers of STORED rasters accept 6 or 8 and use bands 0-5 by index, exactly as before.
+S2_STORED_BAND_COUNTS = (6, 8)
+
+
 def decode_tiff(raw, expected_shape=None, bands=None):
-    """GeoTIFF bytes -> float32 array (H, W, B)."""
+    """GeoTIFF bytes -> float32 array (H, W, B). `bands` = one count or a tuple of accepted counts."""
     import tifffile
     arr = tifffile.imread(io.BytesIO(raw))
     arr = np.asarray(arr, dtype=np.float32)
     if arr.ndim == 2:
         arr = arr[:, :, None]
-    if arr.ndim == 3 and bands is not None and arr.shape[0] == bands and arr.shape[2] != bands:
+    ok = None if bands is None else ((bands,) if isinstance(bands, int) else tuple(bands))
+    if arr.ndim == 3 and ok is not None and arr.shape[0] in ok and arr.shape[2] not in ok:
         arr = np.moveaxis(arr, 0, -1)          # planar config -> band-last
     if expected_shape is not None and arr.shape[:2] != tuple(expected_shape):
         raise ValueError(f"raster shape {arr.shape[:2]} != grid {tuple(expected_shape)}")
-    if bands is not None and arr.shape[2] != bands:
-        raise ValueError(f"raster has {arr.shape[2]} bands, expected {bands}")
+    if ok is not None and arr.shape[2] not in ok:
+        raise ValueError(f"raster has {arr.shape[2]} bands, expected {' or '.join(map(str, ok))}")
     return arr
+
+
+def read_stored(decode, raw, sensor, expected_shape):
+    """A STORED raster for analysis: S2 accepts 6 or 8 bands and returns bands 0-5 (by index), S1 3 bands."""
+    if sensor != "S2":
+        return decode(raw, expected_shape=expected_shape, bands=3)
+    return decode(raw, expected_shape=expected_shape, bands=S2_STORED_BAND_COUNTS)[:, :, :6]
 
 
 def safe_name(product_id):
