@@ -681,8 +681,15 @@
       esc((fmtDate(before && before.sensing_time_utc) || '?') + ' → ' + (fmtDate(ev.first_after_time_utc) || '?')) + '</span> · ' + esc(t(ev.confidence || 'na'));
     S.calloutLayer = S.L.tooltip({permanent: true, direction: 'top', className: 'satw-callout', pane: 'satwCallout', offset: [0, -6]}).setLatLng([b.getNorth(), b.getCenter().lng]).setContent(html).addTo(S.map);
   }
-  function lastClearBefore(ev) {
-    var mv = minValid(), list = (ev.before || []).map(function (x) { return S.byId[x.acq_id] || x; }).filter(function (x) { return acqState(x, mv) === 'ok'; });
+  // The event's `before` list holds the baselines of EVERY after-image, so it can contain acquisitions later than the
+  // onset. "Last clear acquisition without change" = latest valid baseline strictly before the first after-image.
+  function lastClearBefore(ev) { return lastClearBeforeOf(ev, S.byId, minValid()); }
+  function lastClearBeforeOf(ev, byId, mv) {
+    var onset = ev.first_after_time_utc ? String(parseUtc(ev.first_after_time_utc).toISOString()) : null;
+    var list = (ev.before || []).map(function (x) { return byId[x.acq_id] || x; }).filter(function (x) {
+      var d = parseUtc(x.sensing_time_utc);
+      return acqState(x, mv) === 'ok' && d && (!onset || d.toISOString() < onset);
+    });
     return list.sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0] || null;
   }
   function zkatLabel(z) { return String(z) === '10' ? t('zkat10') : String(z) === '14' ? t('zkat14') : t('zkatOther', {z: z === null || z === undefined ? '?' : z}); }
@@ -971,6 +978,7 @@
   var api = {load: loadOverview, openArea: function (id) { return openArea(+id); }, openEvent: function (id) { return openEvent(+id); },
              _changeColour: changeColour, _CHANGE_COLOURS: CHANGE_COLOURS, _worstColour: worstColour, _fmtTime: fmtTime, _rigaParts: rigaParts,
              _acqState: acqState, _comparePair: comparePair, _pairComposite: pairComposite, _defaultPair: defaultPair, _vmdValue: vmdValue, _T: T,
+             _lastClearBefore: function (ev, byId, mv) { return lastClearBeforeOf(ev, byId, mv); },
              get state() { return S; }};
   global.SatWorkspace = api;
   // Route the section here; keep every other legacy hook (lvmButton, _trServer, …) of window.SatMonitoring.

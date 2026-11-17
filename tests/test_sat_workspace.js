@@ -122,3 +122,11 @@ test('WCAG AA (4.5:1) for text on panels in both themes (values read from the CS
   const r=ratio(v[fg],solid[name][bg]);assert.ok(r>=4.5,`${name}: --${fg} ${v[fg]} on ${bg} ${solid[name][bg]} = ${r.toFixed(2)}`);}
  assert.ok(ratio('#F5F5F0','#245B43')>=4.5,'chip text on brand');
 });
+
+test('"last clear acquisition without change" is strictly before the onset (event 60: not the 08-04 baseline)',()=>{
+ const W=load().SatWorkspace,a=fx('area_2_kekava'),e=fx('event_60_current_successor_of_51'),by={};a.timeline.forEach(x=>by[x.acq_id]=x);
+ const b=W._lastClearBefore(e,by,60);
+ assert.ok(b,'found');assert.ok(new Date(b.sensing_time_utc)<new Date(e.first_after_time_utc),b.sensing_time_utc+' < '+e.first_after_time_utc);
+ assert.ok(e.before.some(x=>new Date(x.sensing_time_utc)>=new Date(e.first_after_time_utc)),'fixture really contains a later baseline');
+ assert.equal(W._lastClearBefore({before:[],first_after_time_utc:null},by,60),null);
+});
