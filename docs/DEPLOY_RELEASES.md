@@ -83,6 +83,10 @@ these are committed, a release built from git alone would revert them.
 
 ## Activation record: satellite-monitoring-20261117T0521Z (2026-11-17 07:11 UTC, owner "approved release")
 
+- **Git tag:** `prod-2026-11-17-satellite-monitoring` (annotated, object `1a7426f5`) → commit `bc8c428`, pushed.
+  Verified 2026-11-17 07:57 UTC: 97 files of the release folder byte-identical to `bc8c428` (`git hash-object`);
+  not in git: `pre-activation-check.sh` (release helper inherited from an older folder) and the `data` symlink.
+
 - `/root/forest_ai/releases/forest-api-satellite-monitoring-20261117T0521Z` = active `98-` folder
   (`…20261116T1545Z`) + `git archive bc8c428` of `api.py index.html assets satellite_monitoring` (44 files identical
   to git; no unversioned live edit lost). Changed vs active: `index.html`, `assets/{sat-monitoring.js,.css,i18n-lv.js}`,
@@ -314,6 +318,11 @@ Roll back code only. Do **not** restore the DB backup over live user writes unle
 data recovery has been separately approved. All schema changes are additive and can
 remain in place.
 
+- **Rollback-safety patch (proposed, NOT released):** branch `feature/sat-rollback-8band` @ `e0c9c84` = `7bd2bbb`
+  (code of `…1545Z`) + `raster.read_stored()`: stored S2 rasters with 6 or 8 bands, bands 0-5 by index (3 files,
+  ~15 lines; fresh fetches of that code stay 6-band). Tests 155 + 88 (venv) pass, incl. 8-band stored baselines →
+  same events as 6-band, real GeoTIFF 6/8 band. Releasing it = a NEW rollback folder (`…1545Z` + the 3 files), no
+  service restart; needs the owner's OK.
 - **satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-20261116T1545Z (current rollback target, 2026-11-17):**
   ```sh
   printf '[Service]\nWorkingDirectory=/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z\n' \
