@@ -95,3 +95,16 @@ Status 2026-11-16 evening; :8000 still runs `7bd2bbb` (Stage 4 release). Next de
   replaced them with 58–66 on the live DB); the page shows the superseded banner and no map button. The Forest Map
   layer returns 404 for superseded ids.
 - Satellite worker (observation, 2026-11-17): first daily run peaked at 552 MB (preflight measured 424 MB); limit 2 GB.
+
+### Follow-ups recorded 2026-11-17 (owner decisions for the Satellite Workspace, NOT done now)
+- **Event polygon time series (`polygon_series`) — postponed.** The API interpreter has no `tifffile`, so it cannot read
+  the stored GeoTIFFs. Chosen later path (option c): the worker (venv2) precomputes per event, after each run, the median
+  NDVI/NBR/NDMI (S2) and VV/VH dB (S1, same geometry) inside the current mask and writes a JSON sidecar next to the mask
+  (`satellite/<area>/events/event_<id>_series.json`); the API only reads it. Needs a worker change → separate approval.
+  Until then the analysis drawer shows the area median with the note "Notikuma poligona līkne — vēlāk".
+- **Forest Map Esri attribution incomplete.** Forest Map shows "Tiles © Esri"; the World Imagery item
+  (`10df2279f9684e4a9f6a7f08febac2a9`, Esri Master License Agreement) lists "Esri, Vantor, Earthstar Geographics, and the
+  GIS User Community". Commercial SaaS use of World Imagery is not clearly allowed without an Esri agreement (owner
+  decision pending); the Satellite Workspace does not offer it.
+- **LĢIA orthophoto as context basemap — unverified.** Verify terms and the service directly with LĢIA (the LVM GEO WMS
+  `geoserver.lvmgeo.lv` timed out on 2026-11-17, layers/terms not readable).
