@@ -25,4 +25,5 @@ PY
 cp $WT/assets/sectors-cards.js $WT/assets/sectors-cards.css $SB/app/assets/
 cp $WT/tests/fixtures/sectors_ui/sector_cards.json $SB/app/assets/sector-cards-fixture.json
 ln -sfn $SB/data $SB/app/data
+echo "NOTE: restart the sandbox (start.sh) — a running server keeps the deleted app dir as its cwd"
 echo "sandbox app rebuilt from $REV + $(git -C $WT rev-parse --short HEAD) (+ working tree)"

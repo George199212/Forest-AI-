@@ -115,3 +115,26 @@ test('D10/D12: legacy detail + RU table only behind SECTOR_LEGACY_MODULES; nothi
     assert.ok(html.includes(keep), 'legacy code kept: ' + keep);
   assert.equal((html.match(/<script src="\/assets\/forest-map\.js\?v=20261107"><\/script>/g) || []).length, 1);
 });
+
+test('R3 area: 0 < ha < 0.01 → "<0,01 ha"; stored 0 with a polygon never "0 ha"; NULL → null ("Nav pieejams")', () => {
+  const C = load();
+  assert.equal(C._haText({area_ha: 0.004, ring}), '<0,01 ha');
+  assert.equal(C._haText({area_ha: 0.009, ring}), '<0,01 ha');
+  assert.equal(C._haText({area_ha: 0, ring}), '<0,01 ha');
+  assert.equal(C._haText({area_ha: 0, ring: null}), null);
+  assert.equal(C._haText({area_ha: null, ring}), null);
+  assert.equal(C._haText({area_ha: 0.21, ring}), '0,21 ha');
+  assert.equal(C._haText(byId(16)), '<0,01 ha');                     // real fixture: stored 0 with a polygon
+});
+
+test('R2 small-sector note from pixel size only; R1 no developer text in UI strings', () => {
+  const C = load();
+  assert.equal(C._isSmallSector(byId(76)), true);
+  assert.equal(C._isSmallSector(byId(26)), false);
+  assert.equal(C._isSmallSector({ring: null, extent_m: null}), false);
+  const src = read('assets/sectors-cards.js');
+  const strings = src.slice(src.indexOf('var T = {'), src.indexOf('// ── state'));
+  for (const bad of [/Stage\s*\d/i, /SatWorkspace/, /\bD\d+\b/, /mount\(/, /fixture|fiktūr/i])
+    assert.doesNotMatch(strings.replace(/fixture: '/g, "x: '"), bad, String(bad));
+  assert.match(strings, /smallNote: 'Sektors ir mazs Sentinel-2 izšķirtspējai \(10 m\) — izmaiņu noteikšana var būt neuzticama'/);
+});

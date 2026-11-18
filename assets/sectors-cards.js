@@ -32,7 +32,7 @@
       confirmed: 'Apstiprinātas pārskatīšanā', noImage: 'Satelīta attēls vēl nav pieejams',
       tooSmall: 'Sentinel-2 10 m — sektors par mazu priekšskatījumam', noBoundary: 'Robeža nav saglabāta',
       falseC: 'viltus krāsas', trueC: 'patiesās krāsas', attribution: 'Contains modified Copernicus Sentinel data {year}',
-      fixture: 'Testa teritorija, nav sektors (tikai Stage 1 fiktūra)', shown: 'Rādīti {a}–{b} no {n}', prev: '← Iepriekšējie',
+      fixture: 'Testa teritorija, nav sektors', shown: 'Rādīti {a}–{b} no {n}', prev: '← Iepriekšējie',
       next: 'Nākamie →', none: 'Nav sektoru, kas atbilst filtram.', back: '← Sektori', openMap: 'Atvērt Meža kartē',
       panel: 'Informācija', close: 'Aizvērt', ha: 'ha', haStored: 'saglabātā vērtība', haArea: 'satelīta teritorijas platība',
       cadastre: 'Kadastrs', kvnog: 'kv. {kv} nog. {nog}',
@@ -46,13 +46,14 @@
       notMonitored: 'Šis sektors netiek monitorēts', notMonitoredHint: 'Satelīta dati šim sektoram netiek ielādēti. Pievienojiet to monitoringam, lai sāktu Sentinel-1/-2 novērošanu.',
       awaiting: 'Notiek vēsturisko datu ielāde. Darbvieta parādīsies, kad būs pirmais apstrādātais uzņēmums.',
       stopped: 'Monitorings ir apturēts. Vēsturiskie dati saglabāti.',
-      mountStub: 'Šeit tiek iemontēta Stage 5 satelīta darbvieta šai teritorijai', mountStubNote: 'SatWorkspace.mount(el, {areaId: {id}}) — pievieno Stage 5 sesija pirms laidiena (D1). Prototipā: saite uz darbvietu.',
       openWs: 'Atvērt satelīta darbvietā →', linkSECTOR: 'saistīts ar sektoru', linkLVM_GEO: 'LVM GEO teritorija (precīza VMD ID sakritība)',
       linkEVAL_BBOX: 'novērtējuma teritorija', dupName: 'Vēl {n} sektors(-i) ar šo nosaukumu — ar nosaukumu saistītie dati (GPS, foto, riski) var piederēt arī tiem.',
       boundaryMismatch: 'Monitoringa robeža atšķiras no sektora robežas.', notFound: 'Sektors nav atrasts.', loading: 'Ielādē…',
       error: 'Kļūda', d_OK: 'Dati kārtībā', d_NO_DATA_YET: 'Vēl nav datu', d_BACKFILL_OR_FETCH_IN_PROGRESS: 'Notiek ielāde',
       d_STOPPED: 'Apturēts', s2: 'S2 optiskais', s1: 'S1 radars', open: 'Atvērt', provider_VMD_OPEN_DATA: 'VMD atvērtie dati (LVM GEO)',
       provider_VMD_LOCAL: 'VMD lokālā kopija (LVM GEO)', provider_BOUNDARY_PLAN: 'Robežu plāns (skenēts)', provider_EVAL_BBOX: 'Novērtējuma teritorija',
+      smallNote: 'Sektors ir mazs Sentinel-2 izšķirtspējai (10 m) — izmaiņu noteikšana var būt neuzticama',
+      smallShort: 'Mazs Sentinel-2 izšķirtspējai (10 m)', sectorDetail: 'Sektora dati', satImage: 'Satelīta attēls',
       allSectors: 'Visi sektori', lastGps: 'Pēdējās GPS sesijas', m_gps: 'GPS sesijas', m_risks: 'Riski',
       m_trucks: 'Kokvedēju atskaites', m_timber: 'Kokmateriāli', m_comments: 'Komentāri', m_compare: 'Foto',
       photoCompare: 'foto salīdzināšana', allPhotos: 'Visi foto ({n})', backTo: '← {name}',
@@ -68,7 +69,7 @@
       confirmed: 'Confirmed by review', noImage: 'Satellite image not available yet',
       tooSmall: 'Sentinel-2 10 m — sector too small for a preview', noBoundary: 'No boundary stored',
       falseC: 'false colour', trueC: 'true colour', attribution: 'Contains modified Copernicus Sentinel data {year}',
-      fixture: 'Test area, not a sector (Stage 1 fixture only)', shown: 'Showing {a}–{b} of {n}', prev: '← Previous',
+      fixture: 'Test area, not a sector', shown: 'Showing {a}–{b} of {n}', prev: '← Previous',
       next: 'Next →', none: 'No sectors match the filter.', back: '← Sectors', openMap: 'Open in Forest Map',
       panel: 'Details', close: 'Close', ha: 'ha', haStored: 'stored value', haArea: 'satellite area size',
       cadastre: 'Cadastre', kvnog: 'comp. {kv}-{nog}',
@@ -82,13 +83,14 @@
       notMonitored: 'This sector is not monitored', notMonitoredHint: 'No satellite data is fetched for this sector. Add it to monitoring to start Sentinel-1/-2 observation.',
       awaiting: 'Backfill in progress. The workspace appears once the first acquisition is processed.',
       stopped: 'Monitoring is stopped. Historical data is kept.',
-      mountStub: 'The Stage 5 satellite workspace for this area mounts here', mountStubNote: 'SatWorkspace.mount(el, {areaId: {id}}) — added by the Stage 5 session before its release (D1). Prototype: link-through.',
       openWs: 'Open in the satellite workspace →', linkSECTOR: 'linked to the sector', linkLVM_GEO: 'LVM GEO area (exact VMD ID match)',
       linkEVAL_BBOX: 'evaluation area', dupName: '{n} more sector(s) share this name — name-keyed data (GPS, photos, risks) may belong to them too.',
       boundaryMismatch: 'The monitoring boundary differs from the sector boundary.', notFound: 'Sector not found.', loading: 'Loading…',
       error: 'Error', d_OK: 'Data OK', d_NO_DATA_YET: 'No data yet', d_BACKFILL_OR_FETCH_IN_PROGRESS: 'Fetching',
       d_STOPPED: 'Stopped', s2: 'S2 optical', s1: 'S1 radar', open: 'Open', provider_VMD_OPEN_DATA: 'VMD open data (LVM GEO)',
       provider_VMD_LOCAL: 'VMD local copy (LVM GEO)', provider_BOUNDARY_PLAN: 'Boundary plan (scanned)', provider_EVAL_BBOX: 'Evaluation area',
+      smallNote: 'The sector is small for Sentinel-2 resolution (10 m) — change detection may be unreliable',
+      smallShort: 'Small for Sentinel-2 resolution (10 m)', sectorDetail: 'Sector detail', satImage: 'Satellite image',
       allSectors: 'All sectors', lastGps: 'Latest GPS sessions', m_gps: 'GPS sessions', m_risks: 'Risks',
       m_trucks: 'Truck reports', m_timber: 'Timber', m_comments: 'Comments', m_compare: 'Photos',
       photoCompare: 'photo comparison', allPhotos: 'All photos ({n})', backTo: '← {name}',
@@ -122,6 +124,10 @@
     if (!m) return card && card.queued_job_id ? 'AWAITING_FIRST_DATA' : 'NOT_MONITORED';
     if (m.active === false || m.removed_at_utc) return 'STOPPED';
     return isNum(m.ok_acquisitions) && m.ok_acquisitions > 0 ? 'MONITORED' : 'AWAITING_FIRST_DATA';
+  }
+  function isSmallSector(card) {        // D4/R2: derived only from the pixel size, nothing stored
+    var px = longestSidePx(card);
+    return px !== null && px < PREVIEW_MIN_PX;
   }
   function longestSidePx(card) {
     var e = card && card.extent_m;
@@ -180,8 +186,11 @@
   function timeHtml(s) { var f = fmtTime(s); return f ? '<span class="sc-time">' + esc(f) + '</span>' : na(); }
   function dateHtml(s) { var f = fmtDate(s); return f ? '<span class="sc-time">' + esc(f) + '</span>' : na(); }
   function haText(card) {
-    if (!isNum(card.area_ha)) return null;
-    if (card.area_ha > 0 && card.area_ha < 0.005) return (S.lang === 'lv' ? '<0,01' : '<0.01') + ' ha';   // stored value, not rounded to 0
+    if (!isNum(card.area_ha)) return null;                     // NULL → "Nav pieejams" at the call site
+    // a stored 0 with a non-empty polygon, or 0 < ha < 0.01: never shown as "0 ha"
+    if ((card.area_ha === 0 && card.ring && card.ring.length >= 3) || (card.area_ha > 0 && card.area_ha < 0.01))
+      return (S.lang === 'lv' ? '<0,01' : '<0.01') + ' ha';
+    if (card.area_ha === 0) return null;
     return card.area_ha.toLocaleString(S.lang === 'lv' ? 'lv-LV' : 'en-GB', {maximumFractionDigits: 2}) + ' ha';
   }
 
@@ -255,7 +264,8 @@
         '<div class="sc-body"><div class="sc-name">' + esc(card.name) + '</div>' +
         '<div class="sc-meta">' + (idt ? '<span>' + esc(idt) + '</span>' : na()) + ' · ' + (haText(card) ? esc(haText(card)) : na()) + '</div>' +
         (card._fixture_only ? '<div class="sc-fixture-note">' + esc(t('fixture')) + '</div>' : '') +
-        '<div class="sc-status">' + chip(st) + '</div>' + mon + '</div></a>' +
+        '<div class="sc-status">' + chip(st) + '</div>' +
+        (isSmallSector(card) ? '<div class="sc-smallnote">' + esc(t('smallShort')) + '</div>' : '') + mon + '</div></a>' +
       (st === 'NOT_MONITORED' && !card._fixture_only ? '<button class="sc-btn sc-btn2" data-add="' + esc(card.id) + '">' + esc(t('addMon')) + '</button>' : '') +
       '</li>';
   }
@@ -417,9 +427,10 @@
   }
   function satBlock(card, area, health) {
     var m = card.monitoring;
-    if (!m) return block(t('bSat'), card.queued_job_id
+    var small = isSmallSector(card) ? '<p class="sc-warn">' + esc(t('smallNote')) + '</p>' : '';
+    if (!m) return block(t('bSat'), small + (card.queued_job_id
       ? row(t('obsStatus'), esc(t('st_AWAITING_FIRST_DATA'))) + '<p class="sc-small">' + esc(t('queued', {id: card.queued_job_id === true ? '' : '#' + card.queued_job_id})) + '</p>'
-      : '<p class="sc-muted">' + esc(t('st_NOT_MONITORED')) + '</p>');
+      : '<p class="sc-muted">' + esc(t('st_NOT_MONITORED')) + '</p>'));
     var a = area && area.area, tl = (area && area.timeline) || [], last = {};
     var minValid = area && area.config && isNum(area.config.min_valid_pct) ? area.config.min_valid_pct : m.min_valid_pct;
     // D5: S2 = last VALID optical acquisition (valid_pct_inside ≥ min_valid_pct), S1 = last OK radar; never one combined date
@@ -434,7 +445,7 @@
     var analysis = area ? area.last_successful_analysis_utc : undefined;
     return block(t('bSat'),
       row(t('obsStatus'), a ? esc(t('d_' + a.data_status)) : na()) +
-      '<p class="sc-small">' + esc(t('link' + m.link)) + ' · #' + esc(m.area_id) + '</p>' +
+      '<p class="sc-small">' + esc(t('link' + m.link)) + '</p>' +
       rowT(t('lastS2'), timeHtml(last.S2)) + rowT(t('lastS1'), timeHtml(last.S1)) +
       rowT(t('lastAnalysis'), analysis ? timeHtml(analysis) : (analysis === null ? '<span class="sc-muted">' + esc(t('noAnalysis')) + '</span>' : na())) +
       rowT(t('lastCheck') + ' (' + t('system') + ')', timeHtml(sysCheck)) +
@@ -442,6 +453,10 @@
   }
   function changesBlock(card, area) {
     if (!card.monitoring) return '';
+    var small = isSmallSector(card) ? '<p class="sc-warn">' + esc(t('smallNote')) + '</p>' : '';
+    return changesInner(card, area).replace('</h3>', '</h3>' + small);
+  }
+  function changesInner(card, area) {
     if (!area) return block(t('bChanges'), na());
     var open = (area.events || []).filter(function (e) { return OPEN.indexOf(e.status) >= 0; });
     var analysed = !!area.last_successful_analysis_utc, ws = global.SatWorkspace;
@@ -492,23 +507,31 @@
   }
   function mapPane(card, st) {
     var m = card.monitoring;
-    if (st === 'MONITORED') return '<div class="sc-ws" id="sc-ws-host"></div>';
+    if (st === 'MONITORED') {
+      var src = previewSource(card), year = src.sensing_time_utc ? String(src.sensing_time_utc).slice(0, 4) : '';
+      var cap = src.kind === 'image'
+        ? '<div class="sc-cap">Sentinel-2 · ' + esc(fmtDate(src.sensing_time_utc) || '—') + (src.composite === 'falsecolor' ? ' · ' + esc(t('falseC')) : '') +
+          '</div><div class="sc-small">' + esc(t('attribution', {year: year})) + '</div>'
+        : '<div class="sc-cap">' + esc(t(src.reason === 'tooSmall' ? 'tooSmall' : 'noImage')) + '</div>';
+      return '<div class="sc-mapwrap" id="sc-ws-host"><div class="sc-map" id="sc-map"></div><div class="sc-empty-card sc-img-card">' +
+        '<h3>' + esc(t('satImage')) + '</h3>' + cap +
+        '<a class="sc-btn" href="#sat-monitoring?area=' + encodeURIComponent(m.area_id) + '">' + esc(t('openWs')) + '</a></div></div>';
+    }
     var msg = st === 'STOPPED' ? t('stopped') : st === 'AWAITING_FIRST_DATA' ? t('awaiting') : t('notMonitoredHint');
     return '<div class="sc-mapwrap"><div class="sc-map" id="sc-map"></div><div class="sc-empty-card" role="status">' +
       '<h3>' + esc(st === 'NOT_MONITORED' ? t('notMonitored') : t('st_' + st)) + '</h3><p>' + esc(msg) + '</p>' +
       (st === 'NOT_MONITORED' ? '<button class="sc-btn" data-add-page="' + esc(card.id) + '">' + esc(t('addMon')) + '</button>' : '') +
       (m && m.area_id ? '<a class="sc-btn sc-ghost" href="#sat-monitoring?area=' + m.area_id + '">' + esc(t('openWs')) + '</a>' : '') + '</div></div>';
   }
+  // D1: when the satellite workspace offers mount(), it replaces the fallback map; otherwise fallback B stays.
   function mountWorkspace(host, card) {
     var ws = global.SatWorkspace, id = card.monitoring.area_id;
-    if (ws && typeof ws.mount === 'function') {                // D1: Stage 5 provides it before its release
-      ws.mount(host, {areaId: id, embedded: true, onBack: function () { location.hash = '#sectors'; },
-                      eventHref: function (eid) { return '#sectors/' + encodeURIComponent(card.id) + '?event=' + eid; }});
-      S.mounted = true; return;
-    }
-    host.innerHTML = '<div class="sc-stub"><div class="sc-stub-inner"><div class="sc-stub-badge">Stage 5 · SatWorkspace.mount</div>' +
-      '<h3>' + esc(t('mountStub')) + ' (#' + esc(id) + ')</h3><p>' + esc(t('mountStubNote', {id: id})) + '</p>' +
-      '<a class="sc-btn" href="#sat-monitoring?area=' + encodeURIComponent(id) + '">' + esc(t('openWs')) + '</a></div></div>';
+    if (!host || !ws || typeof ws.mount !== 'function') return false;
+    host.innerHTML = ''; host.className = 'sc-ws';
+    ws.mount(host, {areaId: id, embedded: true, onBack: function () { location.hash = '#sectors'; },
+                    eventHref: function (eid) { return '#sectors/' + encodeURIComponent(card.id) + '?event=' + eid; }});
+    S.mounted = true;
+    return true;
   }
   async function drawPolygonMap(card, detail) {
     var host = document.getElementById('sc-map'); if (!host) return;
@@ -519,7 +542,12 @@
     if (!ring && card.ring) ring = card.ring.map(function (p) { return [p[1], p[0]]; });
     var map = L.map(host, {zoomControl: true, attributionControl: true});
     L.tileLayer(OSM, {maxZoom: 19, attribution: '© OpenStreetMap contributors'}).addTo(map);
-    if (ring) { var poly = L.polygon(ring, {color: '#a3d45a', weight: 2, fillOpacity: 0.08}).addTo(map); map.fitBounds(poly.getBounds(), {padding: [60, 60], maxZoom: 17}); }
+    var src = card.monitoring ? previewSource(card) : null;      // same image rule as the card (D4: none when too small)
+    if (src && src.kind === 'image' && src.bbox) {
+      L.imageOverlay(src.url, [[src.bbox[1], src.bbox[0]], [src.bbox[3], src.bbox[2]]], {opacity: 1, interactive: false}).addTo(map);
+      map.attributionControl.addAttribution(esc(t('attribution', {year: src.sensing_time_utc ? String(src.sensing_time_utc).slice(0, 4) : ''})));
+    }
+    if (ring) { var poly = L.polygon(ring, {color: src && src.kind === 'image' ? '#ffffff' : '#a3d45a', weight: 2, fillOpacity: src && src.kind === 'image' ? 0 : 0.08}).addTo(map); map.fitBounds(poly.getBounds(), {padding: [60, 60], maxZoom: 17}); }
     else map.setView([56.95, 24.1], 7);
     S.map = map;
   }
@@ -530,20 +558,19 @@
     sec.classList.add('active');
     document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.toggle('active', /nav\('sectors'\)/.test(n.getAttribute('onclick') || '')); });
     if (push) history.pushState({type: 'sectorPage', id: String(id)}, '', '#sectors/' + encodeURIComponent(id));
-    var pt = document.getElementById('page-title'); if (pt) pt.textContent = t('title');
+    var pt = document.getElementById('page-title'); if (pt) pt.textContent = '';     // R4: the page header carries the name
     var ps = document.getElementById('page-sub'); if (ps) ps.textContent = new Date().toLocaleString('lv-LV');
     sec.innerHTML = '<div class="sc-loading">' + esc(t('loading')) + '</div>';
     var card;
     try { await loadCards(); card = S.cards.filter(function (c) { return String(c.id) === String(id); })[0]; } catch (e) { card = null; }
     if (seq !== S.seq) return;
     if (!card) { sec.innerHTML = '<div class="sc-page"><header class="sc-head"><a class="sc-back" href="#sectors" data-act="back">' + esc(t('back')) + '</a></header><p class="sc-error">' + esc(t('notFound')) + '</p></div>'; bindPage(sec, null); return; }
-    if (pt) pt.textContent = card.name;
     var st = deriveStatus(card), m = card.monitoring;
     var dup = card._fixture_only ? 0 : S.cards.filter(function (c) { return c.name === card.name && c.id !== card.id; }).length;
     sec.innerHTML = '<div class="sc-page sc-root">' + header(card, st) + '<div class="sc-main">' + mapPane(card, st) +
       '<aside class="sc-panel" id="sc-panel">' + sectorBlock(card, dup) + '<div class="sc-loading">' + esc(t('loading')) + '</div></aside></div></div>';
     bindPage(sec, card);
-    if (st === 'MONITORED') mountWorkspace(document.getElementById('sc-ws-host'), card);
+    var mounted = st === 'MONITORED' && mountWorkspace(document.getElementById('sc-ws-host'), card);
     var reqs = [card._fixture_only ? Promise.resolve(null) : getJson('/api/sectors/' + encodeURIComponent(card.name)).catch(function () { return null; }),
                 m ? getJson('/api/sat-monitoring/areas/' + encodeURIComponent(m.area_id) + '?geometry=0').catch(function () { return null; }) : Promise.resolve(null),
                 m ? getJson('/api/sat-monitoring/health').catch(function () { return null; }) : Promise.resolve(null)];
@@ -552,7 +579,7 @@
     var detail = res[0], area = res[1], health = res[2];
     document.getElementById('sc-panel').innerHTML = sectorBlock(card, dup) + satBlock(card, area, health) + changesBlock(card, area) +
       (card._fixture_only ? '' : risksBlock(detail) + activityBlock(detail, card));
-    if (st !== 'MONITORED') drawPolygonMap(card, detail);
+    if (!mounted) drawPolygonMap(card, detail);
   }
   function bindPage(sec, card) {
     sec.querySelectorAll('[data-act=back]').forEach(function (a) { a.onclick = function (e) {
@@ -589,7 +616,7 @@
     var photos = null;
     return global.openSectorModule(card.name, module, {
       backHref: '#sectors/' + encodeURIComponent(card.id), backText: t('backTo', {name: card.name}),
-      title: t('m_' + (module === 'photos' ? 'compare' : module)),
+      title: t('m_' + (module === 'photos' ? 'compare' : module)), subtitle: t('sectorDetail'),
       extraLink: module === 'compare' ? function (detail) {
         photos = detail && Array.isArray(detail.photos) ? detail.photos.length : 0;
         return photos > 0 ? {href: '#sectors/' + encodeURIComponent(card.id) + '/photos', text: t('allPhotos', {n: photos})} : null;
@@ -619,7 +646,7 @@
     routeFromHash: routeFromHash, leave: cleanupPage, addToMonitoring: addToMonitoring,
     // pure rules, exported for tests
     _deriveStatus: deriveStatus, _previewSource: previewSource, _counts: counts, _identifierText: identifierText,
-    _matches: matches, _worstColour: worstColour, _longestSidePx: longestSidePx, _activityCounts: activityCounts,
+    _matches: matches, _worstColour: worstColour, _longestSidePx: longestSidePx, _isSmallSector: isSmallSector, _haText: haText, _activityCounts: activityCounts,
     PREVIEW_MIN_PX: PREVIEW_MIN_PX, S2_PIXEL_M: S2_PIXEL_M, PAGE_SIZE: PAGE_SIZE,
     _state: S, _t: t
   };

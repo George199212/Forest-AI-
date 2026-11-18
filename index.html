@@ -1479,7 +1479,8 @@ async function openSectorModule(name, module, opts={}) {
   await openSector(name, false, {module: true});
   detailTab(module);
   const extra = opts.extraLink ? opts.extraLink(currentDetailData) : null;
-  document.getElementById('page-sub').textContent = new Date().toLocaleString('lv-LV');
+  document.getElementById('page-title').textContent = '';   // the module bar carries the sector name
+  document.getElementById('page-sub').textContent = (opts.subtitle ? opts.subtitle + ' · ' : '') + new Date().toLocaleString('lv-LV');
   bar.innerHTML = `<a class="sc-back" href="${opts.backHref}">${sectorNameText(opts.backText)}</a><span class="sc-module-title">${sectorNameText(opts.title)}</span>`
     + (extra ? `<a class="sc-btn sc-ghost" href="${extra.href}">${sectorNameText(extra.text)}</a>` : '');
 }

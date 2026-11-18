@@ -83,12 +83,6 @@
   border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;}
 .sc-empty-card h3{font-size:14px;margin:0;color:var(--text);}
 .sc-empty-card p{font-size:12px;color:var(--text2);line-height:1.45;margin:0;}
-.sc-stub{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  background:repeating-linear-gradient(135deg,#0d1209 0 14px,#10160b 14px 28px);}
-.sc-stub-inner{max-width:460px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;padding:20px;}
-.sc-stub-badge{font:11px var(--mono);color:#e2bf55;border:1px dashed #b58a2a;border-radius:4px;padding:2px 8px;}
-.sc-stub h3{font-size:15px;color:var(--text);margin:0;}
-.sc-stub p{font-size:12px;color:var(--text2);margin:0;line-height:1.5;}
 .sc-panel{width:320px;flex:none;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:2px;}
 .sc-block{background:var(--sc-card);border:1px solid var(--sc-line);border-radius:8px;padding:10px 12px;}
 .sc-block h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin:0 0 7px;font-weight:600;}
@@ -140,3 +134,7 @@
 .sc-module-bar .sc-back{color:var(--text2);text-decoration:none;font-size:13px;}
 .sc-module-bar .sc-back:hover{color:var(--gbright);}
 .sc-module-title{font-size:15px;font-weight:600;color:var(--gbright);flex:1;}
+
+/* R1 fallback B caption card; R2 small-sector note */
+.sc-img-card .sc-cap{font-size:12.5px;font-weight:600;color:var(--text);}
+.sc-smallnote{margin-top:6px;font-size:11px;color:#e2bf55;}
