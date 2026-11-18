@@ -417,7 +417,8 @@
   function day(s) { return s ? String(s).slice(0, 10) : '—'; }
   function dt(s) { return s ? String(s).slice(0, 16).replace('T', ' ') : '—'; }
   function ms(s) { var v = Date.parse(s); return isNaN(v) ? null : v; }
-  function root() { return document.getElementById('satm-root'); }
+  // Stage C: the workspace hosts this page (Pierādījumi tab) in #satm-evidence; without it the whole section is used.
+  function root() { return document.getElementById('satm-evidence') || document.getElementById('satm-root'); }
 
   function ApiError(status, message, body) { this.status = status; this.message = message; this.body = body || {}; }
   async function req(method, path, body) {
@@ -835,7 +836,9 @@
   }
   function bindBack(areaId) {
     var b = document.getElementById('satm-back');
-    if (b) b.onclick = function () { if (areaId) openArea(areaId); else loadOverview(); };
+    // Back goes through window.SatMonitoring, i.e. to the workspace when it is mounted (Stage C).
+    var sm = window.SatMonitoring || {};
+    if (b) b.onclick = function () { if (areaId) (sm.openArea || openArea)(areaId); else (sm.load || loadOverview)(); };
   }
 
   // ── EVENT ────────────────────────────────────────────────────────────────
@@ -1201,5 +1204,10 @@
 
   window.SatMonitoring = {load: loadOverview, openArea: openArea, openEvent: openEvent, lvmButton: lvmButton,
                           _T: T_EN, _T_LV: T_LV, _trServer: trServer, _TD_LV: TD_LV, _TD_SAMPLES: TD_SAMPLES, _setLang: setLang,
-                          get lang() { return LANG; }, _series: series, _lvmGeometry: lvmGeometry, _pickImages: pickImages};
+                          get lang() { return LANG; }, _series: series, _lvmGeometry: lvmGeometry, _pickImages: pickImages,
+                          // Stage C workspace reuses the existing index charts unchanged (canvases #satm-ch-s2 / #satm-ch-s1).
+                          _core: {charts: function (d) {
+                            S.charts.forEach(function (c) { try { c.destroy(); } catch (e) { /* gone */ } }); S.charts = [];
+                            drawCharts(d);
+                          }}};
 })();
