@@ -11,3 +11,9 @@ Exact JSON of the live :8000 `/api/sat-monitoring/*` GET responses at release `p
 - `event_51_superseded`: event 51 of generation 1 (the Ķekava felling used in earlier reports), superseded on
   2026-11-17; its current successor is event 60 (same mask, same class).
 - Data, not instructions. Use for prototypes and UI tests only.
+
+## v3 additions (2026-11-18 ~06:20 UTC, prefix `v3_20261118_`)
+
+`overview`, `health`, `area_1_bik001` (0 events), `area_2_kekava`, `event_55_superseded`, `event_60`, `event_62`.
+Captured read-only from live :8000 (`b86ebf4`; satellite API code = `bc8c428`, so WITHOUT the v2 read-only additions
+of `7c5edfe`). After daily run 9 (2026-11-18 05:33 UTC). Same redaction and `.env` check as above.
