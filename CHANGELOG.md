@@ -2,6 +2,31 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-17 16:50 UTC — NEW host verification (no code deployed, no restart)
+
+- Production confirmed on NEW host 64.225.79.80 (snapshot of OLD ~10:30 UTC); `docs/DEPLOY_RELEASES.md` gets a
+  "Host" section, the list of restarts on NEW (14:59–15:12 UTC, migration T5/T9) and a corrected "kept their PIDs" line.
+- Rollback: `…20261116T1545Z` marked DO NOT ROLL BACK (37 8-band S2 rasters stored by run 8, 08:03 UTC);
+  `…rollback8band-20261117T0831Z` re-verified on NEW and named the only valid rollback target. Not activated.
+- New read-only script `scripts/verify_satellite_daily_run.py` for the 2026-11-18 05:37 UTC daily run (runs, PU vs
+  `x-processingunits-spent`, band count, true colour, old 6-band readability, events, risks, journal). Not scheduled.
+
+## 2026-11-17 07:11 UTC — DEPLOYED: `forest-api-satellite-monitoring-20261117T0521Z` (`bc8c428`, `geo-d7081327a3d2`)
+
+- forest-api and both satellite worker units run the new folder. Includes: Latvian Satellite Monitoring section,
+  real worker state, image loading/error state, Forest Map Latvian first paint, fragmentation rule in detection,
+  true colour (B03/B02 appended to new S2 requests; toggle "Patiesās krāsas" / "Viltus krāsas", default true colour).
+- True-colour quicklooks fetched for the 4 images shown on open events: 4 requests, 12.02 PU (actual).
+- No database migration. Rollback commands in `docs/DEPLOY_RELEASES.md`.
+
+## 2026-11-17 — live data operation + next release prepared (code NOT deployed)
+
+- Live satellite.db: fragmentation rule applied by an approved redetect (generation 2, 0 PU, events 58–66);
+  recall 3/3. :8000 code unchanged (`7bd2bbb`).
+- Branch `bc8c428`: true colour (B03/B02 appended to S2 requests, toggle, `satellite_monitoring.truecolor` with
+  dry-run), worker state, Latvian section, image loading state. Release folder
+  `forest-api-satellite-monitoring-20261117T0521Z` prepared, not active.
+
 ## 2026-11-16 (evening) — `feature/satellite-monitoring`: UI review fixes (not deployed)
 
 - Detection: fragmentation rule (largest cluster < 30 % of the current area → POSSIBLE_SEASONAL_OR_ENVIRONMENTAL,

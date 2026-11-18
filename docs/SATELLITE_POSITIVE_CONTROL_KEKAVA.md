@@ -499,3 +499,32 @@ Fragmented change: the largest cluster (14.57 ha) is 12% of the current area (12
 - Event 50 (the only open outside event without a VMD felling pre-tag) becomes SEASONAL / LOW.
 - A live redetect creates NEW event ids (here 58–66; 49–57 stay as superseded rows). Links and bookmarks to
   #49–#57 would then open superseded events. Needs the owner's "approved" and a backup, like generation 1.
+
+
+## 13. Fragmentation rule applied to the LIVE satellite.db (generation 2, 2026-11-17, owner approved)
+
+- Waited for the first daily TIMER run (run 4, 05:38:50–05:40:08 UTC, OK, 14 new acquisitions, 12 requests,
+  21.67 PU). Area 3 (LVM_GEO, "VMD 348-21 (60620022173)", 0.53 ha) was added by the dashboard user at 05:53 and
+  backfilled (run 5, 106 requests, 2.91 PU); it has no events.
+- Backup `/root/backups/satellite_before_gen2_fragmentation_20261117T060147Z.db.raw` (byte copy under a SQLite write
+  lock, WAL empty, sha256 `0d01604a…` = live before) and `.db` (online backup, `7cdec6fd…`), integrity ok, mode 600.
+- `python -m satellite_monitoring.redetect --area 1 --area 2 --area 3` at `bc8c428`, run as a transient systemd unit
+  with the worker isolation (ProtectHome=read-only, ReadWritePaths=/root/forest_ai_satellite_data, Nice 10, MemoryMax
+  2G) from the release folder `forest-api-satellite-monitoring-20261117T0521Z`: generation 2, run 6, OK,
+  **0 requests, 0 PU**; superseded 9 events, 385 detections, 29 candidates, 93 radar anomalies (kept, frozen, none
+  deleted); risk links: none existed (0 carried, 0 not carried). Integrity ok; 66 event rows.
+
+| gen 1 (live, incl. today's run) | gen 2 (live) | ha | largest share | gen 1 class / conf | gen 2 class / conf |
+|---|---|---|---|---|---|
+| 49 | 58 | 0.08 | 38 % | FOREST_LOSS / LOW (RECOVERED) | unchanged |
+| 50 | 59 | 1.62 | 27 % | FOREST_LOSS / HIGH | SEASONAL / LOW |
+| 51, 52, 53 | 60, 61, 62 | 5.97, 3.51, 6.78 | 77, 56, 32 % | FOREST_LOSS / HIGH | unchanged |
+| 54 | 63 | 55.77 | 22 % | FOREST_LOSS / HIGH | SEASONAL / LOW |
+| **55** | **64** | **123.95** | **12 %** | **OUTSIDE_BOUNDARY / HIGH** | **SEASONAL / LOW** |
+| 56, 57 | 65, 66 | 68.80, 28.53 | 23, 16 % | SEASONAL / HIGH | SEASONAL / LOW |
+
+Evaluation on the live DB (`positive_control --area 2`, same truth and reference DB; JSON
+`/root/forest_ai_satellite_data/eval/kekava_gen2_live_20261117.json`): **recall 3/3** (Wilson 0.44–1.00), median
+delay 6 d; open outside events **4 = 105.73 ha**; RECOVERED 1 (separate). The same evaluation on the pre-redetect
+backup gives 4 = 105.73 ha: the +0.62 ha against §12 (105.11) comes from the 2026-11-17 daily run (event 50
+1.04 → 1.62 ha), not from the rule. Masks and areas are identical gen 1 → gen 2.
