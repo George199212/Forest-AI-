@@ -68,6 +68,7 @@
     bNoData: 'Monitoring has not produced data yet. The first backfill runs after the worker picks up the job.',
     bBackfill: 'Backfill or fetch in progress.', bStopped: 'Monitoring stopped. History is kept.',
     before: 'Before', after: 'After', change: 'Change (mask over after)', sideBySide: 'Side by side', swipe: 'Swipe',
+    swipeHandle: 'Drag to compare before / after', basemapNote: 'Background map: OpenStreetMap (not dated, not Sentinel)',
     suspectedLine: 'Suspected change — automated detection, not verified on the ground.',
     recoveredLine: 'Recovered — the change is no longer visible.', seasonal: 'Seasonal caveat',
     confidence: 'Detection confidence', evidence: 'Evidence quality', classification: 'Classification',
@@ -240,6 +241,8 @@
     change: "Izmaiņas (maska virs “pēc” attēla)",
     sideBySide: "Blakus",
     swipe: "Pārvilkt",
+    swipeHandle: "Velciet, lai salīdzinātu pirms / pēc",
+    basemapNote: "Fona karte: OpenStreetMap (nav datēta, nav Sentinel)",
     suspectedLine: "Iespējamas izmaiņas — automātiska noteikšana, dabā nav pārbaudīts.",
     recoveredLine: "Atjaunojies — izmaiņas vairs nav redzamas.",
     seasonal: "Sezonāls brīdinājums",
@@ -931,10 +934,17 @@
       '<div><div class="satm-chart-title">' + t('change') + '</div><div id="satm-img-change" class="satm-img"></div>' + legend() +
       (imgs.after ? attribution('Contains modified Copernicus Sentinel data ' + String(imgs.after.sensing_time_utc).slice(0, 4)) : '') + '</div></div>';
   }
+  // Swipe (UI review 2026-11-18, D7): the divider, its handle and the PIRMS / PĒC labels live ON the map
+  // (built in swipeMap); the split is a container-pixel position, so it never moves with the imagery.
   function swipeBox(imgs) {
-    return '<div class="satm-swipe-labels"><span>' + t('before') + '</span><span>' + t('after') + '</span></div>' +
-      '<div id="satm-swipe" class="satm-img satm-img-wide"></div><input type="range" id="satm-swipe-range" min="0" max="100" value="50">' +
+    return '<div id="satm-swipe" class="satm-img satm-img-wide"></div>' +
       '<div class="satm-imgs2">' + imgMeta(imgs.before) + imgMeta(imgs.after) + '</div>';
+  }
+  function swipeLabel(kind, img, imgs) {
+    if (!img) return T[kind] + ' · ' + T.noImage;
+    var parts = [T[kind], day(img.sensing_time_utc), img.sensor];
+    if (img.sensor === 'S2') parts.push(useTrue(imgs) ? T.colourTrue : T.colourFalse);
+    return parts.join(' · ');
   }
   // Satellite images go into panes BELOW Leaflet's overlay pane (400): masks and boundaries always draw on top.
   function imagePane(map, name, z) {
@@ -943,14 +953,22 @@
     return name;
   }
   function bboxBounds(bb) { return [[bb[1], bb[0]], [bb[3], bb[2]]]; }
-  // Zoom to the change (padded), not to the whole request grid: a 6 ha felling in a 3,670 ha box is otherwise invisible.
+  // Zoom to the event's polygons, not to the whole request grid: a 6 ha felling in a 3,670 ha box is otherwise
+  // invisible. Padding is in screen pixels (fitView), so it no longer grows a large polygon back to the whole grid
+  // (event 62 opened at grid scale). Whole grid only when the event has no polygon inside it.
   function focusBounds(L, area, change) {
     var full = L.latLngBounds(bboxBounds(area.grid_bbox || [0, 0, 0, 0]));
     if (!change || !change.features || !change.features.length) return full;
     var b = L.geoJSON(change).getBounds();
-    if (!b.isValid()) return full;
-    var padded = b.pad(0.35);
-    return padded.contains(full) || !full.intersects(padded) ? full : padded;
+    return b.isValid() && full.intersects(b) ? b : full;
+  }
+  function fitView(map, bounds) { map.fitBounds(bounds, {padding: [28, 28], maxZoom: 16, animate: false}); }
+  // Muted, undated context under the Sentinel image so the area outside the request grid is not an empty dark box.
+  // Never a "before" or "after" image; labelled in the attribution.
+  function basemap(L, map) {
+    L.tileLayer(OSM, {maxZoom: 19, opacity: 0.45, className: 'satm-basemap',
+                      attribution: '&copy; OpenStreetMap contributors · ' + esc(T.basemapNote)}).addTo(map);
+    L.control.attribution({prefix: false}).addTo(map);
   }
   function syncMaps(maps) {
     var busy = false;
@@ -976,7 +994,8 @@
     if (!div || !area.grid_bbox) return null;
     var map = L.map(div, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); S.maps.push(map);
     var b = bboxBounds(area.grid_bbox);
-    map.fitBounds(focus || b);                       // view first, then layers (as in the area map)
+    fitView(map, focus || b);                        // view first, then layers (as in the area map)
+    basemap(L, map);
     if (img && img.quicklook_url) imgStatus(div, L.imageOverlay(imgUrl(img, imgs || {}), b, {pane: imagePane(map, 'satmImg', 350)})).addTo(map);
     if (area.buffer_ring) L.geoJSON(area.buffer_ring, {style: {color: COL.buffer, weight: 1, dashArray: '5 4', fill: false}}).addTo(map);
     if (area.geometry) L.geoJSON(area.geometry, {style: {color: COL.boundary, weight: 2, fill: false}}).addTo(map);
@@ -988,21 +1007,61 @@
     if (!div || !area.grid_bbox) return;
     var map = L.map(div, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); zoomCtl(L, map); S.maps.push(map);
     var b = bboxBounds(area.grid_bbox);
+    fitView(map, focus || b);
+    basemap(L, map);
     if (imgs.before && imgs.before.quicklook_url) imgStatus(div, L.imageOverlay(imgUrl(imgs.before, imgs), b, {pane: imagePane(map, 'satmImg', 350)})).addTo(map);
     imagePane(map, 'satmAfter', 360);
     var pane = map.getPane('satmAfter');
     if (imgs.after && imgs.after.quicklook_url) imgStatus(div, L.imageOverlay(imgUrl(imgs.after, imgs), b, {pane: 'satmAfter'})).addTo(map);
     if (change) changeLayer(L, change).addTo(map);
     if (area.geometry) L.geoJSON(area.geometry, {style: {color: COL.boundary, weight: 2, fill: false}}).addTo(map);
-    var range = document.getElementById('satm-swipe-range');
+
+    // Divider + handle + labels: plain DOM in the map container (not a map pane), so they stay at a fixed screen x
+    // while the imagery pans and zooms under them. The "after" pane is clipped to the right of that x.
+    var frac = isNum(S.swipeFrac) ? S.swipeFrac : 0.5;
+    var line = document.createElement('div'); line.className = 'satm-swipe-divider';
+    var handle = document.createElement('div'); handle.className = 'satm-swipe-handle';
+    handle.setAttribute('role', 'slider'); handle.setAttribute('tabindex', '0');
+    handle.setAttribute('aria-label', T.swipeHandle); handle.title = T.swipeHandle;
+    handle.setAttribute('aria-valuemin', '0'); handle.setAttribute('aria-valuemax', '100');
+    line.appendChild(handle);
+    var lb = document.createElement('div'); lb.className = 'satm-swipe-label satm-swipe-label-before';
+    lb.textContent = swipeLabel('before', imgs.before, imgs);
+    var la = document.createElement('div'); la.className = 'satm-swipe-label satm-swipe-label-after';
+    la.textContent = swipeLabel('after', imgs.after, imgs);
+    [line, lb, la].forEach(function (n) { L.DomEvent.disableClickPropagation(n); L.DomEvent.disableScrollPropagation(n); div.appendChild(n); });
+
     function clip() {
-      var v = Number(range.value) / 100, nw = map.containerPointToLayerPoint([0, 0]),
-          se = map.containerPointToLayerPoint(map.getSize()), x = nw.x + (se.x - nw.x) * v;
-      pane.style.clip = 'rect(' + nw.y + 'px,' + se.x + 'px,' + se.y + 'px,' + x + 'px)';
+      var size = map.getSize(), x = Math.round(size.x * frac);
+      // clip is in the after pane's own (layer) coordinates: container point -> layer point accounts for the pan offset.
+      var nw = map.containerPointToLayerPoint([x, 0]), se = map.containerPointToLayerPoint([size.x, size.y]);
+      pane.style.clip = 'rect(' + nw.y + 'px,' + se.x + 'px,' + se.y + 'px,' + nw.x + 'px)';
+      line.style.left = x + 'px';
+      handle.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
+      div.setAttribute('data-swipe-x', String(x));
     }
-    range.oninput = clip; map.on('move zoom resize', clip);
-    map.fitBounds(focus || b); clip();
+    function setFrac(f) { frac = Math.max(0, Math.min(1, f)); S.swipeFrac = frac; clip(); }
+    function fromEvent(ev) { var r = div.getBoundingClientRect(); return (ev.clientX - r.left) / r.width; }
+    handle.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault(); ev.stopPropagation(); map.dragging.disable();
+      handle.setPointerCapture(ev.pointerId); div.classList.add('satm-swiping');
+    });
+    handle.addEventListener('pointermove', function (ev) { if (handle.hasPointerCapture(ev.pointerId)) setFrac(fromEvent(ev)); });
+    function release(ev) {
+      if (handle.hasPointerCapture(ev.pointerId)) handle.releasePointerCapture(ev.pointerId);
+      map.dragging.enable(); div.classList.remove('satm-swiping');
+    }
+    handle.addEventListener('pointerup', release); handle.addEventListener('pointercancel', release);
+    handle.addEventListener('keydown', function (ev) {
+      var step = {ArrowLeft: -0.05, ArrowRight: 0.05}[ev.key];
+      if (step) { ev.preventDefault(); setFrac(frac + step); }
+      else if (ev.key === 'Home' || ev.key === 'End') { ev.preventDefault(); setFrac(ev.key === 'Home' ? 0 : 1); }
+    });
+    // Recompute on every map movement, during zoom animation and after a container resize.
+    map.on('move zoom zoomanim viewreset resize moveend zoomend', clip);
+    clip();
   }
+
 
   function row(label, value) { return '<tr><td>' + t(label) + '</td><td class="mono">' + data(value) + '</td></tr>'; }
   function areasCard(e) {
