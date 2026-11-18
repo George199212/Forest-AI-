@@ -38,6 +38,7 @@
 .sc-chip-monitored{background:rgba(122,184,60,.16);color:#a3d45a;border-color:rgba(122,184,60,.35);}
 .sc-chip-awaiting_first_data{background:rgba(212,160,23,.14);color:#e2bf55;border-color:rgba(212,160,23,.35);}
 .sc-chip-not_monitored{background:rgba(255,255,255,.04);color:var(--text2);border-color:var(--border);}
+.sc-chip-unknown{background:rgba(255,255,255,.04);color:var(--text3);border-color:var(--border);}
 .sc-chip-stopped{background:rgba(138,143,140,.15);color:#b4b9b6;border-color:rgba(138,143,140,.35);}
 .sc-fixture-note{display:inline-block;margin-top:6px;font-size:11px;color:#e2bf55;border:1px dashed #b58a2a;border-radius:4px;padding:1px 6px;}
 .sc-facts{margin-top:9px;display:grid;gap:3px;font-size:11.5px;}

@@ -4112,7 +4112,7 @@ setInterval(()=>{ if(currentSection&&currentSection!=='detail'&&currentSection!=
 function routeFromHash() {
   const h = location.hash.slice(1);
   let m;
-  const sectorPage = window.SectorCards?.routeFromHash(h);   // #sectors/{id}
+  const sectorPage = typeof SectorCards !== 'undefined' ? SectorCards.routeFromHash(h) : null;   // #sectors/{id}[/{module}]
   if (sectorPage) return sectorPage;
   if ((m = h.match(/^sector-(.+)$/))) {
     try { return {type:'sector', name: decodeURIComponent(m[1])}; }
@@ -4124,7 +4124,7 @@ function routeFromHash() {
   // Satellite deep links: #forest-map?sat_event=<id> | ?sat_area=<id>, #sat-monitoring?event=<id> | ?area=<id>
   if ((m = h.match(/^(forest-map|sat-monitoring)\?(.*)$/))) {
     const q = new URLSearchParams(m[2]), num = k => { const v = parseInt(q.get(k), 10); return v > 0 ? v : null; };
-    return m[1] === 'forest-map' ? {type:'nav', id:'forest-map', satEvent: num('sat_event'), satArea: num('sat_area')}
+    return m[1] === 'forest-map' ? Object.assign({type:'nav', id:'forest-map', satEvent: num('sat_event'), satArea: num('sat_area')}, num('sector') ? {sector: num('sector')} : {})
                                  : {type:'nav', id:'sat-monitoring', event: num('event'), area: num('area')};
   }
   if (h === 'financial-breakdown') return {type:'financial-breakdown'};
@@ -4160,6 +4160,7 @@ function openRoute(route) {
   } else {
     nav(route.id, false);
     if (route.session) window.ForestMap?.openSession(route.session).catch(() => {});
+    if (route.sector) window.ForestMap?.focusSector?.(route.sector);
     if (route.satEvent) window.ForestMapSat?.openEvent(route.satEvent);
     else if (route.satArea) window.ForestMapSat?.openArea(route.satArea);
     if (route.event) window.SatMonitoring?.openEvent(route.event);

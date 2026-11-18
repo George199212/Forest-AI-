@@ -598,6 +598,9 @@ def serve_index():
     # Activate the UI only when this backend version (and its routes) is running.
     html = html.replace('<script src="/assets/lvm-geodata.js?v=20261106"></script>',
                         '<script>window.FOREST_GEODATA_ENABLED=true;</script>\n<script src="/assets/lvm-geodata.js?v=20261106"></script>', 1)
+    if os.environ.get("SECTOR_LEGACY_MODULES", "").strip().lower() in ("1", "true", "yes", "on"):
+        html = html.replace('<script src="/assets/sectors-cards.js"></script>',
+                            '<script>window.SECTOR_LEGACY_MODULES=true;</script>\n<script src="/assets/sectors-cards.js"></script>', 1)
     html = html.replace('<script src="/assets/forest-map.js?v=20261107"></script>',
                         '<script>window.FOREST_MAP_ENABLED=true;</script>\n<script src="/assets/forest-map.js?v=20261107"></script>', 1)
     # Per-instance UI language (client accounts, see docs/CLIENT_INSTANCES.md).
@@ -713,13 +716,43 @@ def summary():
 
 # ── Sectors ───────────────────────────────────────────────────────────────────
 
+def _sectors_not_archived(where=True):
+    """Archive filter (owner D14): only when the additive column sectors.archived_at exists. No migration here;
+    archived sectors stay resolvable by id/name (detail, cards/{id}, evidence links)."""
+    try:
+        cols = {r["name"] for r in db("PRAGMA table_info(sectors)")}
+    except Exception:
+        return ""
+    return (" WHERE " if where else " AND ") + "archived_at IS NULL" if "archived_at" in cols else ""
+
+
+@app.get("/api/sectors/cards")
+def get_sector_cards():
+    """Sectors page cards (owner D6/D12): one read-only request, stored values only (services/sector_cards.py)."""
+    from satellite_monitoring import config as sat_config
+    from services import sector_cards
+    return sector_cards.cards(DB_NAME, str(sat_config.sat_db_path()), sat_config.DEFAULTS["min_valid_pct"])
+
+
+@app.get("/api/sectors/cards/{sector_id}")
+def get_sector_card(sector_id: int):
+    """One card by id, archived or not (direct links keep working). 404 when the id does not exist."""
+    from satellite_monitoring import config as sat_config
+    from services import sector_cards
+    out = sector_cards.cards(DB_NAME, str(sat_config.sat_db_path()), sat_config.DEFAULTS["min_valid_pct"],
+                             sector_id=sector_id, include_archived=True)
+    if not out["sectors"]:
+        raise HTTPException(status_code=404, detail="sector not found")
+    return {"sector": out["sectors"][0], "meta": out["meta"]}
+
+
 @app.get("/api/sectors")
 def get_sectors():
     sectors = db("""
         SELECT name, contractor, status, approved_volume, map_url,
                boundary_json, center_lat, center_lon, area_ha, color, created_at, updated_at,
                boundary_plan_id, object_name
-        FROM sectors ORDER BY name
+        FROM sectors""" + _sectors_not_archived() + """ ORDER BY name
     """)
     for s in sectors:
         rs = calc_risk_score(s["name"])
@@ -815,7 +848,7 @@ def get_objects():
 
     sectors = db("""
         SELECT name, contractor, status, area_ha, color, boundary_plan_id, object_name
-        FROM sectors ORDER BY boundary_plan_id IS NULL, boundary_plan_id, name
+        FROM sectors""" + _sectors_not_archived() + """ ORDER BY boundary_plan_id IS NULL, boundary_plan_id, name
     """)
 
     grouped = {}

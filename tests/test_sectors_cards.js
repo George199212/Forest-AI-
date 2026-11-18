@@ -127,14 +127,44 @@ test('R3 area: 0 < ha < 0.01 → "<0,01 ha"; stored 0 with a polygon never "0 ha
   assert.equal(C._haText(byId(16)), '<0,01 ha');                     // real fixture: stored 0 with a polygon
 });
 
-test('R2 small-sector note from pixel size only; R1 no developer text in UI strings', () => {
+test('F1/F2 detection note: stored area < DETECTION_MIN_HA (0.5 ha default), only for Monitorēts / Gaida pirmos datus', () => {
   const C = load();
-  assert.equal(C._isSmallSector(byId(76)), true);
-  assert.equal(C._isSmallSector(byId(26)), false);
-  assert.equal(C._isSmallSector({ring: null, extent_m: null}), false);
+  const t56 = byId(76), lg917 = byId(81);
+  assert.equal(t56.area_ha, 0.21); assert.equal(lg917.area_ha, 1.08);
+  assert.equal(C._detectionNote(t56, {}), true);                                  // T-56 0.21 ha, monitored → note
+  assert.equal(C._detectionNote({...lg917, monitoring: mon({})}, {}), false);   // LG917 1.08 ha, even if monitored → no note
+  assert.equal(C._detectionNote(lg917, {}), false);                              // not monitored → never (F2)
+  assert.equal(C._detectionNote({...t56, monitoring: null, queued_job_id: null}, {}), false);   // small but not monitored (F2)
+  assert.equal(C._detectionNote({...t56, monitoring: null, queued_job_id: 7}, {}), true);       // Gaida pirmos datus
+  assert.equal(C._detectionNote({...t56, monitoring: mon({active: false})}, {}), false);       // Apturēts
+  assert.equal(C._detectionNote({...lg917, monitoring: mon({})}, {detection_min_ha: 2}), true); // server config wins
+  assert.equal(C._detectionNote({area_ha: null, monitoring: mon({})}, {}), false);              // NULL area → no claim
+  const src = read('assets/sectors-cards.js');
+  assert.doesNotMatch(src, /isSmallSector/);                                     // the note no longer uses PREVIEW_MIN_PX
+  assert.match(src, /smallNote: 'Sektors ir mazs Sentinel-2 izšķirtspējai \(10 m\) — izmaiņu noteikšana var būt neuzticama'/);
+});
+
+test('no developer text in UI strings; satellite data unavailable → UNKNOWN, never "Netiek monitorēts"', () => {
+  const C = load();
   const src = read('assets/sectors-cards.js');
   const strings = src.slice(src.indexOf('var T = {'), src.indexOf('// ── state'));
-  for (const bad of [/Stage\s*\d/i, /SatWorkspace/, /\bD\d+\b/, /mount\(/, /fixture|fiktūr/i])
+  for (const bad of [/Stage\s*\d/i, /SatWorkspace/, /\bD\d+\b/, /mount\(/, /fiktūr/i])
     assert.doesNotMatch(strings.replace(/fixture: '/g, "x: '"), bad, String(bad));
-  assert.match(strings, /smallNote: 'Sektors ir mazs Sentinel-2 izšķirtspējai \(10 m\) — izmaiņu noteikšana var būt neuzticama'/);
+  assert.equal(C._deriveStatus({monitoring: null, monitoring_unavailable: true}), 'UNKNOWN');
+  assert.deepEqual(JSON.parse(JSON.stringify(C._counts({monitoring: null, monitoring_unavailable: true}))), {suspected: null, confirmed: null});
+});
+
+test('times: Europe/Riga with zone label + UTC (no satellite workspace module needed)', () => {
+  const C = load();
+  assert.equal(C._fmtTime('2026-11-06T09:44:43.447Z'), '2026-11-06 11:44 EET, 09:44 UTC');
+  assert.equal(C._fmtTime('2026-07-01T21:30:00Z'), '2026-07-02 00:30 EEST, 2026-07-01 21:30 UTC');
+  assert.equal(C._fmtTime(null), null);
+});
+
+test('Izmaiņas wording: "Analīze nav veikta" only when the API says so; a missing field is neutral', () => {
+  const C = load(), card = {monitoring: mon({})};
+  const text = area => C._changesBlock(card, area).replace(/<[^>]+>/g, ' ');
+  assert.match(text({events: []}), /Atvērtu iespējamo izmaiņu nav/);                                   // API without the field
+  assert.match(text({events: [], last_successful_analysis_utc: null}), /Analīze nav veikta/);
+  assert.match(text({events: [], last_successful_analysis_utc: '2026-11-18T05:34:00Z'}), /Izmaiņas nav konstatētas/);
 });

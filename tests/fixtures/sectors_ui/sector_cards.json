@@ -1,7 +1,13 @@
 {
- "_captured": "2026-11-18T07:38:44Z",
- "_source": "scripts/sector_cards_fixture.py on .backup copies (read-only); no personal fields; client/property names, surname and cadastral numbers redacted (scripts/fixture_redaction.py)",
- "_note": "Shape of the planned GET /api/sectors/cards + /api/sat-monitoring/sector-summaries (D6). Cards with _fixture_only are Stage 1 fixtures (D3) and never part of Stage 2 or a release.",
+ "_captured": "2026-11-18T08:57:12Z",
+ "_source": "scripts/sector_cards_fixture.py = services/sector_cards.py on .backup copies (read-only); client/property names, surname and cadastral numbers redacted (fixtures only)",
+ "_note": "Shape of GET /api/sectors/cards. Cards with _fixture_only are Stage 1 fixtures (D3), never in the app.",
+ "meta": {
+  "satellite_available": true,
+  "detection_min_ha": 0.5,
+  "min_valid_pct": 60.0,
+  "archive_column": false
+ },
  "sectors": [
   {
    "id": 1,
@@ -11,6 +17,7 @@
    "area_ha": null,
    "area_ha_source": null,
    "created_at": null,
+   "archived_at": null,
    "identifier": null,
    "provenance": null,
    "boundary_plan_id": null,
@@ -28,6 +35,7 @@
    "area_ha": 101.35,
    "area_ha_source": "stored",
    "created_at": "2026-06-11 10:09:31 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": null,
    "boundary_plan_id": null,
@@ -70,6 +78,7 @@
    "area_ha": 271.38,
    "area_ha_source": "stored",
    "created_at": "2026-06-11 10:13:33 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": null,
    "boundary_plan_id": null,
@@ -112,6 +121,7 @@
    "area_ha": 336.15,
    "area_ha_source": "stored",
    "created_at": "2026-06-11 10:43:18 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": null,
    "boundary_plan_id": null,
@@ -154,6 +164,7 @@
    "area_ha": 337.78,
    "area_ha_source": "stored",
    "created_at": "2026-06-11 10:43:52 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": null,
    "boundary_plan_id": null,
@@ -196,6 +207,7 @@
    "area_ha": 50.35,
    "area_ha_source": "stored",
    "created_at": "2026-10-09 01:35:55 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": null,
    "boundary_plan_id": null,
@@ -260,28 +272,6 @@
      24.214914585,
      56.969045814
     ],
-    "geometry_ring": [
-     [
-      24.1958,
-      56.968
-     ],
-     [
-      24.213,
-      56.965
-     ],
-     [
-      24.213,
-      56.9615
-     ],
-     [
-      24.1988,
-      56.9617
-     ],
-     [
-      24.1958,
-      56.968
-     ]
-    ],
     "link": "SECTOR"
    },
    "queued_job_id": null
@@ -294,6 +284,7 @@
    "area_ha": 0.21,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T08:35:57.180201+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "46…(11)",
     "kvart": "1",
@@ -373,6 +364,7 @@
    "area_ha": 1.14,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T08:35:57.170425+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "46…(11)",
     "kvart": "1",
@@ -460,6 +452,7 @@
    "area_ha": 0.52,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T08:35:57.176696+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "46…(11)",
     "kvart": "1",
@@ -531,6 +524,7 @@
    "area_ha": 1.16,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T07:08:51.611377+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "64…(11)",
     "kvart": "1",
@@ -746,6 +740,7 @@
    "area_ha": 1.38,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T07:08:51.544435+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "64…(11)",
     "kvart": "350",
@@ -857,6 +852,7 @@
    "area_ha": 1.08,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.870514+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -932,6 +928,7 @@
    "area_ha": 2.33,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.875513+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1011,6 +1008,7 @@
    "area_ha": 2.27,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.877472+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1118,6 +1116,7 @@
    "area_ha": 2.2,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.889801+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1205,6 +1204,7 @@
    "area_ha": 0.85,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.879444+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1296,6 +1296,7 @@
    "area_ha": 1.16,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.896788+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1363,6 +1364,7 @@
    "area_ha": 0.46,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.881376+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1422,6 +1424,7 @@
    "area_ha": 3.88,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.883745+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1581,6 +1584,7 @@
    "area_ha": 1.13,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.885961+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1668,6 +1672,7 @@
    "area_ha": 2.15,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.900662+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1795,6 +1800,7 @@
    "area_ha": 0.14,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.894951+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1866,6 +1872,7 @@
    "area_ha": 1.42,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.887860+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -1945,6 +1952,7 @@
    "area_ha": 2.96,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.892533+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -2048,6 +2056,7 @@
    "area_ha": 1.54,
    "area_ha_source": "stored",
    "created_at": "2026-11-17T05:50:14.898530+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "60…(11)",
     "kvart": "348",
@@ -2115,6 +2124,7 @@
    "area_ha": 1.41,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T07:28:24.819181+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "98…(11)",
     "kvart": "1",
@@ -2250,6 +2260,7 @@
    "area_ha": 0.05,
    "area_ha_source": "stored",
    "created_at": "2026-11-16T07:02:47.376993+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "94…(11)",
     "kvart": "2",
@@ -2325,6 +2336,7 @@
    "area_ha": 0.07,
    "area_ha_source": "stored",
    "created_at": "2026-11-16T07:02:47.373900+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "94…(11)",
     "kvart": "2",
@@ -2380,6 +2392,7 @@
    "area_ha": 1.72,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T15:04:49.255722+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "78…(11)",
     "kvart": "1",
@@ -2559,6 +2572,7 @@
    "area_ha": 0.21,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T15:04:49.250698+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "78…(11)",
     "kvart": "1",
@@ -2690,6 +2704,7 @@
    "area_ha": 0.19,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T15:04:49.258169+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "78…(11)",
     "kvart": "1",
@@ -2757,6 +2772,7 @@
    "area_ha": null,
    "area_ha_source": null,
    "created_at": "2026-07-10 06:20:23 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -2777,6 +2793,7 @@
    "area_ha": 0.93,
    "area_ha_source": "stored",
    "created_at": "2026-07-09 12:58:30 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -2846,6 +2863,7 @@
    "area_ha": 0.12,
    "area_ha_source": "stored",
    "created_at": "2026-07-09 13:16:10 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -3103,6 +3121,7 @@
    "area_ha": 0.02,
    "area_ha_source": "stored",
    "created_at": "2026-07-09 12:58:30 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -3176,6 +3195,7 @@
    "area_ha": 0.0,
    "area_ha_source": "stored",
    "created_at": "2026-07-09 13:16:10 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -3229,6 +3249,7 @@
    "area_ha": 0.04,
    "area_ha_source": "stored",
    "created_at": "2026-07-09 12:58:30 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -3278,6 +3299,7 @@
    "area_ha": 0.01,
    "area_ha_source": "stored",
    "created_at": "2026-07-09 13:16:10 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -3351,6 +3373,7 @@
    "area_ha": 0.01,
    "area_ha_source": "stored",
    "created_at": "2026-07-09 10:31:25 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": null,
    "boundary_plan_id": null,
@@ -3429,6 +3452,7 @@
    "area_ha": null,
    "area_ha_source": null,
    "created_at": "2026-07-10 06:09:09 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -3449,6 +3473,7 @@
    "area_ha": 0.52,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T14:38:20.467703+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "50…(11)",
     "kvart": "1",
@@ -3512,6 +3537,7 @@
    "area_ha": 0.21,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T14:38:20.474097+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "50…(11)",
     "kvart": "1",
@@ -3583,6 +3609,7 @@
    "area_ha": 1.0,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T14:38:20.476308+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "50…(11)",
     "kvart": "1",
@@ -3666,6 +3693,7 @@
    "area_ha": 0.48,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T14:38:20.478458+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "50…(11)",
     "kvart": "1",
@@ -3741,6 +3769,7 @@
    "area_ha": 0.96,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T14:38:20.480610+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "50…(11)",
     "kvart": "1",
@@ -3804,6 +3833,7 @@
    "area_ha": 0.57,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T14:38:20.482591+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "50…(11)",
     "kvart": "1",
@@ -3871,6 +3901,7 @@
    "area_ha": 1.03,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T14:38:20.484784+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "50…(11)",
     "kvart": "1",
@@ -3942,6 +3973,7 @@
    "area_ha": 0.36,
    "area_ha_source": "stored",
    "created_at": "2026-11-11T14:38:20.486746+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "50…(11)",
     "kvart": "1",
@@ -4025,6 +4057,7 @@
    "area_ha": null,
    "area_ha_source": null,
    "created_at": "2026-07-10 06:10:59 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -4045,6 +4078,7 @@
    "area_ha": 0.36,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T09:39:43.381692+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "96…(11)",
     "kvart": "1",
@@ -4128,6 +4162,7 @@
    "area_ha": 0.53,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T09:39:43.399859+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "96…(11)",
     "kvart": "1",
@@ -4207,6 +4242,7 @@
    "area_ha": 2.56,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T14:59:53.889752+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "80…(11)",
     "kvart": "115",
@@ -4318,6 +4354,7 @@
    "area_ha": 0.71,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:19:18.582123+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -4405,6 +4442,7 @@
    "area_ha": 1.36,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:19:18.586175+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -4524,6 +4562,7 @@
    "area_ha": 0.4,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T09:10:41.291038+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "78…(11)",
     "kvart": "1",
@@ -4603,6 +4642,7 @@
    "area_ha": 0.91,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.484201+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -4714,6 +4754,7 @@
    "area_ha": 0.46,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.490168+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -4785,6 +4826,7 @@
    "area_ha": 0.19,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.493246+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -4848,6 +4890,7 @@
    "area_ha": 0.18,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.496452+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -4911,6 +4954,7 @@
    "area_ha": 0.26,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.499237+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -4982,6 +5026,7 @@
    "area_ha": 0.73,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.502291+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5081,6 +5126,7 @@
    "area_ha": 0.43,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.505314+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5164,6 +5210,7 @@
    "area_ha": 0.4,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.508365+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5239,6 +5286,7 @@
    "area_ha": 0.24,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.511722+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5298,6 +5346,7 @@
    "area_ha": 0.84,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.514716+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5365,6 +5414,7 @@
    "area_ha": 0.8,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.518088+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5436,6 +5486,7 @@
    "area_ha": 0.57,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.521617+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5507,6 +5558,7 @@
    "area_ha": 0.44,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.524905+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5570,6 +5622,7 @@
    "area_ha": 0.28,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.528062+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5633,6 +5686,7 @@
    "area_ha": 0.32,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.531502+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5728,6 +5782,7 @@
    "area_ha": 0.31,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.535129+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5823,6 +5878,7 @@
    "area_ha": 0.58,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.538421+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5926,6 +5982,7 @@
    "area_ha": 0.08,
    "area_ha_source": "stored",
    "created_at": "2026-11-09T08:17:56.541621+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "42…(11)",
     "kvart": "1",
@@ -5985,6 +6042,7 @@
    "area_ha": 0.18,
    "area_ha_source": "stored",
    "created_at": "2026-10-30T15:03:15.275219+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "40…(11)",
     "kvart": "1",
@@ -6040,6 +6098,7 @@
    "area_ha": 0.45,
    "area_ha_source": "stored",
    "created_at": "2026-11-06T13:40:57.909512+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "40…(11)",
     "kvart": "1",
@@ -6115,6 +6174,7 @@
    "area_ha": 0.14,
    "area_ha_source": "stored",
    "created_at": "2026-11-06T13:40:57.914190+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "40…(11)",
     "kvart": "1",
@@ -6174,6 +6234,7 @@
    "area_ha": 0.16,
    "area_ha_source": "stored",
    "created_at": "2026-11-06T13:40:57.912272+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "40…(11)",
     "kvart": "1",
@@ -6229,6 +6290,7 @@
    "area_ha": 1.06,
    "area_ha_source": "stored",
    "created_at": "2026-11-12T05:00:56.069385+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -6324,6 +6386,7 @@
    "area_ha": 1.08,
    "area_ha_source": "stored",
    "created_at": "2026-11-12T05:00:56.075473+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -6455,6 +6518,7 @@
    "area_ha": 0.24,
    "area_ha_source": "stored",
    "created_at": "2026-11-12T05:00:56.089200+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -6526,6 +6590,7 @@
    "area_ha": 0.5,
    "area_ha_source": "stored",
    "created_at": "2026-11-12T05:00:56.078483+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -6605,6 +6670,7 @@
    "area_ha": 0.32,
    "area_ha_source": "stored",
    "created_at": "2026-11-12T05:00:56.081312+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -6668,6 +6734,7 @@
    "area_ha": 0.21,
    "area_ha_source": "stored",
    "created_at": "2026-11-12T05:00:56.083839+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -6761,44 +6828,6 @@
      26.813888614,
      57.455970729
     ],
-    "geometry_ring": [
-     [
-      26.811951820397024,
-      57.45495705053835
-     ],
-     [
-      26.811941791281157,
-      57.454826488942395
-     ],
-     [
-      26.809800351337273,
-      57.454802924907916
-     ],
-     [
-      26.809591079497064,
-      57.45495026631467
-     ],
-     [
-      26.80954703928427,
-      57.45495124834921
-     ],
-     [
-      26.811375002658615,
-      57.454955662967706
-     ],
-     [
-      26.811379128946527,
-      57.45495324675907
-     ],
-     [
-      26.81140143889142,
-      57.454955726478026
-     ],
-     [
-      26.811951820397024,
-      57.45495705053835
-     ]
-    ],
     "link": "SECTOR"
    },
    "queued_job_id": null
@@ -6811,6 +6840,7 @@
    "area_ha": 1.21,
    "area_ha_source": "stored",
    "created_at": "2026-11-12T05:00:56.086493+00:00",
+   "archived_at": null,
    "identifier": {
     "cadastre": "36…(11)",
     "kvart": "1",
@@ -6914,6 +6944,7 @@
    "area_ha": null,
    "area_ha_source": null,
    "created_at": "2026-07-10 06:16:37 UTC",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "BOUNDARY_PLAN",
@@ -6935,12 +6966,14 @@
    "area_ha": 3670.1653,
    "area_ha_source": "satellite_area",
    "created_at": "2026-11-11T07:06:54Z",
+   "archived_at": null,
    "identifier": null,
    "provenance": {
     "provider": "EVAL_BBOX",
     "source_feature_id": "kekava-2026-vmd-clearcuts",
     "imported_at": "2026-11-11T07:06:54Z"
    },
+   "boundary_plan_id": null,
    "ring": [
     [
      24.1,
@@ -7054,28 +7087,6 @@
      56.811011858,
      24.201820753,
      56.867066475
-    ],
-    "geometry_ring": [
-     [
-      24.1,
-      56.812
-     ],
-     [
-      24.2,
-      56.812
-     ],
-     [
-      24.2,
-      56.866
-     ],
-     [
-      24.1,
-      56.866
-     ],
-     [
-      24.1,
-      56.812
-     ]
     ],
     "link": "EVAL_BBOX"
    },
