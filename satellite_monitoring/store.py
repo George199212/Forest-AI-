@@ -431,7 +431,10 @@ def event_detail(event_id):
         out["operational_context"] = _j(ev["gps_context_json"])
         out["thresholds"] = _j(ev["thresholds_json"])
         out["before"] = [_acq_brief(conn, i) for i in (_j(ev["before_acq_ids"], []) or [])]
-        out["after"] = [_acq_brief(conn, h["acq_id"]) for h in (_j(ev["after_acq_history_json"], []) or [])]
+        # Per-acquisition evidence quality as stored in the history (owner D2/Q2, read-only): the event-level value is
+        # the best over this list (pipeline.py), so the UI can say which acquisition it comes from. None when not stored.
+        out["after"] = [dict(_acq_brief(conn, h["acq_id"]), evidence_quality=h.get("evidence_quality"))
+                        for h in (_j(ev["after_acq_history_json"], []) or [])]
         out["review_log"] = [dict(r) for r in conn.execute(
             "SELECT id, action, actor, old_status, new_status, note, created_at_utc FROM sat_review_log "
             "WHERE event_id=? ORDER BY id", (event_id,))]

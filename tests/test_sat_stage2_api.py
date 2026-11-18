@@ -859,3 +859,22 @@ def test_stage0_fixtures_load_gzipped_and_hold_no_user_names():
     for n in names:
         s = json.dumps(fx.load(n))
         assert '"added_by": "<user>"' in s or '"added_by"' not in s
+
+
+def test_event_detail_after_items_carry_their_own_stored_evidence_quality(client, sat):
+    """Q2 (2026-11-18): after[i].evidence_quality = the value stored in after_acq_history_json for that acquisition;
+    read-only (DB bytes unchanged), event-level evidence_quality unchanged, missing value stays None (never invented)."""
+    conn = sqlite3.connect(os.environ["SAT_DB_PATH"])
+    hist = [{"acq_id": sat["acq"][2], "sensor": "S2", "time": "2026-10-21T10:00:00Z", "evidence_quality": "LIMITED"},
+            {"acq_id": sat["acq"][3], "sensor": "S1", "time": "2026-10-25T05:00:00Z", "evidence_quality": "GOOD"},
+            {"acq_id": sat["acq"][0], "sensor": "S2", "time": "2026-10-01T10:00:00Z"}]
+    conn.execute("UPDATE sat_change_events SET after_acq_history_json=? WHERE id=?", (json.dumps(hist), sat["open"]))
+    conn.commit(); conn.close()
+    db = os.environ["SAT_DB_PATH"]
+    before = hashlib.sha256(open(db, "rb").read()).hexdigest()
+    e = client.get(f"/api/sat-monitoring/events/{sat['open']}", headers=AUTH).json()
+    assert [(a["acq_id"], a["sensor"], a["evidence_quality"]) for a in e["after"]] == [
+        (sat["acq"][2], "S2", "LIMITED"), (sat["acq"][3], "S1", "GOOD"), (sat["acq"][0], "S2", None)]
+    assert e["evidence_quality"] == "GOOD"                      # event-level value as stored, not recomputed
+    assert all("evidence_quality" not in b for b in e["before"])
+    assert hashlib.sha256(open(db, "rb").read()).hexdigest() == before
