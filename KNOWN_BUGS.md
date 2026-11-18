@@ -90,6 +90,10 @@ Status 2026-11-16 evening; :8000 still runs `7bd2bbb` (Stage 4 release). Next de
 8. **Closed** (2026-11-16): the "HTTP 401 invalid_client" banner was a synthetic sandbox state; live satellite.db has
    no token failure (302 requests, all HTTP 200, last 2026-11-11). A real token request on 2026-11-16 ~15:44 UTC
    returned 200.
+   Re-verified 2026-11-18 (Stage 0 v3): the 401 banner in the owner's v3 screenshots was this same sandbox state, not
+   a production issue — `sat_provider_status` catalog/process OK 2026-11-18 05:33/05:34 UTC, 560 logged CDSE requests,
+   0 × HTTP 401 ever; API and both satellite workers load the same EnvironmentFile.
+
 
 - Satellite Monitoring (open, 2026-11-17): links / bookmarks to events 49–57 now open superseded rows (generation 2
   replaced them with 58–66 on the live DB); the page shows the superseded banner and no map button. The Forest Map
@@ -108,3 +112,23 @@ Status 2026-11-16 evening; :8000 still runs `7bd2bbb` (Stage 4 release). Next de
   decision pending); the Satellite Workspace does not offer it.
 - **LĢIA orthophoto as context basemap — unverified.** Verify terms and the service directly with LĢIA (the LVM GEO WMS
   `geoserver.lvmgeo.lv` timed out on 2026-11-17, layers/terms not readable).
+
+### Satellite Monitoring — backlog (owner decisions D2/D6/D7, 2026-11-18; NOT scheduled, each needs its own approval)
+
+- **Per-polygon clear-pixel check (worker side).** SCL/dataMask are stored per acquisition (6-band GeoTIFF on the
+  area grid); the forest-api interpreter cannot read them (no `tifffile`), so the check must run in the worker venv and
+  be stored in existing JSON (`after_acq_history_json` entries / `sat_detections.details_json`). Measured 2026-11-18:
+  events 60 and 62 polygons 100 % clear on every S2 after-image → the check would not change any current event.
+- **Event evidence-quality aggregation (`satellite_monitoring/pipeline.py:901`).** Today: event EQ = best EQ over all
+  after-acquisitions across sensors (`max` by `EQ_ORDER`). Effect: event 62 is GOOD only through S1 acq 196
+  (2026-07-29) while both S2 after-images are LIMITED. Options (no change made):
+  (a) keep the rule, show the basis in the UI ("Laba — no radara (S1) 29.07.2026; optiskie: ierobežota") — owner D2,
+  planned for Stage C; (b) per-sensor EQ (`eq_s1`, `eq_s2`) stored in existing JSON, event badge = the sensor of the
+  shown evidence; (c) event EQ = EQ of the acquisition that first showed the change (onset), not the best later one;
+  (d) best-of only within the same sensor as `sensor_basis` primary, S1 support listed separately. (b)–(d) change
+  stored interpretation → new detection generation, separate approval.
+- **Transparent no-data in quicklooks.** PNGs are RGB without alpha; swath-edge / no-data pixels are opaque black.
+  Needs worker regeneration with alpha from `dataMask` (0 PU, local rasters). Separate approval.
+- **LKS-92 (EPSG:3059) coordinate search.** Forest Map search is WGS84 only (decimal comma accepted since D6). LKS-92
+  needs a server-side `pyproj` parse.
+- Esri World Imagery stays off in satellite views (licence, Stage 0 §8).

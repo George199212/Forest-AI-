@@ -401,6 +401,8 @@
     'Change (mask over after)': 'Izmaiņas (maska virs “pēc” attēla)',
     'Side by side': 'Blakus',
     'Swipe': 'Pārvilkt',
+    'Drag to compare before / after': 'Velciet, lai salīdzinātu pirms / pēc',
+    'Background map: OpenStreetMap (not dated, not Sentinel)': 'Fona karte: OpenStreetMap (nav datēta, nav Sentinel)',
     'Suspected change — automated detection, not verified on the ground.': 'Iespējamas izmaiņas — automātiska noteikšana, dabā nav pārbaudīts.',
     'Recovered — the change is no longer visible.': 'Atjaunojies — izmaiņas vairs nav redzamas.',
     'Seasonal caveat': 'Sezonāls brīdinājums',
