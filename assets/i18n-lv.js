@@ -404,6 +404,7 @@
     'Drag to compare before / after': 'Velciet, lai salīdzinātu pirms / pēc',
     'Background map: OpenStreetMap (not dated, not Sentinel)': 'Fona karte: OpenStreetMap (nav datēta, nav Sentinel)',
     // ── Satelītu monitorings workspace (Stage C1, 2026-11-18): every EN string of sat-workspace.js T_EN ──
+    'A true-colour pair is available: {before} → {after} — show': 'Ir pieejams patiesu krāsu pāris: {before} → {after} — rādīt',
     'Add “{name}” to satellite monitoring?': 'Pievienot “{name}” satelītu monitoringam?',
     'Expected Copernicus cost: Not available.': 'Paredzamās Copernicus izmaksas: Nav pieejams.',
     'This month: {pu} of {puGuard} PU, {req} of {reqGuard} requests (guard).': 'Šomēnes: {pu} no {puGuard} PU, {req} no {reqGuard} pieprasījumiem (drošības robeža).',

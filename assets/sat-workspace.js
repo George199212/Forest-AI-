@@ -132,6 +132,25 @@
     }
     return {before: null, after: null};
   }
+  // True-colour alternative (owner C1 review): when the default pair cannot be shown in true colour, look for another valid
+  // S2 pair of the SAME event (its own before / after lists) with true colour on BOTH sides: latest such baseline before
+  // the onset, earliest such after-image. Offered as a hint only — never switched silently.
+  function trueColourAlternative(ev, byId, minValid, current) {
+    if (!ev) return null;
+    if (current && current.before && current.after && pairComposite(current.before, current.after, 'true') === 'true') return null;
+    function ok(a) { return a && a.sensor === 'S2' && a.truecolor_url && a.quicklook_url && acqState(a, minValid) === 'ok'; }
+    var onset = ev.first_after_time_utc ? parseUtc(ev.first_after_time_utc).toISOString() : null;
+    var after = (ev.after || []).map(function (x) { return byId[x.acq_id] || x; }).filter(ok)
+      .sort(function (x, y) { return String(x.sensing_time_utc).localeCompare(String(y.sensing_time_utc)); })[0];
+    if (!after) return null;
+    var before = (ev.before || []).map(function (x) { return byId[x.acq_id] || x; }).filter(function (b) {
+      var d = parseUtc(b.sensing_time_utc);
+      return ok(b) && b.sensing_time_utc < after.sensing_time_utc && d && (!onset || d.toISOString() < onset);
+    }).sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0];
+    if (!before || !comparePair(before, after).ok) return null;
+    if (current && current.before && current.after && current.before.acq_id === before.acq_id && current.after.acq_id === after.acq_id) return null;
+    return {before: before, after: after};
+  }
   // VMD p_cirg / p_cirp: stored 0 / 0.0 / NULL mean "not stated" — never a year
   function vmdValue(v) { return v === null || v === undefined || v === '' || Number(v) === 0 ? null : (Number(v) % 1 === 0 ? String(Number(v)) : String(v)); }
   // "Last clear acquisition without change" = latest valid baseline strictly before the first after-image.
@@ -204,6 +223,7 @@
     imageKind: 'Image type', trueC: 'True colour', trueSub: 'B04 · B03 · B02 — as the eye sees it', falseC: 'False colour',
     falseSub: 'Vegetation and clearings in contrast', radarC: 'Radar image (VH)', radarSub: 'Not a photograph',
     compositeNote: 'True colour is not available for both images — false colour on both sides.',
+    tcHint: 'A true-colour pair is available: {before} → {after} — show',
     layers: 'Layers', lBoundary: 'Area boundary', lBuffer: 'Buffer zone', lChange: 'Change polygons', lVmd: 'VMD compartments', lBase: 'Background map',
     eventsTitle: 'Changes in the area', eventsCount: '{open} open · {rec} recovered', noEvents: 'No suspected change events in this area.',
     noEventsHint: 'Monitoring is running; no change has been detected.', noDataYet: 'Monitoring has not produced data yet.',
@@ -268,6 +288,7 @@
     imageKind: 'Attēla veids', trueC: 'Patiesās krāsas', trueSub: 'B04 · B03 · B02 — kā redz acs', falseC: 'Viltus krāsas',
     falseSub: 'Veģetācija un izcirtumi kontrastā', radarC: 'Radara attēls (VH)', radarSub: 'Nav fotogrāfija',
     compositeNote: 'Patiesās krāsas nav abiem attēliem — abās pusēs rādītas viltus krāsas.',
+    tcHint: 'Ir pieejams patiesu krāsu pāris: {before} → {after} — rādīt',
     layers: 'Slāņi', lBoundary: 'Teritorijas robeža', lBuffer: 'Buferzona', lChange: 'Izmaiņu poligoni', lVmd: 'VMD nogabali', lBase: 'Fona karte',
     eventsTitle: 'Izmaiņas teritorijā', eventsCount: '{open} atvērtas · {rec} atjaunojušās', noEvents: 'Šajā teritorijā nav iespējamo izmaiņu notikumu.',
     noEventsHint: 'Uzraudzība darbojas; izmaiņas nav konstatētas.', noDataYet: 'Uzraudzība vēl nav sniegusi datus.',
@@ -1033,18 +1054,19 @@
     if (S.map2) { try { S.map2.remove(); } catch (e) { /* gone */ } S.maps = S.maps.filter(function (m) { return m !== S.map2; }); S.map2 = null; S.vmd2 = null; S.base2 = null; S.groups2 = null; }
     var wrap = document.getElementById('satw-maps'); if (wrap) wrap.classList.remove('split');
     var mw = document.getElementById('satw-mapwrap'); if (mw) mw.classList.remove('satw-muted-map');
-    ['satw-map2', 'satw-divider', 'satw-pill-b', 'satw-pill-a', 'satw-pill-s', 'satw-pill-b2', 'satw-pill-a2'].forEach(function (id) { var x = document.getElementById(id); if (x) x.remove(); });
+    ['satw-map2', 'satw-divider', 'satw-pill-b', 'satw-pill-a', 'satw-pill-s', 'satw-pill-b2', 'satw-pill-a2', 'satw-cmpbar'].forEach(function (id) { var x = document.getElementById(id); if (x) x.remove(); });
     if (S.imgLayers && S.map) S.imgLayers.forEach(function (l) { S.map.removeLayer(l); });
     S.imgLayers = [];
     if (S.swipe && S.map) { S.map.off('move zoom zoomanim viewreset resize moveend zoomend', S.swipe); S.swipe = null; }
     if (S.map) { var p = S.map.getPane('satwAfter'); if (p) p.style.clip = ''; }
     return L;
   }
-  function pillText(kind, a, comp) {
-    var parts = [t(kind), fmtDay(a.sensing_time_utc), a.sensor];
-    if (isNum(a.valid_pct_inside)) parts.push(fmtNum(a.valid_pct_inside, 1) + ' %');
-    if (comp === 'false' && a.sensor === 'S2') parts.push(t('falseC'));
-    return parts.join(' · ');
+  // Pill = date · sensor · valid % (owner spec), two short lines so both fit beside the divider. The composite is shown
+  // once in the left panel ("Attēla veids") and is the same on both sides (never mixed).
+  function pillText(kind, a) {
+    var l2 = [a.sensor];
+    if (isNum(a.valid_pct_inside)) l2.push(t('valid', {v: fmtNum(a.valid_pct_inside, 1)}));
+    return t(kind) + ' · ' + fmtDay(a.sensing_time_utc) + '\n' + l2.join(' · ');
   }
   function pill(id, text, cls, parent) {
     var d = document.createElement('div'); d.id = id; d.className = 'satw-pill ' + (cls || ''); d.setAttribute('data-no-i18n', ''); d.textContent = text;
@@ -1077,13 +1099,37 @@
         sideBySide(L, map, pair, c, bounds);
       }
       copernicusAttr(map, [pair.before.sensing_time_utc, pair.after.sensing_time_utc]);
+      compareBar(pair);
     }
     syncModes(); renderTimeline();
+    if (S.ev) renderCard(S.ev);                    // the card always names the acquisitions that are compared
+  }
+  // Compare bar: offers a true-colour pair of the same event when the shown pair is false colour. Click = explicit switch.
+  function compareBar(pair) {
+    if (!S.ev || S.mode === 'change') return;
+    var alt = trueColourAlternative(S.ev, S.byId, minValid(), pair);
+    if (!alt) return;
+    var bar = document.createElement('div'); bar.id = 'satw-cmpbar'; bar.className = 'satw-cmpbar';
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'satw-btn satw-small'; b.setAttribute('data-act', 'tc-pair');
+    b.textContent = t('tcHint', {before: fmtDay(alt.before.sensing_time_utc), after: fmtDay(alt.after.sensing_time_utc)});
+    bar.appendChild(b); S.L.DomEvent.disableClickPropagation(bar);
+    var mw = document.getElementById('satw-mapwrap'); mw.appendChild(bar);
+    bar.style.maxWidth = Math.max(220, visibleRight(mw) - 90) + 'px';          // stays left of the event card
+    b.onclick = function () {
+      S.compare = {before: alt.before, after: alt.after}; S.composite = 'true'; S.acq = alt.after;
+      S.swipeFrac = null;                          // divider back to the middle of the visible map: both pills readable
+      renderAcqBox(); renderComposites(); renderImagery(); setHash(viewParams(), true);
+    };
   }
   // Swipe (Stage A design): divider + handle + pills are DOM in the map container at a fixed container x; the "after"
   // pane is clipped to the right of it and recomputed on every movement incl. the zoom animation.
+  // Right edge of the map part that is not covered by the event card (container px).
+  function visibleRight(mw) {
+    var card = document.getElementById('satw-card'), w = mw.clientWidth;
+    return card && !card.hidden ? Math.max(120, w - card.offsetWidth - 24) : w;
+  }
   function swipe(L, map, mw, beforeText, afterText) {
-    var pane = map.getPane('satwAfter'), frac = isNum(S.swipeFrac) ? S.swipeFrac : 0.5;
+    var pane = map.getPane('satwAfter'), frac = isNum(S.swipeFrac) ? S.swipeFrac : (visibleRight(mw) / 2) / Math.max(1, mw.clientWidth);
     var line = document.createElement('div'); line.id = 'satw-divider'; line.className = 'satw-divider';
     var handle = document.createElement('div'); handle.className = 'satw-handle'; handle.setAttribute('role', 'slider'); handle.setAttribute('tabindex', '0');
     handle.setAttribute('aria-label', t('modeSwipe')); handle.setAttribute('aria-valuemin', '0'); handle.setAttribute('aria-valuemax', '100');
@@ -1096,8 +1142,9 @@
       pane.style.clip = 'rect(' + nw.y + 'px,' + se.x + 'px,' + se.y + 'px,' + nw.x + 'px)';
       line.style.left = x + 'px'; handle.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
       mw.setAttribute('data-swipe-x', String(x));
-      pb.hidden = false; pa.hidden = false;          // a pill is shown only where it fits beside the divider
-      pb.hidden = x < pb.offsetWidth + 20; pa.hidden = size.x - x < pa.offsetWidth + 20;
+      pb.hidden = false; pa.hidden = false;          // a pill is shown only where it fits beside the divider (not under the card)
+      var vr = Math.min(size.x, visibleRight(mw));
+      pb.hidden = x < pb.offsetWidth + 20 || x > vr; pa.hidden = vr - x < pa.offsetWidth + 20;
     }
     function setFrac(f) { frac = Math.max(0, Math.min(1, f)); S.swipeFrac = frac; clip(); }
     handle.addEventListener('pointerdown', function (ev) { ev.preventDefault(); ev.stopPropagation(); map.dragging.disable(); handle.setPointerCapture(ev.pointerId); mw.classList.add('satw-swiping'); });
@@ -1202,8 +1249,8 @@
   }
   function renderCard(ev) {
     var card = document.getElementById('satw-card'); if (!card) return;
-    var c = changeColour(ev), pair = S.compare;
-    var row = function (kind, a) { return a ? '<div class="satw-prod"><span>' + esc(t(kind)) + '</span><code data-no-i18n>' + esc(a.product_id || t('na')) + '</code><span class="satw-mono" data-no-i18n>' + esc(isNum(a.valid_pct_inside) ? fmtNum(a.valid_pct_inside, 1) + ' %' : t('na')) + '</span></div>' : ''; };
+    var c = changeColour(ev), pair = S.mode && S.compare && comparePair(S.compare.before, S.compare.after).ok ? S.compare : null;
+    var row = function (kind, a) { return a ? '<div class="satw-prod" data-acq="' + a.acq_id + '"><span>' + esc(t(kind)) + '</span><span><span class="satw-mono" data-no-i18n>' + esc(fmtDay(a.sensing_time_utc) + ' · ' + a.sensor) + '</span><code data-no-i18n title="' + esc(a.product_id || '') + '">' + esc(a.product_id || t('na')) + '</code></span><span class="satw-mono" data-no-i18n>' + esc(isNum(a.valid_pct_inside) ? fmtNum(a.valid_pct_inside, 1) + ' %' : t('na')) + '</span></div>' : ''; };
     var sup = ev.current === false ? '<div class="satw-banner warn">' + (ev.successor ? esc(t('superseded', {id: ev.successor.event_id})) : esc(t('supersededNone'))) + '</div>' : '';
     card.innerHTML = '<div class="satw-card-top"><span class="satw-eyebrow" data-no-i18n>' + esc(t('eventN', {id: ev.id})) + '</span><button type="button" class="satw-x" data-act="close" aria-label="' + esc(t('close')) + '">×</button></div>' +
       '<span class="satw-chip st" style="--c:' + c.color + '">' + esc(t('s' + ev.status)) + '</span>' +
@@ -1352,7 +1399,7 @@
              _changeColour: changeColour, _CHANGE_COLOURS: CHANGE_COLOURS, _worstColour: worstColour, _worstOpenEvent: worstOpenEvent,
              _fmtTime: fmtTime, _fmtDay: fmtDay, _fmtClock: fmtClock, _rigaParts: rigaParts, _acqState: acqState, _comparePair: comparePair,
              _pairComposite: pairComposite, _singleComposite: singleComposite, _defaultPair: defaultPair, _vmdValue: vmdValue,
-             _evidenceSource: evidenceSource, _parseCoordinates: parseCoordinates, _inGeometry: inGeometry, _defaultAreaId: defaultAreaId,
+             _evidenceSource: evidenceSource, _trueColourAlternative: trueColourAlternative, _parseCoordinates: parseCoordinates, _inGeometry: inGeometry, _defaultAreaId: defaultAreaId,
              _T: {lv: T_LV, en: T_EN}, _T_EN: T_EN, _T_LV: T_LV, _hashParams: hashParams, _buildHash: buildHash,
              _lastClearBefore: function (ev, byId, mv) { return lastClearBeforeOf(ev, byId, mv); }, _setLang: function (l) { S.lang = l === 'en' ? 'en' : 'lv'; },
              get state() { return S; }};

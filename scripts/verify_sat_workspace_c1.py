@@ -87,6 +87,25 @@ def main():
                       return {ims, clipLeft:c[3]+m.m41, divider:d.x-r.x, pills:[...mw.querySelectorAll('.satw-divider .satw-pill')].map(p=>p.getBoundingClientRect().x-r.x)}}""")
                     check(f'#62 {tag}: swipe {pos}% aligned + clip at divider', len(st['ims']) == 2 and st['ims'][0] == st['ims'][1] and abs(st['clipLeft'] - st['divider']) < 1.5, st)
                     shot(pg, f'02-izmainas-62-swipe{pos}-{tag}')
+                # owner C1 review: true-colour pair hint (never switched silently)
+                srcs0 = pg.evaluate("[...document.querySelectorAll('#satw-mapwrap img.leaflet-image-layer')].map(i=>i.getAttribute('src'))")
+                hint = pg.locator('[data-act=tc-pair]')
+                htxt = hint.inner_text() if hint.count() else ''
+                check(f'#62 {tag}: true-colour pair hint offered, default still false colour',
+                      hint.count() == 1 and ('29.06.2026' in htxt or '2026-06-29' in htxt) and ('21.08.2026' in htxt or '2026-08-21' in htxt)
+                      and all('/quicklook' in x for x in srcs0), [htxt, srcs0])
+                if hint.count():
+                    hint.click(); wait(pg, 2500)
+                    srcs1 = pg.evaluate("[...document.querySelectorAll('#satw-mapwrap img.leaflet-image-layer')].map(i=>i.getAttribute('src'))")
+                    pills1 = pg.evaluate("[...document.querySelectorAll('.satw-pill')].filter(p=>!p.hidden&&p.offsetParent).map(p=>p.textContent)")
+                    card1 = pg.locator('#satw-card').inner_text()
+                    check(f'#62 {tag}: after switch true colour 299 → 331 on map, pills and card',
+                          any('/299/truecolor' in x for x in srcs1) and any('/331/truecolor' in x for x in srcs1)
+                          and any('29.06.2026' in x or '2026-06-29' in x for x in pills1) and any('21.08.2026' in x or '2026-08-21' in x for x in pills1)
+                          and 'S2A_MSIL2A_20260629T094121' in card1 and 'S2B_MSIL2A_20260821T094029' in card1
+                          and pg.locator('[data-act=tc-pair]').count() == 0, [srcs1, pills1, card1[-400:]])
+                    if (w, h, lang) == (1440, 900, 'lv'):
+                        shot(pg, f'15-izmainas-62-truecolour-pair-after-hint-{tag}')
                 pg.click('[data-mode=side]'); wait(pg, 2200); shot(pg, f'03-izmainas-62-side-{tag}')
                 n2 = pg.evaluate("document.querySelectorAll('#satw-map2 img.leaflet-image-layer').length")
                 check(f'#62 {tag}: side-by-side two maps', n2 == 1, n2)

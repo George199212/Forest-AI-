@@ -203,3 +203,18 @@ test('no dead tools: rail = Kas šeit?, zoom ±, copy link only; no GPS layer to
  assert.doesNotMatch(src,/data-layer="gps"|lGps|Saistītie Forest AI dati|data-comp="mask"/);
  assert.match(src,/var LAYERS = \[\['boundary', 'lBoundary'\], \['buffer', 'lBuffer'\], \['change', 'lChange'\], \['vmd', 'lVmd'\], \['base', 'lBase'\]\];/);
 });
+test('C1 review: true-colour pair hint for #62 = 29.06 (299) → 21.08 (331); none when the shown pair is already true colour',()=>{
+ const W=load().SatWorkspace,k=v3('area_2_kekava'),e=v3('event_62'),by={};k.timeline.forEach(x=>by[x.acq_id]=x);
+ const def=W._defaultPair(e,by,60);
+ assert.equal(W._pairComposite(def.before,def.after,'true'),'false');            // default 299 → 327: 327 has no true colour
+ const alt=W._trueColourAlternative(e,by,60,def);
+ assert.deepEqual([alt.before.acq_id,alt.after.acq_id],[299,331]);
+ assert.equal(W._pairComposite(alt.before,alt.after,'true'),'true');
+ assert.ok(new Date(alt.before.sensing_time_utc)<new Date(e.first_after_time_utc),'baseline before the onset');
+ assert.equal(W._trueColourAlternative(e,by,60,alt),null);                      // already true colour → no hint
+ assert.equal(W._trueColourAlternative(v3('event_60'),by,60,W._defaultPair(v3('event_60'),by,60)).after.acq_id,331);
+ assert.equal(W._trueColourAlternative(null,by,60,def),null);
+ const src=read('assets/sat-workspace.js');
+ assert.match(src,/tcHint: 'Ir pieejams patiesu krāsu pāris: \{before\} → \{after\} — rādīt'/);
+ assert.doesNotMatch(src.slice(src.indexOf('function compareBar('),src.indexOf('b.onclick')),/S\.compare\s*=/);   // never switched silently
+});

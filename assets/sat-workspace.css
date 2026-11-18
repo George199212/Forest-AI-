@@ -126,7 +126,7 @@
 #satm-root.satw .satw-cop-attr{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);z-index:800;background:var(--float);color:var(--muted2);border-radius:4px;padding:1px 7px;font-size:10.5px;pointer-events:none}
 #satm-root.satw .satw-img-status{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:700;background:var(--float);padding:6px 10px;border-radius:6px;color:var(--muted2);pointer-events:none}
 #satm-root.satw .satw-img-status.failed{color:var(--redText)}
-#satm-root.satw .satw-pill{position:absolute;z-index:820;bottom:30px;background:var(--float);border:1px solid var(--line2);border-radius:999px;padding:4px 11px;font:11px var(--mono);color:var(--text);white-space:nowrap;pointer-events:none}
+#satm-root.satw .satw-pill{position:absolute;z-index:820;bottom:30px;background:var(--float);border:1px solid var(--line2);border-radius:10px;padding:4px 10px;font:11px/1.35 var(--mono);color:var(--text);white-space:pre;pointer-events:none}
 #satm-root.satw .satw-pill.single{left:66px;bottom:auto;top:12px}
 #satm-root.satw .satw-pill.side{left:12px;top:auto;bottom:28px}
 #satm-root.satw .satw-divider .satw-pill.before{right:14px;left:auto}#satm-root.satw .satw-divider .satw-pill.after{left:14px}
@@ -150,7 +150,11 @@
 #satm-root.satw .satw-story{color:var(--muted2);margin:6px 0}#satm-root.satw .satw-story b{color:var(--text)}
 #satm-root.satw .satw-eq small{display:block;color:var(--muted2);margin-top:2px}
 #satm-root.satw .satw-prod{display:grid;grid-template-columns:52px 1fr auto;gap:6px;align-items:center;font-size:12px;padding:3px 0;border-top:1px solid var(--line)}
+#satm-root.satw .satw-prod>span:nth-child(2){min-width:0;display:flex;flex-direction:column}
 #satm-root.satw .satw-prod code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#satm-root.satw .satw-cmpbar{position:absolute;left:66px;bottom:84px;z-index:880;background:var(--float);border:1px solid var(--yellow);border-radius:18px;padding:3px}
+#satm-root.satw .satw-cmpbar .satw-btn{white-space:normal;text-align:left}
+#satm-root.satw .satw-cmpbar .satw-btn{border-radius:999px;background:transparent;border-color:transparent;color:var(--yellow)}
 #satm-root.satw .satw-banner{border-radius:8px;padding:6px 10px;margin:6px 0}#satm-root.satw .satw-banner.warn{border:1px solid var(--yellow);color:var(--yellow)}
 /* analysis + timeline + status */
 #satm-root.satw .satw-analysis{background:var(--panel);border-top:1px solid var(--line);padding:6px 14px}

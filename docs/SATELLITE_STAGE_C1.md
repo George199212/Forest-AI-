@@ -34,6 +34,15 @@
   add = `/lookup` + `POST /areas` (LVM_GEO, same as the LVM GEO button) after a confirm with cost "Nav pieejams" + month vs guard.
 - Search: coordinates (copied D6 parser), 11-digit cadastre (`/api/geodata/vmd/cadastre`), `VMD:` id (`/forest-map/feature`), area name.
 
+## Owner review 2026-11-18: true-colour pair hint
+
+When the default pair cannot be shown in true colour but the SAME event has another valid S2 pair with true colour on
+both sides (`trueColourAlternative`: latest such baseline before the onset → earliest such after-image), the map shows
+"Ir pieejams patiesu krāsu pāris: {before} → {after} — rādīt". Nothing switches silently; after the click the pills
+(date · sensor · valid %) and the event card rows (date · sensor · product id · valid %) name the compared acquisitions.
+#62: default 29.06 (299) → 14.08 (327, false colour) · hint → 29.06 (299) → 21.08 (331, true colour). Screenshot
+`15-izmainas-62-truecolour-pair-after-hint-1440x900-lv.png`; 7 more checks (102 total).
+
 ## Evidence (`docs/evidence/satellite-stage5-v3/c1/`, not versioned)
 
 48 screenshots (1440×900 and 1920×1080, LV and EN): Teritorija default, #62 swipe at 25/50/75 %, side by side, change only,
