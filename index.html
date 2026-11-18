@@ -267,53 +267,6 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 .trk-sum b{display:block;color:var(--text);font-family:var(--mono);font-size:13px;}
 .leaflet-tooltip.trk-gap-label{background:rgba(40,40,40,0.75);color:#ddd;border:none;box-shadow:none;font-size:10px;padding:1px 5px;}
 
-/* John Deere integration panel — scoped to this card only. */
-#john-deere-card{padding:0;margin-bottom:24px;border-radius:12px;overflow:hidden;min-width:0;background:var(--bg2);}
-#john-deere-card .jd-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}
-#john-deere-card .jd-technical{min-width:0;padding:28px;}
-#john-deere-card .jd-eyebrow{font:10px var(--mono);letter-spacing:.14em;color:var(--text2);text-transform:uppercase;line-height:1.6;}
-#john-deere-card .jd-title{overflow-wrap:anywhere;font-size:18px;font-weight:600;letter-spacing:.025em;line-height:1.5;margin:6px 0 24px;color:var(--text);}
-#john-deere-card .jd-section{padding:18px 0;border-top:1px solid var(--border);min-width:0;}
-#john-deere-card .jd-section-title{font:10px var(--mono);color:var(--gbright);letter-spacing:.08em;text-transform:uppercase;line-height:1.7;margin-bottom:10px;}
-#john-deere-card .jd-row{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);gap:12px;padding:6px 0;font:11px/1.7 var(--mono);align-items:start;min-width:0;}
-#john-deere-card .jd-label{color:var(--text2);overflow-wrap:anywhere;min-width:0;}
-#john-deere-card .jd-value{color:var(--text);overflow-wrap:anywhere;white-space:pre-line;min-width:0;text-align:right;}
-#john-deere-card .jd-value[data-tone="ready"]{color:var(--gbright);}
-#john-deere-card .jd-value[data-tone="waiting"]{color:var(--amber);}
-#john-deere-card .jd-value[data-tone="error"]{color:#e07070;}
-#john-deere-card .jd-note{font:11px/1.85 var(--mono);color:var(--text2);white-space:pre-line;overflow-wrap:anywhere;padding:6px 0;}
-#john-deere-card .jd-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 8px;}
-#john-deere-card .jd-actions .btn{overflow-wrap:anywhere;min-width:0;min-height:36px;max-width:100%;white-space:normal;text-align:left;font-size:11px;line-height:1.5;padding:8px 12px;}
-#john-deere-card .jd-actions .btn:focus-visible{outline:2px solid var(--gbright);outline-offset:3px;}
-#john-deere-card .jd-actions .btn:disabled{opacity:.55;cursor:wait;}
-#john-deere-card .jd-overview{min-width:0;align-self:stretch;border-left:1px solid var(--border2);padding:40px 32px;background:radial-gradient(ellipse at 50% 10%,rgba(122,184,60,.065),transparent 55%);}
-#john-deere-card .jd-overview-inner{max-width:480px;margin:0 auto;position:sticky;top:24px;}
-#john-deere-card .jd-brand{text-align:center;padding:8px 8px 28px;}
-#john-deere-card .jd-logo-slot{min-height:120px;display:flex;align-items:center;justify-content:center;padding:20px 12px 12px;}
-#john-deere-card .jd-logo-slot img{display:block;max-width:min(250px,100%);max-height:120px;width:auto;height:auto;object-fit:contain;}
-#john-deere-card .jd-logo-slot img[hidden],#john-deere-card .jd-logo-fallback[hidden]{display:none;}
-#john-deere-card .jd-logo-fallback{overflow-wrap:anywhere;min-width:0;font:600 25px/1.3 var(--sans);color:var(--text);letter-spacing:.01em;}
-#john-deere-card .jd-overview-copy{font-size:12px;line-height:1.9;color:var(--text2);max-width:340px;margin:8px auto 0;}
-#john-deere-card .jd-features{border:1px solid var(--border2);border-radius:10px;background:rgba(14,18,8,.5);box-shadow:0 0 28px rgba(122,184,60,.025);overflow:hidden;}
-#john-deere-card .jd-feature{display:flex;gap:16px;padding:20px;align-items:flex-start;min-width:0;}
-#john-deere-card .jd-feature>div{min-width:0;}
-#john-deere-card .jd-feature+.jd-feature{border-top:1px solid var(--border);}
-#john-deere-card .jd-feature-icon{width:24px;height:24px;color:var(--gbright);flex:0 0 24px;margin-top:2px;}
-#john-deere-card .jd-feature h4{font-size:13px;line-height:1.6;font-weight:500;margin-bottom:4px;}
-#john-deere-card .jd-feature p{font-size:11px;line-height:1.9;color:var(--text2);overflow-wrap:anywhere;}
-#john-deere-card .jd-brand-note{font:10px/1.9 var(--mono);text-align:center;color:var(--text2);padding:20px 8px 0;}
-@media(max-width:1050px){
-  #john-deere-card .jd-layout{grid-template-columns:minmax(0,1fr);}
-  #john-deere-card .jd-overview{border-left:0;border-top:1px solid var(--border2);padding:28px;}
-  #john-deere-card .jd-overview-inner{position:static;}
-}
-@media(max-width:520px){
-  #john-deere-card .jd-technical,#john-deere-card .jd-overview{padding:18px 14px;}
-  #john-deere-card .jd-title{font-size:15px;}
-  #john-deere-card .jd-row{grid-template-columns:minmax(0,1fr);gap:1px;padding:7px 0;}
-  #john-deere-card .jd-value{text-align:left;}
-  #john-deere-card .jd-feature{padding:16px 12px;gap:12px;flex-wrap:wrap;}
-}
 
 </style>
 </head>
@@ -342,7 +295,6 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
       <div class="nav-item" onclick="nav('satellite')" style="display:none"><span class="nav-icon">🛰</span> Satellite</div>
       <div class="nav-group">Admin</div>
       <div class="nav-item" onclick="nav('lvm-geodata')"><span class="nav-icon">🌲</span> LVM GEO</div>
-      <div class="nav-item" onclick="nav('integrations')"><span class="nav-icon">🔌</span> Integrations</div>
       <div class="nav-item" id="forest-map-nav" style="display:none" onclick="nav('forest-map')"><span class="nav-icon">🌳</span> <span id="forest-map-nav-label">Meža karte</span></div>
     </nav>
     <div class="sidebar-foot" id="last-update">–</div>
@@ -666,45 +618,6 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
   </div>
       </div><!-- /sec-satellite -->
 
-      <!-- INTEGRATIONS -->
-      <div class="section" id="sec-integrations">
-        <div class="card" id="lvm-status" style="display:none">LVM GEO — checking connection…</div>
-        <div class="card" id="john-deere-card">
-          <div class="jd-layout">
-            <div class="jd-technical" id="john-deere-technical" aria-label="John Deere live technical status"></div>
-            <aside class="jd-overview" aria-label="Forest AI John Deere integration overview">
-              <div class="jd-overview-inner">
-                <div class="jd-brand">
-                  <div class="jd-eyebrow">MACHINE DATA INTEGRATION</div>
-                  <div class="jd-logo-slot">
-                    <img id="john-deere-logo" src="/assets/john-deere-logo.png" alt="John Deere" hidden>
-                    <span class="jd-logo-fallback" id="john-deere-logo-fallback">John Deere</span>
-                  </div>
-                  <p class="jd-overview-copy">Connect John Deere Operations Center data to Forest AI. Customer data is shown when available.</p>
-                </div>
-                <div class="jd-features"><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13V8h8l3 5h4v4h-2M3 17H2v-4h12M7 8V4h4v4M17 10V7h3"/><circle cx="6" cy="17" r="3"/><circle cx="18" cy="18" r="2"/></svg><div><h4>Equipment &amp; Machines</h4><p>Real machine data from John Deere Operations Center</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><div><h4>GPS &amp; Location</h4><p>Machine locations and movement history</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16h16M8 15v-4M12 15V7M16 15v-6M20 8l-4-4-4 2"/></svg><div><h4>Hours &amp; Utilization</h4><p>Engine hours and hours of operation</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4M12 2v1"/></svg><div><h4>Alerts</h4><p>Equipment alerts and diagnostic events</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><div><h4>Fleet Integration</h4><p>ISO 15143-3 (AEMP) compatible</p></div></div><div class="jd-feature"><svg class="jd-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 17H5a4 4 0 0 1-1-8 7 7 0 0 1 13-2 5 5 0 0 1 3 9M10 16v-2a2 2 0 0 1 4 0v2"/><rect x="8" y="16" width="8" height="6" rx="1.5"/></svg><div><h4>Secure OAuth</h4><p>John Deere Operations Center authorization</p></div></div></div>
-                <p class="jd-brand-note">Forest AI integrates with John Deere.<br>Forest AI is an independent product, not an official John Deere product or partner.</p>
-              </div>
-            </aside>
-          </div>
-        </div>
-        <div class="kpis" id="int-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px"></div>
-        <div class="card" style="margin-bottom:16px">
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="filter-btn active" data-cat="" onclick="setIntCategoryFilter('')">All</button>
-            <button class="filter-btn" data-cat="machine" onclick="setIntCategoryFilter('machine')">Machines</button>
-            <button class="filter-btn" data-cat="fleet" onclick="setIntCategoryFilter('fleet')">Fleet</button>
-            <button class="filter-btn" data-cat="gis" onclick="setIntCategoryFilter('gis')">GIS</button>
-            <button class="filter-btn" data-cat="satellite" onclick="setIntCategoryFilter('satellite')">Satellite</button>
-            <button class="filter-btn" data-cat="timber" onclick="setIntCategoryFilter('timber')">Timber</button>
-            <button class="filter-btn" data-cat="weighbridge" onclick="setIntCategoryFilter('weighbridge')">Weighbridge</button>
-            <button class="filter-btn" data-cat="worker" onclick="setIntCategoryFilter('worker')">Workers</button>
-            <button class="filter-btn" data-cat="erp" onclick="setIntCategoryFilter('erp')">ERP</button>
-            <button class="filter-btn" data-cat="audit" onclick="setIntCategoryFilter('audit')">Audit</button>
-          </div>
-        </div>
-        <div id="int-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px"></div>
-      </div><!-- /sec-integrations -->
 
       <!-- LVM GEO geodata browser -->
       <div class="section" id="sec-sat-monitoring"><div id="satm-root"></div></div>
@@ -736,16 +649,6 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
         </div>
         <details class="vmd-source-details card"><summary>VMD datu avots</summary><div id="vmd-local-card"><h3>VMD meža nogabali</h3><p>VMD atvērtie dati · Indeksētie nogabali: <span id="vmd-local-count">—</span> · CRS: EPSG:4326 · <span id="vmd-local-importable">—</span></p><p id="vmd-local-status" role="status">Notiek VMD datu kopas ielāde…</p><p id="vmd-coverage"></p></div></details>
       </div>
-      <!-- INTEGRATION DETAIL (opened via click, not in nav menu) -->
-      <div class="section" id="sec-integration-detail">
-        <div class="card">
-          <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
-            <span id="int-detail-title">Integration</span>
-            <button class="btn" onclick="nav('integrations')">← Back</button>
-          </div>
-          <div id="int-detail-body"></div>
-        </div>
-      </div><!-- /sec-integration-detail -->
 
       <!-- RISK DETAIL (opened via click, not in nav menu) -->
       <div class="section" id="sec-risk-detail">
@@ -895,12 +798,12 @@ function tbl(headers, keys, rows) {
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
-const titles = {'forest-map':'Meža karte','lvm-geodata':'Slāņi',overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor',integrations:'Integrations','integration-detail':'Integration','sat-monitoring':'Satellite Monitoring'};
+const titles = {'forest-map':'Meža karte','lvm-geodata':'Slāņi',overview:'Overview',objects:'Objects','object-detail':'Object',sectors:'Sectors',map:'Map',risks:'Risks',gps:'GPS Sessions',trucks:'Truck Reports',timber:'Timber Movements',photos:'Photos',detail:'Sector Detail',inspector:'AI Inspector',satellite:'Satellite Monitor','sat-monitoring':'Satellite Monitoring'};
 
 const geodataNavigationText=new Map();
 function localizeGeodataNavigation(active){
   if(window.ForestI18n?.lang==='lv')return;
-  const labels={'Overview':'Pārskats','Objects':'Objekti','Sectors':'Sektori','Map':'Karte','Risks':'Riski','GPS Sessions':'GPS sesijas','Truck Reports':'Kokvedēju atskaites','Timber':'Kokmateriāli','Photos':'Foto','AI Inspector':'AI inspektors','Satellite':'Satelīts','Satellite Monitoring':'Satelītu monitorings','Integrations':'Integrācijas','Monitor':'Monitorings','Operations':'Operācijas','Admin':'Administrēšana'};
+  const labels={'Overview':'Pārskats','Objects':'Objekti','Sectors':'Sektori','Map':'Karte','Risks':'Riski','GPS Sessions':'GPS sesijas','Truck Reports':'Kokvedēju atskaites','Timber':'Kokmateriāli','Photos':'Foto','AI Inspector':'AI inspektors','Satellite':'Satelīts','Satellite Monitoring':'Satelītu monitorings','Monitor':'Monitorings','Operations':'Operācijas','Admin':'Administrēšana'};
   document.querySelectorAll('.sidebar .nav-item,.sidebar .nav-group').forEach(element=>{
     element.childNodes.forEach(node=>{
       if(node.nodeType!==3)return;
@@ -911,7 +814,15 @@ function localizeGeodataNavigation(active){
   });
 }
 
+// The Integrations page was removed (2026-11-18). Old links, bookmarks and history
+// entries (#integrations, #integration-detail) open Overview and the URL is rewritten.
+const REMOVED_SECTIONS = new Set(['integrations', 'integration-detail']);
+
 function nav(id, push=true) {
+  if (REMOVED_SECTIONS.has(id)) {
+    id = 'overview';
+    if (!push) history.replaceState({type:'nav', id}, '', '#'+id);
+  }
   if(id!=='forest-map')window.ForestMap?.deactivate();
   currentSection = id;
   document.body.classList.toggle('vmd-workflow-open',id==='lvm-geodata');
@@ -920,7 +831,7 @@ function nav(id, push=true) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el = document.getElementById('sec-'+id);
   if (el) el.classList.add('active');
-  const navMap = {overview:0,objects:1,sectors:2,'sat-monitoring':3,risks:4,gps:5,trucks:6,timber:7,photos:8,inspector:9,satellite:10,'lvm-geodata':11,integrations:12,'forest-map':13};
+  const navMap = {overview:0,objects:1,sectors:2,'sat-monitoring':3,risks:4,gps:5,trucks:6,timber:7,photos:8,inspector:9,satellite:10,'lvm-geodata':11,'forest-map':12};
   const items = document.querySelectorAll('.nav-item');
   if (navMap[id]!==undefined) items[navMap[id]].classList.add('active');
   document.getElementById('page-title').textContent = titles[id]||id;
@@ -938,11 +849,9 @@ const loaders = {
   risks: loadRisks, gps: loadGPS, trucks: loadTrucks, timber: loadTimber,
   photos: loadPhotos, inspector: () => Promise.all([loadInspector(), loadIncidentsEquipment()]), satellite: loadSatellite,
   'risk-detail': () => currentRiskId && openRisk(currentRiskId, false),
-  integrations: loadIntegrations,
   'lvm-geodata': loadLvmLayers,
   'sat-monitoring': () => window.SatMonitoring ? window.SatMonitoring.load() : Promise.resolve(),
   'forest-map': () => window.ForestMap.load(),
-  'integration-detail': () => currentIntegrationId && openIntegration(currentIntegrationId, false),
 };
 
 function load(id) {
@@ -4166,328 +4075,6 @@ async function saveForestNotes(sector) {
   } catch(e) { if(msg){msg.style.color='var(--red)';msg.textContent='⚠ Error';} }
 }
 
-// ── INTEGRATIONS ────────────────────────────────────────────────────────────
-let currentIntegrationId = null;
-let intCategoryFilter = '';
-
-function statusBadgeClass(status) {
-  if (status === 'CONNECTED') return 'b-green';
-  if (status === 'ERROR') return 'b-red';
-  if (status === 'SYNCING') return 'b-amber';
-  if (status === 'Demo') return 'b-amber';
-  if (status === 'Available') return 'b-gray';
-  return 'b-gray';
-}
-
-async function apiPost(path, body) {
-  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: body!==undefined ? JSON.stringify(body) : undefined});
-  clearCache();
-  let data = {};
-  try { data = await r.json(); } catch(e) {}
-  if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
-  return data;
-}
-async function apiPatch(path, body) {
-  const r = await fetch(path, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-  clearCache();
-  let data = {};
-  try { data = await r.json(); } catch(e) {}
-  if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
-  return data;
-}
-
-function setIntCategoryFilter(cat, el) {
-  intCategoryFilter = cat;
-  document.querySelectorAll('#sec-integrations .filter-btn').forEach(b=>b.classList.remove('active'));
-  (el || document.querySelector(`#sec-integrations .filter-btn[data-cat="${cat}"]`))?.classList.add('active');
-  renderIntegrationCards();
-}
-
-let _intCatalogCache = [];
-
-let deereCsrf = '';
-async function loadJohnDeere() {
-  const card = document.getElementById('john-deere-card');
-  const technical = document.getElementById('john-deere-technical');
-  technical.replaceChildren();
-  const eyebrow = document.createElement('div');
-  eyebrow.className = 'jd-eyebrow'; eyebrow.textContent = 'LIVE TECHNICAL STATUS'; technical.appendChild(eyebrow);
-  const heading = document.createElement('h3');
-  heading.className = 'jd-title'; heading.textContent = 'JOHN DEERE — SANDBOX'; technical.appendChild(heading);
-  const logo = document.getElementById('john-deere-logo');
-  const fallback = document.getElementById('john-deere-logo-fallback');
-  const showLogo = () => { logo.hidden = false; fallback.hidden = true; };
-  const hideLogo = () => { logo.hidden = true; fallback.hidden = false; };
-  logo.onload = showLogo; logo.onerror = hideLogo;
-  if (logo.complete) { if (logo.naturalWidth) showLogo(); else hideLogo(); }
-  let group = technical;
-  let actions = null;
-  const section = title => {
-    group = document.createElement('section'); group.className = 'jd-section'; technical.appendChild(group);
-    const titleEl = document.createElement('h4'); titleEl.className = 'jd-section-title'; titleEl.textContent = title; group.appendChild(titleEl);
-    actions = null;
-  };
-  const line = text => {
-    const el = document.createElement('div');
-    const split = text.indexOf(': ');
-    if (split > 0 && !text.includes('\n')) {
-      el.className = 'jd-row';
-      const key = document.createElement('span'); key.className = 'jd-label'; key.textContent = text.slice(0, split);
-      const value = document.createElement('span'); value.className = 'jd-value'; value.textContent = text.slice(split + 2);
-      const state = value.textContent.toUpperCase();
-      if (['OK','READY','WORKING','CONNECTED','RECEIVING','VALID','REFRESHED','AVAILABLE','INSIDE','LIVE'].includes(state)) value.dataset.tone = 'ready';
-      else if (/WAITING|NOT CHECKED|NOT TESTED|NOT VERIFIED|UNAVAILABLE|NOT AVAILABLE|UNKNOWN|EXPIRED|STALE|NO ORGANIZATIONS/.test(state)) value.dataset.tone = 'waiting';
-      else if (/ERROR|FAILED|AUTH REQUIRED|PERMISSION REQUIRED|RATE LIMITED|OFFLINE/.test(state)) value.dataset.tone = 'error';
-      el.append(key, value);
-    } else { el.className = 'jd-note'; el.textContent = text; }
-    group.appendChild(el);
-  };
-  const button = (text, action) => {
-    if (!actions) { actions = document.createElement('div'); actions.className = 'jd-actions'; group.appendChild(actions); }
-    const el = document.createElement('button'); el.type = 'button'; el.className = 'btn'; el.textContent = text; el.onclick = action; actions.appendChild(el);
-  };
-  section('Authorization & API access');
-  try {
-    const response = await fetch('/api/john-deere/status', {cache:'no-store'});
-    if (!response.ok) throw new Error('Unable to load John Deere status.');
-    const data = await response.json();
-    deereCsrf = data.csrf_token;
-    const outcome = new URLSearchParams(location.search).get('john_deere');
-    if (outcome === 'authorization_failed') line('OAuth: ERROR — permission was not granted. Connect again and Allow Access.');
-    if (outcome === 'token_failed') line('OAuth: ERROR — token exchange failed. Check server configuration and reconnect.');
-    line('OAuth: ' + data.oauth);
-    line('Token: ' + (data.token || 'Not available'));
-    line('API Catalog: ' + (data.api_catalog || 'Not checked'));
-    line('Organizations: ' + (data.organizations || 0) + ' · ' + (data.organizations_status || 'Not checked'));
-    line('Organization Connection: ' + (data.organization_connection || 'Not connected'));
-    for (const org of data.organizations_list || []) line(org.name + ' · ' + org.connection_status);
-    if (data.error) line(data.error);
-    if (data.configured) button(data.oauth === 'OK' ? 'Reconnect John Deere' : 'Connect John Deere', () => deereAction('connect'));
-    if (data.oauth === 'OK') button('Refresh', () => deereAction('refresh'));
-    if (data.can_authorize) button('Authorize Organization', () => { location.href = '/integrations/john-deere/organizations/authorize'; });
-    if (data.can_manage) button('Manage connection', () => { location.href = '/integrations/john-deere/organizations/manage'; });
-    if (data.can_authorize || data.can_manage) line('After selecting organizations and saving in Deere Connections, return here and click Refresh.');
-    const diag = data.phase2a;
-    if (diag) {
-      section('API & machine diagnostics');
-      line('API CONNECTION: ' + diag.api_connection);
-      line('ORGANIZATION DATA: ' + diag.organization_data);
-      line('MACHINE DATA: ' + diag.machine_data);
-      line('Diagnostic OAuth: ' + diag.oauth + ' · Token: ' + diag.token);
-      line('Connected Organizations: ' + (diag.connected_organizations ?? 'Not verified'));
-      line('Equipment: ' + diag.equipment + ' · Status: ' + diag.equipment_status);
-      line('Machines: ' + diag.machines);
-      line('ISO 15143-3 Fleet: ' + diag.fleet.status + (diag.fleet.machines === null ? '' : ' · Machines: ' + diag.fleet.machines));
-      if (diag.fleet.connection_status) line('Fleet connection: ' + diag.fleet.connection_status);
-      if (diag.message) line(diag.message);
-      for (const [stage, error] of Object.entries(diag.errors || {})) line(stage + ': ' + error);
-      if (diag.checked_at) line('Last API test: ' + new Date(diag.checked_at * 1000).toLocaleString());
-      if (Object.keys(diag.machine_api_status || {}).length) section('Machine API readiness');
-      for (const [resource, state] of Object.entries(diag.machine_api_status || {})) line(resource + ': ' + state);
-    }
-    if (data.oauth === 'OK') button('Test John Deere API', async () => {
-      card.querySelectorAll('button').forEach(el => el.disabled = true);
-      line('Testing John Deere Sandbox APIs…');
-      await deereAction('test');
-    });
-    const sync = data.phase2b;
-    if (sync) {
-      section('JOHN DEERE CUSTOMER READINESS');
-      line(sync.implementation + ' · ' + sync.verification);
-      for (const [layer,state] of Object.entries(sync.readiness)) line(layer + ': ' + state);
-      section('Synchronization');
-      for (const [name,count] of Object.entries(sync.counts)) line(name.replaceAll('_',' ') + ': ' + count);
-      for (const [kind,last] of Object.entries(sync.last_sync)) line('Last ' + kind + ' sync: ' + (last || 'Not available'));
-      for (const [kind,title] of Object.entries({organizations:'Sync Organizations',machines:'Sync Machines',telemetry:'Sync Telemetry',all:'Sync All'})) {
-        if (data.oauth === 'OK') button(title, async () => {
-          card.querySelectorAll('button').forEach(el => el.disabled = true);
-          line(title + ' running…');
-          try {
-            const response = await fetch('/api/john-deere/sync/'+kind,{method:'POST',headers:{'X-CSRF-Token':deereCsrf}});
-            const result = await response.json();
-            alert((result.status || result.detail || 'Synchronization finished.') + (result.retry_after ? ' · Retry after ' + result.retry_after + ' seconds' : ''));
-          } catch (err) { alert('Synchronization request failed.'); }
-          await loadJohnDeere();
-        });
-      }
-      if (sync.history.length) section('Recent synchronization');
-      for (const run of sync.history.slice(0,5)) {
-        line(run.sync_type + ': ' + run.status + ' · ' + run.completed_at + ' · errors ' + run.errors_count);
-        for (const error of run.result?.errors || []) line(error.stage + ': ' + error.status);
-      }
-    }
-    line('API diagnostics never create machines or risks. Manual synchronization uses real Deere responses only.');
-  } catch (err) { line(err.message); }
-}
-async function deereAction(action) {
-  // A same-origin POST with a session CSRF token; OAuth tokens never enter JavaScript.
-  if (action === 'connect') {
-    // Native form navigation follows the OAuth redirect without cross-origin fetch.
-    // The server accepts the CSRF token in this form body.
-    const form = document.createElement('form');
-    form.method = 'post'; form.action = '/integrations/john-deere/connect';
-    const input = document.createElement('input'); input.type = 'hidden'; input.name = 'csrf_token'; input.value = deereCsrf;
-    form.appendChild(input); document.body.appendChild(form); form.submit();
-    return;
-  }
-  try {
-    const response = await fetch(action === 'test' ? '/api/john-deere/test' : '/api/john-deere/refresh', {method:'POST', headers:{'X-CSRF-Token':deereCsrf}});
-    if (!response.ok) { const data = await response.json(); alert(data.detail || 'John Deere refresh failed.'); }
-  } catch (err) { alert('John Deere request failed. Try Refresh again.'); }
-  await loadJohnDeere();
-}
-
-async function loadIntegrations() {
-  loadLvmStatus();
-  await loadJohnDeere();
-  const data = await api('/api/integrations');
-  _intCatalogCache = data.integrations;
-  const connected = _intCatalogCache.filter(e=>e.integration && e.integration.connection_status==='CONNECTED').length;
-  const demo = _intCatalogCache.filter(e=>e.integration && e.integration.is_demo).length;
-  const totalRecords = _intCatalogCache.reduce((s,e)=> s + (e.integration ? (e.integration.records_received||0) : 0), 0);
-  const errors = _intCatalogCache.filter(e=>e.integration && e.integration.connection_status==='ERROR').length;
-  document.getElementById('int-kpis').innerHTML = `
-    <div class="kpi"><div class="kpi-label">Подключено</div><div class="kpi-value green">${connected}</div><div class="kpi-sub">из ${_intCatalogCache.length} в каталоге</div></div>
-    <div class="kpi"><div class="kpi-label">Demo-интеграции</div><div class="kpi-value">${demo}</div><div class="kpi-sub">не смешиваются с продакшеном</div></div>
-    <div class="kpi"><div class="kpi-label">Получено записей</div><div class="kpi-value">${totalRecords}</div><div class="kpi-sub">по всем интеграциям</div></div>
-    <div class="kpi"><div class="kpi-label ${errors>0?'red':''}">Ошибки</div><div class="kpi-value ${errors>0?'red':'green'}">${errors}</div><div class="kpi-sub">требуют внимания</div></div>
-  `;
-  renderIntegrationCards();
-}
-
-function renderIntegrationCards() {
-  const grid = document.getElementById('int-cards-grid');
-  const list = _intCatalogCache.filter(e=>(!window.FOREST_GEODATA_ENABLED || e.provider!=='lvm_geo') && (!intCategoryFilter || e.category===intCategoryFilter));
-  if (!list.length) { grid.innerHTML = '<div class="card" style="color:var(--text3)">Нет интеграций в этой категории.</div>'; return; }
-  grid.innerHTML = list.map(e => {
-    const status = e.display_status;
-    const conn = e.integration;
-    return `
-    <div class="card" style="display:flex;flex-direction:column;gap:8px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-weight:600;font-size:14px">${e.display_name}</div>
-          <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${e.vendor||''} · ${e.category}</div>
-        </div>
-        ${badge(status, statusBadgeClass(status))}
-      </div>
-      ${e.confirmed_customer_use ? `<div style="font-size:11px;color:var(--text3);background:var(--bg3);padding:6px 8px;border-radius:var(--r)">ℹ ${e.confirmed_customer_use}</div>` : ''}
-      ${conn ? `
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">
-          Последняя синхронизация: ${conn.last_sync_at || '—'}<br>
-          Записей получено: ${conn.records_received||0}
-          ${conn.error_message ? `<br><span style="color:var(--red)">⚠ ${conn.error_message}</span>` : ''}
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-          <button class="btn" style="padding:4px 10px;font-size:11px" onclick="openIntegration(${conn.id})">Configure</button>
-          <button class="btn" style="padding:4px 10px;font-size:11px" onclick="testIntegrationAction(${conn.id})">Test Connection</button>
-          <button class="btn" style="padding:4px 10px;font-size:11px" onclick="syncIntegrationAction(${conn.id})">Sync Now</button>
-          <button class="btn" style="padding:4px 10px;font-size:11px" onclick="openIntegration(${conn.id})">View Logs</button>
-          ${conn.is_demo ? `<button class="btn" style="padding:4px 10px;font-size:11px" onclick="resetDemoAction(${conn.id})">Reset Demo Data</button>` : ''}
-          <button class="btn" style="padding:4px 10px;font-size:11px;color:var(--red)" onclick="disconnectIntegrationAction(${conn.id})">Disconnect</button>
-        </div>
-      ` : e.implemented ? `
-        <div style="font-size:11px;color:var(--text3)">${e.demo_available ? 'Demo mode available — no real credentials required.' : ''}</div>
-        <button class="btn" style="padding:4px 10px;font-size:11px;align-self:flex-start" onclick="connectIntegrationAction('${e.provider}', ${e.demo_available})">Connect</button>
-      ` : `
-        <div style="font-size:11px;color:var(--text3)">${e.notes || 'No adapter implemented yet — planned integration.'}</div>
-      `}
-    </div>`;
-  }).join('');
-}
-
-async function connectIntegrationAction(provider, demoAvailable) {
-  try {
-    const row = await apiPost('/api/integrations', {provider, is_demo: demoAvailable});
-    await apiPost(`/api/integrations/${row.id}/test`);
-    await loadIntegrations();
-  } catch(e) { alert('Connect failed: ' + e.message); }
-}
-async function testIntegrationAction(id) {
-  try { const r = await apiPost(`/api/integrations/${id}/test`); alert(r.ok ? '✅ ' + r.message : '❌ ' + r.message); await loadIntegrations(); }
-  catch(e) { alert('Test failed: ' + e.message); }
-}
-async function syncIntegrationAction(id) {
-  try {
-    const r = await apiPost(`/api/integrations/${id}/sync`);
-    alert(r.ok ? `✅ Sync OK — fetched ${r.fetched}, saved ${r.saved}, deduplicated ${r.deduplicated}` : `❌ Sync failed: ${r.error}`);
-    await loadIntegrations();
-    if (currentSection==='integration-detail') openIntegration(id);
-  } catch(e) { alert('Sync failed: ' + e.message); }
-}
-async function resetDemoAction(id) {
-  if (!confirm('Сбросить demo-данные этой интеграции? Реальные операционные данные не затрагиваются.')) return;
-  try {
-    const r = await apiPost(`/api/integrations/${id}/reset-demo`);
-    alert(`🔄 Reset OK — удалено записей: ${r.deleted_records}, инцидентов: ${r.deleted_incidents}`);
-    await loadIntegrations();
-    if (currentSection==='integration-detail') openIntegration(id);
-  } catch(e) { alert('Reset failed: ' + e.message); }
-}
-async function disconnectIntegrationAction(id) {
-  if (!confirm('Отключить интеграцию? История синхронизации и логи сохранятся — подключить можно снова в любой момент.')) return;
-  try {
-    await apiPatch(`/api/integrations/${id}`, {connection_status: 'NOT_CONNECTED'});
-    await loadIntegrations();
-    if (currentSection==='integration-detail') openIntegration(id);
-  } catch(e) { alert('Disconnect failed: ' + e.message); }
-}
-
-async function openIntegration(id, push=true) {
-  currentIntegrationId = id;
-  currentSection = 'integration-detail';
-  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
-  document.getElementById('sec-integration-detail').classList.add('active');
-  document.getElementById('page-title').textContent = 'Integration';
-  if (push) history.pushState({type:'integration', id}, '', '#integration-detail');
-
-  const [detail, logsData, recordsData] = await Promise.all([
-    fetch(`/api/integrations/${id}`).then(r=>r.json()),
-    fetch(`/api/integrations/${id}/logs?limit=30`).then(r=>r.json()),
-    fetch(`/api/integrations/${id}/records?limit=20`).then(r=>r.json()),
-  ]);
-
-  document.getElementById('int-detail-title').textContent = `${detail.catalog?.display_name || detail.provider} (${detail.category})`;
-  document.getElementById('int-detail-body').innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;margin:8px 0 16px">
-      ${badge(detail.connection_status, statusBadgeClass(detail.connection_status))}
-      ${detail.is_demo ? badge('DEMO MODE', 'b-amber') : badge('PRODUCTION', 'b-green')}
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px">
-      <div class="info-cell"><div class="info-cell-label">Sync status</div><div class="info-cell-value">${detail.sync_status}</div></div>
-      <div class="info-cell"><div class="info-cell-label">Sync frequency</div><div class="info-cell-value">${detail.sync_frequency_minutes} min</div></div>
-      <div class="info-cell"><div class="info-cell-label">Last sync</div><div class="info-cell-value">${detail.last_sync_at||'—'}</div></div>
-      <div class="info-cell"><div class="info-cell-label">Last success</div><div class="info-cell-value">${detail.last_success_at||'—'}</div></div>
-      <div class="info-cell"><div class="info-cell-label">Records received</div><div class="info-cell-value">${detail.records_received}</div></div>
-      <div class="info-cell"><div class="info-cell-label">Credentials</div><div class="info-cell-value">${detail.has_credentials===false ? 'not set' : (detail.credentials_reference ? 'configured' : 'none required (demo)')}</div></div>
-    </div>
-    ${detail.error_message ? `<div style="color:var(--red);font-size:12px;margin-bottom:16px">⚠ ${detail.error_message}</div>` : ''}
-    ${detail.catalog?.confirmed_customer_use ? `<div style="font-size:12px;color:var(--text3);background:var(--bg3);padding:8px;border-radius:var(--r);margin-bottom:16px">ℹ ${detail.catalog.confirmed_customer_use}</div>` : ''}
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
-      <button class="btn" onclick="testIntegrationAction(${id})">Test Connection</button>
-      <button class="btn" onclick="syncIntegrationAction(${id})">Sync Now</button>
-      ${detail.is_demo ? `<button class="btn" onclick="resetDemoAction(${id})">Reset Demo Data</button>` : ''}
-      <button class="btn" style="color:var(--red)" onclick="disconnectIntegrationAction(${id})">Disconnect</button>
-    </div>
-
-    <div class="card-head" style="padding:0;margin-bottom:8px"><span>Sync log</span></div>
-    <table class="tbl" style="margin-bottom:20px"><thead><tr><th>Started</th><th>Trigger</th><th>Status</th><th>Fetched</th><th>Saved</th><th>Dedup</th></tr></thead><tbody>
-      ${(logsData.sync_runs||[]).map(s=>`<tr><td>${s.started_at}</td><td>${s.trigger||''}</td><td>${badge(s.status, s.status==='SUCCESS'?'b-green':s.status==='ERROR'?'b-red':'b-amber')}</td><td>${s.records_fetched}</td><td>${s.records_saved}</td><td>${s.records_deduplicated}</td></tr>`).join('') || '<tr><td colspan="6" style="color:var(--text3)">No sync runs yet.</td></tr>'}
-    </tbody></table>
-
-    <div class="card-head" style="padding:0;margin-bottom:8px"><span>Recent log messages</span></div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text3);max-height:200px;overflow:auto;margin-bottom:20px">
-      ${(logsData.logs||[]).map(l=>`<div style="padding:3px 0;border-bottom:1px solid var(--border)">[${l.created_at}] <span style="color:${l.level==='ERROR'?'var(--red)':'inherit'}">${l.level}</span> ${l.message}</div>`).join('') || '<div>No log entries yet.</div>'}
-    </div>
-
-    <div class="card-head" style="padding:0;margin-bottom:8px"><span>Recent normalized records</span></div>
-    <table class="tbl"><thead><tr><th>Received</th><th>Entity</th><th>External ID</th><th>Sector</th><th>Validation</th></tr></thead><tbody>
-      ${(recordsData.records||[]).map(r=>`<tr><td>${r.received_at}</td><td>${r.entity_type}</td><td>${r.external_id}</td><td>${r.sector||''}</td><td>${badge(r.validation_status, r.validation_status==='VALID'?'b-green':'b-gray')}</td></tr>`).join('') || '<tr><td colspan="5" style="color:var(--text3)">No records synced yet.</td></tr>'}
-    </tbody></table>
-  `;
-}
-
 // ── AUTO REFRESH every 30s ────────────────────────────────────────────────────
 // Satellite Monitoring is excluded: a refresh re-rendered the overview and threw an open area/event page away.
 setInterval(()=>{ if(currentSection&&currentSection!=='detail'&&currentSection!=='lvm-geodata'&&currentSection!=='forest-map'&&currentSection!=='sat-monitoring'){ clearCache(); load(currentSection); } }, 30000);
@@ -4511,7 +4098,7 @@ function routeFromHash() {
                                  : {type:'nav', id:'sat-monitoring', event: num('event'), area: num('area')};
   }
   if (h === 'financial-breakdown') return {type:'financial-breakdown'};
-  if (h === 'integration-detail') return {type:'nav', id:'integrations'};
+  if (h === 'integrations' || h === 'integration-detail') return {type:'nav', id: h};  // removed page: nav() redirects to Overview
   if (h !== 'risk-detail' && Object.prototype.hasOwnProperty.call(loaders, h)) return {type:'nav', id: h};
   return {type:'nav', id:'overview'};
 }
@@ -4554,7 +4141,7 @@ window.addEventListener('popstate', e=>{
   else if (state.type==='sector') openSector(state.name, false);
   else if (state.type==='risk') openRisk(state.id, false);
   else if (state.type==='financial-breakdown') openFinancialBreakdown(false);
-  else if (state.type==='integration') openIntegration(state.id, false);
+  else if (state.type==='integration') nav('integration-detail', false);  // removed page -> Overview
 });
 
 // INIT

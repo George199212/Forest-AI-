@@ -10,7 +10,7 @@ function sidebar(labels){
  return labels.map(text=>({childNodes:[{nodeType:1,textContent:'◈'},{nodeType:3,textContent:' '+text}]}));
 }
 function make(i18nLang){
- const items=sidebar(['Overview','Objects','Sectors','Risks','GPS Sessions','Truck Reports','Timber','Photos','AI Inspector','Satellite','LVM GEO','Integrations']);
+ const items=sidebar(['Overview','Objects','Sectors','Risks','GPS Sessions','Truck Reports','Timber','Photos','AI Inspector','Satellite','LVM GEO']);
  const groups=sidebar(['Monitor','Operations','AI','Admin']);
  const document={querySelectorAll:sel=>sel==='.sidebar .nav-item,.sidebar .nav-group'?[...items,...groups]:[]};
  const window={ForestI18n:i18nLang?{lang:i18nLang}:undefined};
@@ -30,7 +30,7 @@ test('init localizes before opening the first route (deep links to sector/object
 });
 test('Latvian labels applied; repeated calls are idempotent; unknown labels untouched',()=>{
  const m=make();m.localize(true);m.localize(true);
- assert.deepEqual(m.items(),['Pārskats','Objekti','Sektori','Riski','GPS sesijas','Kokvedēju atskaites','Kokmateriāli','Foto','AI inspektors','Satelīts','LVM GEO','Integrācijas']);
+ assert.deepEqual(m.items(),['Pārskats','Objekti','Sektori','Riski','GPS sesijas','Kokvedēju atskaites','Kokmateriāli','Foto','AI inspektors','Satelīts','LVM GEO']);
  assert.deepEqual(m.groups(),['Monitorings','Operācijas','AI','Administrēšana']);
 });
 test('client instances with the i18n-lv overlay are left alone',()=>{
