@@ -228,7 +228,7 @@
     superseded: 'This event was superseded by #{id} (newer detection generation).', supersededNone: 'This event was superseded; no successor found.',
     toolWhatHere: 'What is here?', toolWhatHereTip: 'Click anywhere on the map: coordinates, cadastre, VMD compartment, whether the place is monitored — and "Add to monitoring".',
     hintDismiss: 'Got it', zoomIn: 'Zoom in', zoomOut: 'Zoom out', copyLink: 'Copy link to this view', copied: 'Copied', copy: 'Copy',
-    whCoords: 'Coordinates (WGS84)', whMonitored: 'Monitored', whArea: 'Monitored area', whNotMonitored: 'This place is not monitored',
+    whCoords: 'Coordinates (WGS84)', whArea: 'Monitored area', whNotMonitored: 'This place is not monitored',
     whCompartment: 'VMD compartment', whCadastre: 'Cadastre', whZoomIn: 'Zoom in to inspect compartments.', whZoomBtn: 'Zoom in',
     whNoForest: 'No forest compartment at this location.', whDense: 'Dense location; zoom in to inspect.', whComplex: 'Complex geometry; use the cadastre search.',
     whAdd: 'Add to monitoring', whQueued: 'Queued for monitoring', whAlready: 'Already monitored', whMulti: 'Multi-part compartment: add each part via LVM GEO',
@@ -292,7 +292,7 @@
     superseded: 'Šis notikums ir aizstāts ar #{id} (jaunāka noteikšanas paaudze).', supersededNone: 'Šis notikums ir aizstāts; pēctecis nav atrasts.',
     toolWhatHere: 'Kas šeit?', toolWhatHereTip: 'Klikšķis jebkurā kartes vietā: koordinātas, kadastrs, VMD nogabals, vai vieta tiek uzraudzīta — un “Pievienot monitoringam”.',
     hintDismiss: 'Skaidrs', zoomIn: 'Tuvināt', zoomOut: 'Tālināt', copyLink: 'Kopēt saiti uz šo skatu', copied: 'Nokopēts', copy: 'Kopēt',
-    whCoords: 'Koordinātas (WGS84)', whMonitored: 'Tiek uzraudzīts', whArea: 'Uzraudzītā teritorija', whNotMonitored: 'Šī vieta netiek uzraudzīta',
+    whCoords: 'Koordinātas (WGS84)', whArea: 'Uzraudzītā teritorija', whNotMonitored: 'Šī vieta netiek uzraudzīta',
     whCompartment: 'VMD nogabals', whCadastre: 'Kadastrs', whZoomIn: 'Pietuviniet, lai redzētu nogabalus.', whZoomBtn: 'Tuvināt',
     whNoForest: 'Šajā vietā nav meža nogabala.', whDense: 'Blīva vieta; pietuviniet.', whComplex: 'Sarežģīta ģeometrija; izmantojiet kadastra meklēšanu.',
     whAdd: 'Pievienot monitoringam', whQueued: 'Gaida pievienošanu monitoringam', whAlready: 'Jau tiek uzraudzīts', whMulti: 'Daudzdaļu nogabals: pievienojiet katru daļu LVM GEO',
@@ -317,6 +317,8 @@
     noPolygon: 'Nav poligona', add: 'Pievienot', copLink: 'Saite nokopēta'
   };
   var CLS = {POTENTIAL_FOREST_LOSS: 'LOSS', POTENTIAL_CHANGE_OUTSIDE_BOUNDARY: 'OUT', POSSIBLE_SEASONAL_OR_ENVIRONMENTAL: 'SEAS', INSUFFICIENT_EVIDENCE: 'INS'};
+  var MONTHS_LV = ['janv.', 'febr.', 'marts', 'apr.', 'maijs', 'jūn.', 'jūl.', 'aug.', 'sept.', 'okt.', 'nov.', 'dec.'];
+  var MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var GEOM_COLOURS = ['#8FB4D9', '#B9A2E8', '#6FC7B1', '#E0A36F', '#D98CB5', '#A9C26F'];
 
   // ── state ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -552,7 +554,8 @@
   function areaCard(a, d) {
     var evs = d ? d.events : [], openN = evs.filter(isOpen), c = worstColour(openN);
     var counts = {}; openN.forEach(function (e) { var k = changeColour(e); counts[k.key] = counts[k.key] || {c: k, n: 0}; counts[k.key].n++; });
-    var lastAny = [a.last_s1_utc, a.last_s2_any].filter(Boolean).sort().pop();
+    // last OK acquisition of either sensor (last_s2_any is an object incl. cloud-skipped attempts — not used here)
+    var lastAny = [a.last_s1_utc, a.last_valid_s2_utc].filter(function (x) { return typeof x === 'string' && x; }).sort().pop();
     return '<button type="button" class="satw-card" data-area="' + a.id + '">' +
       '<div class="satw-card-h"><b data-no-i18n>' + esc(a.name) + '</b>' + (c ? '<span class="satw-dot" style="--c:' + c.color + '" aria-hidden="true"></span>' : '') + '</div>' +
       '<div class="satw-muted">' + esc(t('src' + a.source)) + ' · <span data-no-i18n>' + esc(ha(a.area_ha, 1) || t('na')) + '</span></div>' +
@@ -725,7 +728,7 @@
     var div = document.createElement('div'); div.className = 'satw-what';
     var inside = areasAt(lon, lat);
     div.innerHTML = '<div class="satw-what-row"><span class="satw-muted">' + esc(t('whCoords')) + '</span><span><code data-no-i18n>' + esc(coords) + '</code> <button type="button" class="satw-btn satw-small" data-act="copy">' + esc(t('copy')) + '</button></span></div>' +
-      '<div class="satw-what-row"><span class="satw-muted">' + esc(t('whMonitored')) + '</span><span>' + (inside.length ? inside.map(function (a) {
+      '<div class="satw-what-row"><span class="satw-muted">' + esc(t('whArea')) + '</span><span>' + (inside.length ? inside.map(function (a) {
         return '<button type="button" class="satw-link" data-open-area="' + a.id + '" data-no-i18n>' + esc(a.name) + '</button>'; }).join(', ') : esc(t('whNotMonitored'))) + '</span></div>' +
       '<div class="satw-what-vmd"><span class="satw-muted">' + esc(t('whLoading')) + '</span></div>';
     S.whatPopup = L.popup({maxWidth: 360, className: 'satw-popup', autoPanPadding: [24, 24]}).setLatLng(latlng).setContent(div).openOn(map);
@@ -1093,7 +1096,8 @@
       pane.style.clip = 'rect(' + nw.y + 'px,' + se.x + 'px,' + se.y + 'px,' + nw.x + 'px)';
       line.style.left = x + 'px'; handle.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
       mw.setAttribute('data-swipe-x', String(x));
-      pb.hidden = x < 140; pa.hidden = size.x - x < 140;
+      pb.hidden = false; pa.hidden = false;          // a pill is shown only where it fits beside the divider
+      pb.hidden = x < pb.offsetWidth + 20; pa.hidden = size.x - x < pa.offsetWidth + 20;
     }
     function setFrac(f) { frac = Math.max(0, Math.min(1, f)); S.swipeFrac = frac; clip(); }
     handle.addEventListener('pointerdown', function (ev) { ev.preventDefault(); ev.stopPropagation(); map.dragging.disable(); handle.setPointerCapture(ev.pointerId); mw.classList.add('satw-swiping'); });
@@ -1160,7 +1164,12 @@
     var polys = (S.polys || {})[id] || []; if (!polys.length) return null;
     var b = S.L.latLngBounds([]); polys.forEach(function (p) { b.extend(p.getBounds()); }); return b.isValid() ? b : null;
   }
-  function fitEvent(id) { var b = polyBounds(id); if (b && S.map) S.map.fitBounds(b, {padding: [70, 70], maxZoom: 16, animate: false}); }
+  // The event card covers the right side of the map: keep the polygons in the visible part.
+  function fitEvent(id) {
+    var b = polyBounds(id), card = document.getElementById('satw-card'); if (!b || !S.map) return;
+    var right = card && !card.hidden ? card.offsetWidth + 40 : 70;
+    S.map.fitBounds(b, {paddingTopLeft: [80, 70], paddingBottomRight: [right, 70], maxZoom: 16, animate: false});
+  }
   function highlight(id) {
     Object.keys(S.polys || {}).forEach(function (k) { S.polys[k].forEach(function (l) { l.setStyle({weight: +k === id ? 3.5 : 2, opacity: +k === id || !id ? 1 : 0.55}); }); });
   }
@@ -1173,7 +1182,7 @@
     var parts = ['#' + ev.id, shortCls(ev.classification)];
     if (isNum(ev.changed_area_ha)) parts.push(ha(ev.changed_area_ha));
     var b1 = before && fmtDay(before.sensing_time_utc, null, true), a1 = fmtDay(ev.first_after_time_utc, null, true);
-    if (b1 && a1) parts.push(b1 + '→' + a1); else if (a1) parts.push(a1);
+    if (b1 && a1) parts.push(b1 + ' → ' + a1); else if (a1) parts.push(a1);
     if (ev.confidence) parts.push(t(ev.confidence));
     S.calloutLayer = S.L.tooltip({permanent: true, direction: 'top', className: 'satw-callout', pane: 'satwCallout', offset: [0, -4]})
       .setLatLng([b.pad(0.08).getNorth(), b.getCenter().lng]).setContent('<span data-no-i18n>' + esc(parts.join(' · ')) + '</span>').addTo(S.map);
@@ -1245,11 +1254,13 @@
       '<line x1="' + x0 + '" x2="' + x1 + '" y1="' + yS2 + '" y2="' + yS2 + '" class="trk"/><line x1="' + x0 + '" x2="' + x1 + '" y1="' + yS1 + '" y2="' + yS1 + '" class="trk"/>';
     for (var m = new Date(start); m.getTime() <= end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
       var mx = X(new Date(m.getFullYear(), m.getMonth(), 1).toISOString());
-      if (mx >= x0) svg += '<line x1="' + mx + '" x2="' + mx + '" y1="8" y2="64" class="tick"/><text x="' + (mx + 3) + '" y="74" class="tlbl" data-no-i18n>' + esc(new Date(m.getFullYear(), m.getMonth(), 1).toLocaleDateString(S.lang === 'lv' ? 'lv-LV' : 'en-GB', {month: 'short', year: '2-digit'})) + '</text>';
+      if (mx >= x0) svg += '<line x1="' + mx + '" x2="' + mx + '" y1="8" y2="64" class="tick"/><text x="' + (mx + 3) + '" y="74" class="tlbl" data-no-i18n>' + esc((S.lang === 'lv' ? MONTHS_LV : MONTHS_EN)[m.getMonth()] + (m.getMonth() === 0 ? ' ' + m.getFullYear() : '')) + '</text>';
     }
-    (S.events || []).forEach(function (e) {
-      var ex = X(e.first_after_time_utc); if (ex < x0) return; var c = changeColour(e);
-      svg += '<g class="onset"><path d="M' + ex + ' 6 l-5 -6 h10 z" transform="translate(0 4)" fill="' + c.color + '"/><text x="' + (ex + 6) + '" y="9" class="tlbl" data-no-i18n>#' + e.id + '</text><title>#' + e.id + ' ' + esc(clsLabel(e.classification)) + '</title></g>';
+    var lastLbl = -99;                     // onset labels: skip the text (not the marker) when it would overlap the previous one
+    (S.events || []).slice().sort(function (p, q) { return String(p.first_after_time_utc).localeCompare(String(q.first_after_time_utc)); }).forEach(function (e) {
+      var ex = X(e.first_after_time_utc); if (ex < x0) return; var c = changeColour(e), lbl = ex - lastLbl > 30;
+      if (lbl) lastLbl = ex;
+      svg += '<g class="onset"><path d="M' + ex + ' 6 l-5 -6 h10 z" transform="translate(0 4)" fill="' + c.color + '"/>' + (lbl ? '<text x="' + (ex + 6) + '" y="9" class="tlbl" data-no-i18n>#' + e.id + '</text>' : '') + '<title>#' + e.id + ' ' + esc(clsLabel(e.classification)) + '</title></g>';
     });
     var pair = S.mode && S.compare ? S.compare : null;
     tl.forEach(function (a) {
