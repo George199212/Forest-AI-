@@ -219,7 +219,9 @@ def identify(lat,lon,zoom,actor):
 def sectors(actor):
     identity=context(actor)
     with closing(data._app_connection()) as c:
-        rows=c.execute('SELECT id,name,boundary_json,area_ha,center_lat,center_lon FROM sectors WHERE organization_id=? LIMIT 1001',(identity['organization_id'],)).fetchall()
+        # owner D14: hide archived sectors only when the additive column exists (no migration in this release)
+        archived=' AND archived_at IS NULL' if 'archived_at' in {r[1] for r in c.execute('PRAGMA table_info(sectors)')} else ''
+        rows=c.execute('SELECT id,name,boundary_json,area_ha,center_lat,center_lon FROM sectors WHERE organization_id=?'+archived+' LIMIT 1001',(identity['organization_id'],)).fetchall()
     if len(rows)>1000:raise HTTPException(413,'Too many sectors for this overlay')
     features=[];unmapped=[];invalid=markers=outside=0
     for row in rows:

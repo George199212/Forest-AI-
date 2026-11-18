@@ -721,6 +721,8 @@ nav{flex:1;padding:8px 0;overflow-y:auto;}
 <script src="/assets/sat-monitoring.js"></script>
 <link rel="stylesheet" href="/assets/sat-workspace.css">
 <script src="/assets/sat-workspace.js"></script>
+<link rel="stylesheet" href="/assets/sectors-cards.css">
+<script src="/assets/sectors-cards.js"></script>
 <script>
 const API = '';
 let cache = {};
@@ -824,6 +826,7 @@ function nav(id, push=true) {
     if (!push) history.replaceState({type:'nav', id}, '', '#'+id);
   }
   if(id!=='forest-map')window.ForestMap?.deactivate();
+  window.SectorCards?.leave();
   currentSection = id;
   document.body.classList.toggle('vmd-workflow-open',id==='lvm-geodata');
   localizeGeodataNavigation(true);  // Latvian sidebar labels on every page (was LVM GEO only)
@@ -1244,6 +1247,14 @@ async function loadObjects() {
 function sectorNameText(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function sectorNameArgument(value){return sectorNameText(JSON.stringify(String(value??'')));}
 async function loadSectors() {
+  // Sectors as cards (feature/sectors-workspace), also for the object filter (Objects → sectors); legacy table behind the flag.
+  if (window.SectorCards && !window.SECTOR_LEGACY_MODULES) {
+    if (objectFilter === undefined) return window.SectorCards.renderList(document.getElementById('sectors-table'));
+    const objects = await api('/api/objects');
+    const obj = objects.find(o => (o.boundary_plan_id ?? null) === objectFilter);
+    return window.SectorCards.renderList(document.getElementById('sectors-table'), {plan: objectFilter, object: obj ? {
+      name: obj.object_name, annotatedUrl: objectFilter!==null ? `/api/boundary-plans/${objectFilter}/annotated` : obj.plan_scan_url} : null});
+  }
   const [rows, objects] = await Promise.all([api('/api/sectors'), api('/api/objects')]);
   let filtered = rows;
   let banner = '';
@@ -1289,7 +1300,10 @@ function clearObjectFilter() {
 }
 
 // ── SECTOR DETAIL ─────────────────────────────────────────────────────────────
-async function openSector(name, push=true) {
+async function openSector(name, push=true, opts={}) {
+  // One sector page (owner D10): the tab bar, KPI row, risk gauge, financial exposure and upload stay behind SECTOR_LEGACY_MODULES.
+  if (window.SectorCards && !window.SECTOR_LEGACY_MODULES && !opts.module) return window.SectorCards.openByName(name, push);
+  if (!opts.module) document.getElementById('sec-detail').classList.remove('sc-module-mode');
   currentSector = name;
   currentSection = 'detail';
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
@@ -1364,6 +1378,22 @@ async function openSector(name, push=true) {
   </div>`;
 
   detailTab('gps');
+}
+
+// Sector page → one existing per-sector module (#sectors/{id}/{module}) without the legacy chrome; reuses detailTab().
+async function openSectorModule(name, module, opts={}) {
+  const sec = document.getElementById('sec-detail');
+  sec.classList.add('sc-module-mode');
+  let bar = document.getElementById('sc-module-bar');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'sc-module-bar'; bar.className = 'sc-module-bar'; sec.insertBefore(bar, sec.firstChild); }
+  bar.innerHTML = '';
+  await openSector(name, false, {module: true});
+  detailTab(module);
+  const extra = opts.extraLink ? opts.extraLink(currentDetailData) : null;
+  document.getElementById('page-title').textContent = '';   // the module bar carries the sector name
+  document.getElementById('page-sub').textContent = (opts.subtitle ? opts.subtitle + ' · ' : '') + new Date().toLocaleString('lv-LV');
+  bar.innerHTML = `<a class="sc-back" href="${opts.backHref}">${sectorNameText(opts.backText)}</a><span class="sc-module-title">${sectorNameText(opts.title)}</span>`
+    + (extra ? `<a class="sc-btn sc-ghost" href="${extra.href}">${sectorNameText(extra.text)}</a>` : '');
 }
 
 function detailTab(tab) {
@@ -4084,6 +4114,8 @@ setInterval(()=>{ if(currentSection&&currentSection!=='detail'&&currentSection!=
 function routeFromHash() {
   const h = location.hash.slice(1);
   let m;
+  const sectorPage = typeof SectorCards !== 'undefined' ? SectorCards.routeFromHash(h) : null;   // #sectors/{id}[/{module}]
+  if (sectorPage) return sectorPage;
   if ((m = h.match(/^sector-(.+)$/))) {
     try { return {type:'sector', name: decodeURIComponent(m[1])}; }
     catch(e) { return {type:'nav', id:'overview'}; }
@@ -4094,7 +4126,7 @@ function routeFromHash() {
   // Satellite deep links: #forest-map?sat_event=<id> | ?sat_area=<id>, #sat-monitoring?event=<id> | ?area=<id>
   if ((m = h.match(/^(forest-map|sat-monitoring)\?(.*)$/))) {
     const q = new URLSearchParams(m[2]), num = k => { const v = parseInt(q.get(k), 10); return v > 0 ? v : null; };
-    return m[1] === 'forest-map' ? {type:'nav', id:'forest-map', satEvent: num('sat_event'), satArea: num('sat_area')}
+    return m[1] === 'forest-map' ? Object.assign({type:'nav', id:'forest-map', satEvent: num('sat_event'), satArea: num('sat_area')}, num('sector') ? {sector: num('sector')} : {})
                                  : {type:'nav', id:'sat-monitoring', event: num('event'), area: num('area')};
   }
   if (h === 'financial-breakdown') return {type:'financial-breakdown'};
@@ -4107,7 +4139,11 @@ function routeFromHash() {
 // no longer exists (or a failed API call) falls back to its list page.
 function openRoute(route) {
   const fallback = id => { history.replaceState({type:'nav', id}, '', '#'+id); nav(id, false); };
-  if (route.type==='sector') {
+  if (route.type==='sectorPage') {
+    window.SectorCards.openSector(route.id, false);
+  } else if (route.type==='sectorModule') {
+    window.SectorCards.openModule(route.id, route.module, false);
+  } else if (route.type==='sector') {
     openSector(route.name, false).catch(() => {
       if (currentSection==='detail' && currentSector===route.name) fallback('sectors');
     });
@@ -4126,6 +4162,7 @@ function openRoute(route) {
   } else {
     nav(route.id, false);
     if (route.session) window.ForestMap?.openSession(route.session).catch(() => {});
+    if (route.sector) window.ForestMap?.focusSector?.(route.sector);
     if (route.satEvent) window.ForestMapSat?.openEvent(route.satEvent);
     else if (route.satArea) window.ForestMapSat?.openArea(route.satArea);
     if (route.event) window.SatMonitoring?.openEvent(route.event);
@@ -4139,6 +4176,8 @@ window.addEventListener('popstate', e=>{
   if (state.type==='nav') nav(state.id, false);
   else if (state.type==='object') openObject(state.id, false);
   else if (state.type==='sector') openSector(state.name, false);
+  else if (state.type==='sectorPage') window.SectorCards?.openSector(state.id, false);
+  else if (state.type==='sectorModule') window.SectorCards?.openModule(state.id, state.module, false);
   else if (state.type==='risk') openRisk(state.id, false);
   else if (state.type==='financial-breakdown') openFinancialBreakdown(false);
   else if (state.type==='integration') nav('integration-detail', false);  // removed page -> Overview

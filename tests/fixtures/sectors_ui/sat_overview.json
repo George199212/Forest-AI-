@@ -1,0 +1,358 @@
+{
+ "_captured": "2026-11-17 from sandbox 127.0.0.1:8040 on copies of live forest_ai.db (sha 75f527a2) + satellite.db (sha 7affc129); personal/identity fields redacted",
+ "_source": "GET /api/sat-monitoring/overview",
+ "data": {
+  "areas": [
+   {
+    "active": true,
+    "added_at_utc": "2026-11-10T13:20:07Z",
+    "added_by": "<redacted>",
+    "area_ha": 50.4881,
+    "buffer_m": 100.0,
+    "data_status": "OK",
+    "gaps": {
+     "days_since_last_s1": 3.2,
+     "days_since_last_valid_s2": 11.0,
+     "max_gap_days_valid_s2_window": 13.0,
+     "window_days": 120
+    },
+    "geometry": {
+     "coordinates": [
+      [
+       [
+        24.1958,
+        56.968
+       ],
+       [
+        24.213,
+        56.965
+       ],
+       [
+        24.213,
+        56.9615
+       ],
+       [
+        24.1988,
+        56.9617
+       ],
+       [
+        24.1958,
+        56.968
+       ]
+      ]
+     ],
+     "type": "Polygon"
+    },
+    "grid_bbox": [
+     24.19398741,
+     56.960511858,
+     24.214914585,
+     56.969045814
+    ],
+    "id": 1,
+    "last_s1_utc": "2026-11-14T04:34:09Z",
+    "last_s2_any": {
+     "sensing_time_utc": "2026-11-16T09:44:43.122Z",
+     "status": "SKIPPED_CLOUD",
+     "valid_pct_inside": null
+    },
+    "last_valid_s2_utc": "2026-11-06T09:44:43.447Z",
+    "last_valid_s2_valid_pct": 99.841,
+    "name": "BIK-001",
+    "open_jobs": [],
+    "open_suspected_events": 0,
+    "recent_observation": true,
+    "recovered_events": 0,
+    "removed_at_utc": null,
+    "reviewed_events": 0,
+    "source": "SECTOR",
+    "source_ref": "26"
+   },
+   {
+    "active": true,
+    "added_at_utc": "2026-11-11T07:06:54Z",
+    "added_by": "<redacted>",
+    "area_ha": 3670.1653,
+    "buffer_m": 100.0,
+    "data_status": "OK",
+    "gaps": {
+     "days_since_last_s1": 3.2,
+     "days_since_last_valid_s2": 21.0,
+     "max_gap_days_valid_s2_window": 13.0,
+     "window_days": 120
+    },
+    "geometry": {
+     "coordinates": [
+      [
+       [
+        24.1,
+        56.812
+       ],
+       [
+        24.2,
+        56.812
+       ],
+       [
+        24.2,
+        56.866
+       ],
+       [
+        24.1,
+        56.866
+       ],
+       [
+        24.1,
+        56.812
+       ]
+      ]
+     ],
+     "type": "Polygon"
+    },
+    "grid_bbox": [
+     24.098193503,
+     56.811011858,
+     24.201820753,
+     56.867066475
+    ],
+    "id": 2,
+    "last_s1_utc": "2026-11-14T04:34:09Z",
+    "last_s2_any": {
+     "sensing_time_utc": "2026-11-16T09:44:43.122Z",
+     "status": "SKIPPED_CLOUD",
+     "valid_pct_inside": null
+    },
+    "last_valid_s2_utc": "2026-10-27T09:44:44.138Z",
+    "last_valid_s2_valid_pct": 97.815,
+    "name": "Kekava positive control",
+    "open_jobs": [],
+    "open_suspected_events": 8,
+    "recent_observation": true,
+    "recovered_events": 1,
+    "removed_at_utc": null,
+    "reviewed_events": 0,
+    "source": "EVAL_BBOX",
+    "source_ref": "kekava-2026-vmd-clearcuts"
+   },
+   {
+    "active": true,
+    "added_at_utc": "2026-11-17T05:54:18Z",
+    "added_by": "<redacted>",
+    "area_ha": 0.5346,
+    "buffer_m": 100.0,
+    "data_status": "OK",
+    "gaps": {
+     "days_since_last_s1": 2.2,
+     "days_since_last_valid_s2": 11.0,
+     "max_gap_days_valid_s2_window": 20.0,
+     "window_days": 120
+    },
+    "geometry": {
+     "coordinates": [
+      [
+       [
+        27.61568720782613,
+        55.88899228531753
+       ],
+       [
+        27.615510834353135,
+        55.88891465237744
+       ],
+       [
+        27.615509466394258,
+        55.888940004386875
+       ],
+       [
+        27.61548701280206,
+        55.889356106985645
+       ],
+       [
+        27.615068599907318,
+        55.88972589555217
+       ],
+       [
+        27.615153795968148,
+        55.89017782523462
+       ],
+       [
+        27.615057518965596,
+        55.89030183821924
+       ],
+       [
+        27.614678795678078,
+        55.890518980736914
+       ],
+       [
+        27.61452812532146,
+        55.89075365567907
+       ],
+       [
+        27.61586733703765,
+        55.890314384367564
+       ],
+       [
+        27.615596336935678,
+        55.890182992682206
+       ],
+       [
+        27.61552401020176,
+        55.88998516769357
+       ],
+       [
+        27.61551619844964,
+        55.88978544682287
+       ],
+       [
+        27.615604034740297,
+        55.88957079473599
+       ],
+       [
+        27.615848652256556,
+        55.889303060031295
+       ],
+       [
+        27.615968338652397,
+        55.889210579959695
+       ],
+       [
+        27.616006660252157,
+        55.88918096904778
+       ],
+       [
+        27.61595839379277,
+        55.889152484409834
+       ],
+       [
+        27.615866543784016,
+        55.88909822507553
+       ],
+       [
+        27.61568720782613,
+        55.88899228531753
+       ]
+      ]
+     ],
+     "type": "Polygon"
+    },
+    "grid_bbox": [
+     27.612766058,
+     55.88792651,
+     27.617892071,
+     55.891789248
+    ],
+    "id": 3,
+    "last_s1_utc": "2026-11-15T04:26:13Z",
+    "last_s2_any": {
+     "sensing_time_utc": "2026-11-16T09:34:46.008Z",
+     "status": "SKIPPED_CLOUD",
+     "valid_pct_inside": null
+    },
+    "last_valid_s2_utc": "2026-11-06T09:34:45.743Z",
+    "last_valid_s2_valid_pct": 100.0,
+    "name": "VMD 348-21 (60…(11))",
+    "open_jobs": [],
+    "open_suspected_events": 0,
+    "recent_observation": true,
+    "recovered_events": 0,
+    "removed_at_utc": null,
+    "reviewed_events": 0,
+    "source": "LVM_GEO",
+    "source_ref": "VMD:nodala2454:49647452"
+   },
+   {
+    "active": true,
+    "added_at_utc": "2026-11-17T08:03:13Z",
+    "added_by": "<redacted>",
+    "area_ha": 0.211,
+    "buffer_m": 100.0,
+    "data_status": "OK",
+    "gaps": {
+     "days_since_last_s1": 2.2,
+     "days_since_last_valid_s2": 21.0,
+     "max_gap_days_valid_s2_window": 40.0,
+     "window_days": 120
+    },
+    "geometry": {
+     "coordinates": [
+      [
+       [
+        26.811951820397024,
+        57.45495705053835
+       ],
+       [
+        26.811941791281157,
+        57.454826488942395
+       ],
+       [
+        26.809800351337273,
+        57.454802924907916
+       ],
+       [
+        26.809591079497064,
+        57.45495026631467
+       ],
+       [
+        26.80954703928427,
+        57.45495124834921
+       ],
+       [
+        26.811375002658615,
+        57.454955662967706
+       ],
+       [
+        26.811379128946527,
+        57.45495324675907
+       ],
+       [
+        26.81140143889142,
+        57.454955726478026
+       ],
+       [
+        26.811951820397024,
+        57.45495705053835
+       ]
+      ]
+     ],
+     "type": "Polygon"
+    },
+    "grid_bbox": [
+     26.807710219,
+     57.453814783,
+     26.813888614,
+     57.455970729
+    ],
+    "id": 4,
+    "last_s1_utc": "2026-11-15T04:25:48Z",
+    "last_s2_any": {
+     "sensing_time_utc": "2026-11-16T09:44:37.899Z",
+     "status": "NO_VALID_PIXELS",
+     "valid_pct_inside": 0.0
+    },
+    "last_valid_s2_utc": "2026-10-27T09:34:35.826Z",
+    "last_valid_s2_valid_pct": 100.0,
+    "name": "Т-56 — K1 N23 [nodala2851:60028580]",
+    "open_jobs": [],
+    "open_suspected_events": 0,
+    "recent_observation": true,
+    "recovered_events": 0,
+    "removed_at_utc": null,
+    "reviewed_events": 0,
+    "source": "SECTOR",
+    "source_ref": "76"
+   }
+  ],
+  "generated_at_utc": "2026-11-17T10:20:43Z",
+  "kpis": {
+   "awaiting_data": 0,
+   "monitored_areas": 4,
+   "open_suspected_events": 8,
+   "recent_days": 14,
+   "recovered_events": 1,
+   "with_recent_observations": 4
+  },
+  "labels": {
+   "attribution": "Contains modified Copernicus Sentinel data 2026",
+   "interpretation": "automated, suspected change only"
+  },
+  "pending_area_jobs": []
+ }
+}

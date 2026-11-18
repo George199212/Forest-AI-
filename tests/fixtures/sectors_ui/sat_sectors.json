@@ -1,0 +1,603 @@
+{
+ "_captured": "2026-11-17 from sandbox 127.0.0.1:8040 on copies of live forest_ai.db (sha 75f527a2) + satellite.db (sha 7affc129); personal/identity fields redacted",
+ "_source": "GET /api/sat-monitoring/sectors",
+ "data": {
+  "sectors": [
+   {
+    "has_polygon": false,
+    "id": 1,
+    "monitored_area_id": null,
+    "name": "A-004",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 2,
+    "monitored_area_id": null,
+    "name": "A-005",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 3,
+    "monitored_area_id": null,
+    "name": "A-006",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 4,
+    "monitored_area_id": null,
+    "name": "A-007 — Сигулдский лес:",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 5,
+    "monitored_area_id": null,
+    "name": "A-008",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 26,
+    "monitored_area_id": 1,
+    "name": "BIK-001",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 97,
+    "monitored_area_id": null,
+    "name": "Dob23 — K1 N2 [nodala2652:50510801]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 95,
+    "monitored_area_id": null,
+    "name": "Dob23 — K1 N3 [nodala2652:131772072]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 96,
+    "monitored_area_id": null,
+    "name": "Dob23 — K1 N4 [nodala2652:131772074]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 35,
+    "monitored_area_id": null,
+    "name": "Kengarags · 64…(11)",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 34,
+    "monitored_area_id": null,
+    "name": "Kengarags · 64…(11)",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 81,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N10 [nodala2454:49647440]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 82,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N11 [nodala2454:49647441]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 83,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N12 [nodala2454:49647442]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 89,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N13 [nodala2454:65641212]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 84,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N15 [nodala2454:49647445]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 92,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N17 [nodala2454:95554179]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 85,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N18 [nodala2454:49647448]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 86,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N19 [nodala2454:49647449]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 87,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N20 [nodala2454:49647451]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 94,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N22 [nodala2454:95554182]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 91,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N24 [nodala2454:80607069]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 88,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N26 [nodala2454:60358895]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 90,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N4 [nodala2454:65641213]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 93,
+    "monitored_area_id": null,
+    "name": "LG917 — K348 N9 [nodala2454:95554181]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 36,
+    "monitored_area_id": null,
+    "name": "<redacted: personal surname> Sektors",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 80,
+    "monitored_area_id": null,
+    "name": "R123 — K2 N23 [nodala2256:49700776]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 79,
+    "monitored_area_id": null,
+    "name": "R123 — K2 N25 [nodala2256:144427331]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 70,
+    "monitored_area_id": null,
+    "name": "RD-9999 — K1 N11 [nodala2855:60176628]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 69,
+    "monitored_area_id": null,
+    "name": "RD-9999 — K1 N2 [nodala2855:60176621]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 71,
+    "monitored_area_id": null,
+    "name": "RD-9999 — K1 N21 [nodala2855:60176638]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": false,
+    "id": 21,
+    "monitored_area_id": null,
+    "name": "S- 123",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 12,
+    "monitored_area_id": null,
+    "name": "S-001 — <property name>",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 15,
+    "monitored_area_id": null,
+    "name": "S-001 — <property name>",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 13,
+    "monitored_area_id": null,
+    "name": "S-002 — <property name>",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 16,
+    "monitored_area_id": null,
+    "name": "S-002 — <property name>",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 14,
+    "monitored_area_id": null,
+    "name": "S-003 — <property name>",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 17,
+    "monitored_area_id": null,
+    "name": "S-003 — <property name>",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 9,
+    "monitored_area_id": null,
+    "name": "S-004",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": false,
+    "id": 18,
+    "monitored_area_id": null,
+    "name": "S-004",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 61,
+    "monitored_area_id": null,
+    "name": "S003 — K1 N10 [nodala2853:51037278]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 62,
+    "monitored_area_id": null,
+    "name": "S003 — K1 N11 [nodala2853:51037279]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 63,
+    "monitored_area_id": null,
+    "name": "S003 — K1 N12 [nodala2853:51037280]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 64,
+    "monitored_area_id": null,
+    "name": "S003 — K1 N13 [nodala2853:51037281]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 65,
+    "monitored_area_id": null,
+    "name": "S003 — K1 N3 [nodala2853:51037290]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 66,
+    "monitored_area_id": null,
+    "name": "S003 — K1 N6 [nodala2853:51037293]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 67,
+    "monitored_area_id": null,
+    "name": "S003 — K1 N7 [nodala2853:51037294]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 68,
+    "monitored_area_id": null,
+    "name": "S003 — K1 N9 [nodala2853:51037296]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": false,
+    "id": 19,
+    "monitored_area_id": null,
+    "name": "Sectors 124",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 58,
+    "monitored_area_id": null,
+    "name": "Sektors - 1999 — K1 N10 [nodala2255:98895542]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 59,
+    "monitored_area_id": null,
+    "name": "Sektors - 1999 — K1 N4 [nodala2255:98895536]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 60,
+    "monitored_area_id": null,
+    "name": "Sektors 00004-1",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 55,
+    "monitored_area_id": null,
+    "name": "Sektors 1985 — K1 N19 [nodala2851:111803718]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 56,
+    "monitored_area_id": null,
+    "name": "Sektors 1985 — K1 N25 [nodala2851:124955755]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 57,
+    "monitored_area_id": null,
+    "name": "Sektors B-256",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 37,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N10 [nodala2251:50525112]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 38,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N11 [nodala2251:50526124]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 39,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N12 [nodala2251:50526125]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 40,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N13 [nodala2251:50526126]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 41,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N14 [nodala2251:50526127]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 42,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N15 [nodala2251:50526128]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 43,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N16 [nodala2251:50526129]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 44,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N17 [nodala2251:50526130]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 45,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N19 [nodala2251:50526132]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 46,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N20 [nodala2251:50526134]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 47,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N21 [nodala2251:50526135]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 48,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N22 [nodala2251:50526136]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 49,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N23 [nodala2251:50526137]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 50,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N24 [nodala2251:50526138]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 51,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N4 [nodala2251:50526141]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 52,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N5 [nodala2251:50526142]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 53,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N6 [nodala2251:50526143]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 54,
+    "monitored_area_id": null,
+    "name": "Sektors jauns 123 — K1 N7 [nodala2251:50526144]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 30,
+    "monitored_area_id": null,
+    "name": "VMD 40…(11) - 1-6",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 31,
+    "monitored_area_id": null,
+    "name": "VMD 40…(11) - K1 - N1 [nodala2651:49703938]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 33,
+    "monitored_area_id": null,
+    "name": "VMD 40…(11) - K1 - N5 [nodala2651:49703942]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 32,
+    "monitored_area_id": null,
+    "name": "VMD 40…(11) - K1 - N9 [nodala2651:49703946]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 72,
+    "monitored_area_id": null,
+    "name": "Т-56 — K1 N10 [nodala2851:49672538]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 73,
+    "monitored_area_id": null,
+    "name": "Т-56 — K1 N13 [nodala2851:49672541]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 78,
+    "monitored_area_id": null,
+    "name": "Т-56 — K1 N15 [nodala2851:87330979]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 74,
+    "monitored_area_id": null,
+    "name": "Т-56 — K1 N18 [nodala2851:49672546]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 75,
+    "monitored_area_id": null,
+    "name": "Т-56 — K1 N22 [nodala2851:60028578]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 76,
+    "monitored_area_id": 4,
+    "name": "Т-56 — K1 N23 [nodala2851:60028580]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": true,
+    "id": 77,
+    "monitored_area_id": null,
+    "name": "Т-56 — K1 N24 [nodala2851:60028582]",
+    "queued_job_id": null
+   },
+   {
+    "has_polygon": false,
+    "id": 20,
+    "monitored_area_id": null,
+    "name": "Ы-13223",
+    "queued_job_id": null
+   }
+  ]
+ }
+}

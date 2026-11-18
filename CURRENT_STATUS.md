@@ -7,6 +7,21 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-18 10:34 UTC — Sectors as satellite-first workspace is LIVE on :8000
+
+- :8000 runs `/root/forest_ai/releases/forest-api-sectors-workspace-20261118T1017Z` (`574e535`, `geo-621ad7f28437`, backend `06c49c04bb64`) since 10:33:58 UTC via
+  drop-in `99-zz-sectors-workspace-release.conf`. Rollback = remove that drop-in, daemon-reload, restart forest-api →
+  `…remove-integrations-page-20261118T0532Z` (commands in `docs/DEPLOY_RELEASES.md`). No DB migration; backups in
+  `/root/backups/sectors_release_20261118T1017Z/`.
+- New: Sectors list as cards (`GET /api/sectors/cards`, one request, 66 ms at 85 sectors vs 976 ms for `/api/sectors`),
+  one sector page `#sectors/{id}` (map with the latest valid Sentinel image + compact panel; legacy tabs/KPI/gauge only
+  behind `SECTOR_LEGACY_MODULES`), Meža karte "Atvērt sektoru" + `#forest-map?sector={id}`, archive filter that activates
+  only when `sectors.archived_at` exists (it does not; D14 not applied).
+- Waiting on Stage 5 (satellite workspace, unreleased): `SatWorkspace.mount` (fallback B used now), worst-event colour
+  dots, "Pēdējā veiksmīgā analīze" (shows "Nav pieejams" until the API has the field).
+- Next: rebuild `feature/swipe-fix` on top of this release (separate approval); D13 auto-monitoring and D14 archive are
+  proposals only; the tag `prod-2026-11-18-sectors-workspace` is local (pre-push scan hits in older pushed commits).
+
 ## Update 2026-11-17 07:20 UTC — release `forest-api-satellite-monitoring-20261117T0521Z` LIVE on :8000
 
 - :8000 and the satellite worker units run `/root/forest_ai/releases/forest-api-satellite-monitoring-20261117T0521Z` (`bc8c428`, `geo-d7081327a3d2`)

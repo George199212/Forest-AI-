@@ -1,5 +1,23 @@
 # Known Bugs / Limitations
 
+- **Sectors release 2026-11-18 — limitations until Stage 5 (satellite workspace) is released:** the sector page shows the
+  map fallback (no embedded workspace, no `SatWorkspace.mount`), cards have no worst-event colour dot (the colour function is
+  imported from Stage 5, not re-implemented), and "Pēdējā veiksmīgā analīze" shows "Nav pieejams" because the production
+  satellite API has no `last_successful_analysis_utc` yet.
+- **Sectors archive (D14) not applied:** the archive filter is in `/api/sectors`, `/api/objects`, `/api/sectors/cards` and
+  Meža karte only; the Telegram bot sector list (`bot.py:581`) and GPS classification (`services/geodata/gps_map.py:71`) are
+  not archive-aware yet. Demo scenarios use A-005/A-006/A-007 by name.
+
+- **Refresh / Atjaunot label inconsistent (found 2026-11-18, Sectors Stage 3 review).** The top-bar refresh button is set in
+  `index.html` `nav()` (`page-refresh` text): "↻ Atjaunot" only for `lvm-geodata`, `forest-map` and `sat-monitoring`,
+  "↻ Refresh" everywhere else — including the Sectors list and sector page, whose content is Latvian. Same page, mixed
+  languages; the sector page (`#sectors/{id}`, opened outside `nav()`) keeps whatever label the previous page set. Not fixed.
+- **Meža karte sector popup says "atrašanās Latvijā nav pārbaudīta" for sectors inside Latvia (found 2026-11-18, e.g. T-56).**
+  `services/geodata/forest_map.py` `sectors()` marks every polygon that passes its Latvia bbox check
+  (20 ≤ lon ≤ 29, 55 ≤ lat ≤ 59) as `valid_boundary`, and `assets/forest-map.js` shows `sectorBorderWarning` ("Saglabātā
+  robeža ir ģeometriski derīga, bet atrašanās Latvijā nav pārbaudīta") for every `valid_boundary`. So a sector well inside
+  Latvia still gets the "not verified" wording. Misleading, not a data error. Not fixed (Meža karte copy decision).
+
 - Vehicle GPS route (History → Vehicles → click plate → map): the route is built only from
   manual GPS pings sent via the Telegram bot's "🚛 Vehicle GPS" flow, not from a continuous
   live track. Points appear only when a driver explicitly sends a location for that vehicle.
