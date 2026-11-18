@@ -585,7 +585,9 @@
     sec.innerHTML = '<div class="sc-loading">' + esc(t('loading')) + '</div>';
     var card;
     try { await loadCards(); card = S.cards.filter(function (c) { return String(c.id) === String(id); })[0]; } catch (e) { card = null; }
-    if (!card && /^\d+$/.test(String(id)) && !global.SECTOR_CARDS_URL) {   // archived (not in the list): one card by id
+    // An id missing from the list can only be an archived sector, and only when the archive column exists:
+    // ask /cards/{id} then, never otherwise (an unknown id → "Sektors nav atrasts" without a 404 request).
+    if (!card && /^\d+$/.test(String(id)) && !global.SECTOR_CARDS_URL && S.meta && S.meta.archive_column === true) {
       try { var one = await getJson('/api/sectors/cards/' + encodeURIComponent(id)); card = one && one.sector; } catch (e) { card = null; }
     }
     if (seq !== S.seq) return;

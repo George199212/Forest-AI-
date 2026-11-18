@@ -168,3 +168,9 @@ test('Izmaiņas wording: "Analīze nav veikta" only when the API says so; a miss
   assert.match(text({events: [], last_successful_analysis_utc: null}), /Analīze nav veikta/);
   assert.match(text({events: [], last_successful_analysis_utc: '2026-11-18T05:34:00Z'}), /Izmaiņas nav konstatētas/);
 });
+
+test('G1: /api/sectors/cards/{id} is requested only when the API reports an archive column', () => {
+  const src = read('assets/sectors-cards.js');
+  assert.match(src, /if \(!card && \/\^\\d\+\$\/\.test\(String\(id\)\) && !global\.SECTOR_CARDS_URL && S\.meta && S\.meta\.archive_column === true\) \{/);
+  assert.equal((src.match(/'\/api\/sectors\/cards\/'/g) || []).length, 1);
+});
