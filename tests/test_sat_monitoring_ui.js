@@ -147,3 +147,26 @@ test('event images: true colour (default) only when both images have it; false c
  assert.match(sat._T_LV.bandNoTrue,/^Patiesās krāsas \(B04 \/ B03 \/ B02\) šiem attēliem nav ielādētas/);
  assert.match(sat._T_LV.bandS2,/^Sentinel-2 viltus krāsas \(B11 \/ B08 \/ B04\)/);
 });
+test('swipe (D7): divider + handle + labels on the map, container-pixel split, zoomanim clip, no range input',()=>{
+ const src=read('assets/sat-monitoring.js'),css=read('assets/sat-monitoring.css');
+ const sw=src.slice(src.indexOf('function swipeMap('),src.indexOf('function row(label'));
+ assert.doesNotMatch(src,/satm-swipe-range/);
+ for(const c of ['satm-swipe-divider','satm-swipe-handle','satm-swipe-label-before','satm-swipe-label-after'])assert.match(sw,new RegExp(c));
+ assert.match(sw,/setAttribute\('role', 'slider'\)/);assert.match(sw,/ArrowLeft/);
+ assert.match(sw,/map\.on\('move zoom zoomanim viewreset resize moveend zoomend', clip\)/);
+ assert.match(sw,/containerPointToLayerPoint\(\[x, 0\]\)/);
+ assert.match(sw,/basemap\(L, map\)/);assert.match(sw,/fitView\(map, focus \|\| b\)/);
+ for(const c of ['.satm-swipe-divider','.satm-swipe-handle','.satm-basemap'])assert.ok(css.includes(c),c);
+});
+test('compare focus = event polygons with pixel padding (event 62 no longer opens at grid scale)',()=>{
+ const src=read('assets/sat-monitoring.js');
+ const f=src.slice(src.indexOf('function focusBounds('),src.indexOf('function fitView('));
+ assert.doesNotMatch(f,/\.pad\(/);assert.match(f,/full\.intersects\(b\) \? b : full/);
+ assert.match(src,/function fitView\(map, bounds\) \{ map\.fitBounds\(bounds, \{padding: \[28, 28\], maxZoom: 16, animate: false\}\); \}/);
+});
+test('swipe/basemap strings: EN + LV (basemap labelled undated, not Sentinel)',()=>{
+ const sat=loadSat();
+ assert.equal(sat._T_LV.swipeHandle,'Velciet, lai salīdzinātu pirms / pēc');
+ assert.equal(sat._T_LV.basemapNote,'Fona karte: OpenStreetMap (nav datēta, nav Sentinel)');
+ assert.equal(sat._T.basemapNote,'Background map: OpenStreetMap (not dated, not Sentinel)');
+});
