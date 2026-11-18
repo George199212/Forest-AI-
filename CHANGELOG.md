@@ -2,6 +2,21 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-18 — Sectors as satellite-first workspace: DEPLOYED to :8000 at 10:33:58 UTC
+
+- Release `forest-api-sectors-workspace-20261118T1017Z` (branch `feature/sectors-workspace` @ `574e535`, `geo-621ad7f28437`) via drop-in
+  `99-zz-sectors-workspace-release.conf`; base = production `b86ebf4` (Integrations page removed).
+- Sectors list: cards with an honest preview (Sentinel-2 quicklook + polygon, or polygon-only; "par mazu" below 64 S2 px),
+  status from stored data (Monitorēts / Gaida pirmos datus / Netiek monitorēts / Apturēts), last valid S2 and last S1
+  separately, suspected vs confirmed counts, search + status filter + pagination, LV/EN; Objects → sectors as cards.
+- One sector page `#sectors/{id}`: header, map (fallback B until the satellite workspace can be mounted), panel Sektors ·
+  Satelīta monitorings (acquisition / analysis / system check) · Izmaiņas · Riski · Aktivitāte (counters with links to the
+  existing per-sector views; Foto → photo comparison in 1 click); detection note below 0.5 ha (`DETECTION_MIN_HA`).
+- API: `GET /api/sectors/cards`, `GET /api/sectors/cards/{id}` (read-only, Basic Auth). Archive filter in
+  `/api/sectors`, `/api/objects`, Meža karte only when `sectors.archived_at` exists (no migration).
+- Meža karte: sector popup "Atvērt sektoru"; `#forest-map?sector={id}` focuses a sector.
+- Legacy sector detail (13 tabs, KPI row, risk gauge, exposure, satellite upload) only with `SECTOR_LEGACY_MODULES=1`.
+
 ## 2026-11-16 (evening) — `feature/satellite-monitoring`: UI review fixes (not deployed)
 
 - Detection: fragmentation rule (largest cluster < 30 % of the current area → POSSIBLE_SEASONAL_OR_ENVIRONMENTAL,
