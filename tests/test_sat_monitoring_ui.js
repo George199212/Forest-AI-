@@ -61,7 +61,7 @@ test('event images: latest S2 after-image, before-image of the same sensor',()=>
 test('sidebar: one new item right after Sectors under MONITOR; order of existing items unchanged; navMap matches',()=>{
  const html=read('index.html'),nav=html.slice(html.indexOf('<nav>'),html.indexOf('</nav>'));
  const ids=[...nav.matchAll(/class="nav-item[^"]*"[^>]*onclick="(?:objectFilter=undefined;)?nav\('([^']+)'\)"/g)].map(m=>m[1]);
- assert.deepEqual(ids,['overview','objects','sectors','sat-monitoring','risks','gps','trucks','timber','photos','inspector','satellite','lvm-geodata','integrations','forest-map']);
+ assert.deepEqual(ids,['overview','objects','sectors','sat-monitoring','risks','gps','trucks','timber','photos','inspector','satellite','lvm-geodata','forest-map']);
  const groups=[...nav.matchAll(/class="nav-group"[^>]*>([^<]+)</g)].map(m=>m[1]);
  assert.deepEqual(groups,['Monitor','Operations','AI','Admin']);
  assert.ok(nav.indexOf("nav('sat-monitoring')")<nav.indexOf('>Operations<'));
