@@ -144,7 +144,7 @@ bot.py:161/172/241, services/robez_ocr_vision.py:59/202/472. Affected sectors:
 | id | name | finding |
 |---|---|---|
 | 9 | S-004 | **outside Latvia** (58.87 N, 28.71 E), bot/OCR origin |
-| 15, 16, 17 | S-00x — Plieksana zeme (plan 17) | **outside Latvia** (58.90 N, 32.74 E) |
+| 15, 16, 17 | S-00x — <property name> (plan 17) | **outside Latvia** (58.90 N, 32.74 E) |
 | 12, 13, 14 | S-00x — Mūrnieku Jāņa (plan 16) | inside Latvia, but created through the same converter: **suspect, not verifiable** without the source plan |
 | 18–21 | manual drafts on plans 16/17 | no boundary |
 
@@ -232,7 +232,7 @@ non-zero ones:
 Findings that block a safe archive by name:
 - **Duplicate name "S-004"** (ids 9 and 18). Every name-keyed row (7 sessions, 10 AI analyses) matches both, so neither
   can be archived "cleanly".
-- **Orphan or mismatched names** (rows whose `sector` matches no sector): risks `'A-005 — Rigas Mezi'` ×5 (3 DEMO_SCENARIO),
+- **Orphan or mismatched names** (rows whose `sector` matches no sector): risks `'A-005 — <client>'` ×5 (3 DEMO_SCENARIO),
   `'A-007'` ×2, `'TEST-STAGE1B'` ×1, `'TEST-STAGE2B'` ×1; sector_employees `'A-007'` ×1; ai_inspector_analyses `NULL` ×15.
 - LVM GEO sectors 30–97: I cannot tell test from production from the data (all REAL, all created by the dashboard account
   2026-10-30…11-17; LG917 and Dob23 were created today). **No proposal without the owner's list.**
@@ -303,3 +303,19 @@ branch.
 - **D7** Should LVM_GEO areas count as a sector's monitoring when `source_ref = geodata_sources.source_feature_id`?
 - **D8** Inventory classification (§6): your list of TEST / LEGACY / keep, especially ids 30–97 and the duplicate S-004.
 - **D9** Flag name/default for the legacy modules (`SECTOR_LEGACY_MODULES`, off).
+
+## 11. Owner decisions (2026-11-17, "approved, with these changes")
+
+- **D1** Option A. `SatWorkspace.mount(el, opts)` is added by the Stage 5 session before its release; this branch never
+  edits `sat-workspace.js`. The Stage 1 prototype may stub the mount call.
+- **D2** O1–O4: UI removed; O5 + O6 behind the flag; backend unchanged.
+- **D3** Ķekava payload only as a Stage 1 fixture, labelled "test area, not a sector"; never in Stage 2 code paths or the release.
+- **D4** No pixelated previews. Longest side of the sector < 64 Sentinel-2 px (10 m) → polygon-only preview labelled
+  "Sentinel-2 10 m — sektors par mazu priekšskatījumam" / "Sentinel-2 10 m — sector too small for a preview". The
+  threshold is a named constant.
+- **D5** Separate dates: primary = last valid S2 sensing date; secondary line = last S1 date. Never one combined date.
+- **D6** Approved: read-only, Basic Auth, with tests.
+- **D7** As recommended: exact `source_ref = geodata_sources.source_feature_id` match only, read-only, the source is shown.
+- **D8** Archive nothing. The owner classifies ids 30–97 later.
+- **D9** `SECTOR_LEGACY_MODULES`, default off (serve_index flag pattern).
+- **D10** Both branches pushed by the owner.
