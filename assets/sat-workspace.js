@@ -1,13 +1,11 @@
 /*
- * Forest AI — Satellite Intelligence Workspace (Stage 5, prototype variant B, branch feature/satellite-workspace).
- * Map-first workspace on top of the existing /api/sat-monitoring/* API (read-only additions of 2026-11-17).
- * NOT deployed. Mounted into #satm-root (section #sec-sat-monitoring); window.SatMonitoring keeps lvmButton and the
- * other legacy hooks, only load / openArea / openEvent are routed here (see the bottom of this file).
- *
- * Rules (owner): wording "Iespējamas izmaiņas / Suspected change"; raw observation, processed measurement, system
- * interpretation and human decision are separate blocks; missing = "Nav pieejams", never 0; no fabricated imagery or
- * timestamps; "Contains modified Copernicus Sentinel data [YEAR]" under every Sentinel image; processing time is never
- * shown as the event time. Base map = OSM (Esri World Imagery is not offered: licence not clear for commercial use).
+ * Forest AI — Satelītu monitorings workspace (Stage C1, owner-approved concept 2026-11-18).
+ * One workspace: Teritorija (start) · Izmaiņas (area / event) · Pierādījumi (existing event page, unchanged).
+ * Every value comes from /api/sat-monitoring/* (or the reused Forest Map read endpoints); missing = "Nav pieejams",
+ * never 0. Wording "Iespējamas izmaiņas / Suspected change"; raw observation, processed measurement, system
+ * interpretation and human decision stay separate. "Contains modified Copernicus Sentinel data YEAR" on the map.
+ * Base map = faint OSM, labelled "not dated, not Sentinel" (Esri is not offered: licence).
+ * Mounted into #satm-root; window.SatMonitoring keeps lvmButton and the legacy event page (Pierādījumi).
  */
 (function (global) {
   'use strict';
@@ -15,10 +13,13 @@
   var OSM = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
   var LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  var FONTS_CSS = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap';
   var VMD_TILES = '/api/geodata/forest-map/tiles/forest/{z}/{x}/{y}';
+  var GEO = '/api/geodata';
   var DAY = 86400000;
+  var BIG_AREA_HA = 20;            // area cards: >= 20 ha before|after thumbnails, smaller areas boundary + NDVI sparkline
 
-  // ── §4.4 change colour language: ONE table, the legend is generated from it ─────────────────────────────
+  // ── change colour language (v3 §5.5): ONE table, the legend is generated from it ─────────────────────────────────
   var OPEN = ['SUSPECTED', 'FIELD_CHECK_REQUESTED'];
   var LOSS = ['POTENTIAL_FOREST_LOSS', 'POTENTIAL_CHANGE_OUTSIDE_BOUNDARY'];
   var CHANGE_COLOURS = [
@@ -43,8 +44,15 @@
     (events || []).forEach(function (e) { var c = changeColour(e); if (!best || c.rank > best.rank) best = c; });
     return best;
   }
+  function isOpen(e) { return OPEN.indexOf(e && e.status) >= 0; }
+  // "Most severe open event": colour rank (table order), then newest onset.
+  function worstOpenEvent(events) {
+    return (events || []).filter(isOpen).sort(function (x, y) {
+      return changeColour(y).rank - changeColour(x).rank || String(y.first_after_time_utc || '').localeCompare(String(x.first_after_time_utc || ''));
+    })[0] || null;
+  }
 
-  // ── time: stored UTC → Europe/Riga with an explicit offset ("07:38 EET, 05:38 UTC") ─────────────────────────
+  // ── time: stored UTC → Europe/Riga with an explicit offset ─────────────────────────────────────────────────────────
   function parseUtc(s) { if (!s) return null; var d = new Date(String(s).replace(' UTC', 'Z')); return isNaN(d) ? null : d; }
   function rigaParts(d) {
     var f = new Intl.DateTimeFormat('en-GB', {timeZone: 'Europe/Riga', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -64,8 +72,20 @@
     return (opts && opts.timeOnly ? '' : r.date + ' ') + r.time + ' ' + r.abbr + ', ' + utc;
   }
   function fmtDate(s) { var d = parseUtc(s); return d ? rigaParts(d).date : null; }
+  // Display date (Riga): LV "21.08.2026", EN "2026-08-21". short=true drops the year ("21.08.").
+  function fmtDay(s, lang, short) {
+    var d = parseUtc(s); if (!d) return null; var iso = rigaParts(d).date, p = iso.split('-');
+    if ((lang || S.lang) === 'lv') return short ? p[2] + '.' + p[1] + '.' : p[2] + '.' + p[1] + '.' + p[0];
+    return short ? p[1] + '-' + p[2] : iso;
+  }
+  // "09:02 EET · 07:02 UTC" (+ Riga date when it is not today's Riga date)
+  function fmtClock(s, lang, nowIso) {
+    var d = parseUtc(s); if (!d) return null; var r = rigaParts(d);
+    var today = rigaParts(nowIso ? parseUtc(nowIso) : new Date()).date;
+    return (r.date !== today ? fmtDay(s, lang, true) + ' ' : '') + r.time + ' ' + r.abbr + ' · ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' UTC';
+  }
 
-  // ── acquisitions: timeline state, compare-pair rules ───────────────────────────────────────────────────────────
+  // ── acquisitions: timeline state, compare-pair rules ───────────────────────────────────────────────────────────────
   function acqState(a, minValid) {
     if (!a) return 'invalid';
     if (a.status === 'SKIPPED_CLOUD') return 'cloud';
@@ -89,6 +109,7 @@
     if (!before || !after || before.sensor !== 'S2') return before && before.sensor === 'S1' ? 's1' : 'false';
     return wanted === 'true' && before.truecolor_url && after.truecolor_url ? 'true' : 'false';
   }
+  function singleComposite(a, wanted) { return !a ? null : a.sensor === 'S1' ? 's1' : wanted === 'true' && a.truecolor_url ? 'true' : 'false'; }
   function imageUrl(a, composite) { return composite === 'true' && a.truecolor_url ? a.truecolor_url : a.quicklook_url; }
   // default pair: last clear before + first after of the SAME sensor; S2 when the event has an S2 after-image
   function defaultPair(ev, byId, minValid) {
@@ -113,176 +134,230 @@
   }
   // VMD p_cirg / p_cirp: stored 0 / 0.0 / NULL mean "not stated" — never a year
   function vmdValue(v) { return v === null || v === undefined || v === '' || Number(v) === 0 ? null : (Number(v) % 1 === 0 ? String(Number(v)) : String(v)); }
+  // "Last clear acquisition without change" = latest valid baseline strictly before the first after-image.
+  function lastClearBeforeOf(ev, byId, mv) {
+    var onset = ev.first_after_time_utc ? String(parseUtc(ev.first_after_time_utc).toISOString()) : null;
+    var list = (ev.before || []).map(function (x) { return byId[x.acq_id] || x; }).filter(function (x) {
+      var d = parseUtc(x.sensing_time_utc);
+      return acqState(x, mv) === 'ok' && d && (!onset || d.toISOString() < onset);
+    });
+    return list.sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0] || null;
+  }
+  // Area events carry before_acq_ids / after_acq_ids (ids only); make them look like /events/{id} lists.
+  function eventLists(e) {
+    var ids = function (v) { return (v || []).map(function (i) { return {acq_id: i}; }); };
+    return {first_after_time_utc: e.first_after_time_utc, before: e.before || ids(e.before_acq_ids), after: e.after || ids(e.after_acq_ids)};
+  }
 
-  // ── strings ────────────────────────────────────────────────────────────────────────────────────────────────────
-  var T = {
-    lv: {
-      title: 'Satelītu monitorings', refresh: 'Atjaunot', na: 'Nav pieejams', notStated: 'nav norādīts',
-      areas: 'Uzraudzītās teritorijas', monitoredHa: 'Uzraudzītā platība', openEvents: 'Atvērtas iespējamās izmaiņas',
-      awaitingReview: 'Gaida pārskatīšanu', lastSync: 'Pēdējā veiksmīgā sinhronizācija', usage: 'Copernicus patēriņš šomēnes',
-      worker: 'Apstrādes process', latest: 'Jaunākās izmaiņas', allAreas: 'Visas teritorijas', addSector: 'Pievienot sektoru',
-      fetchNow: 'Ielādēt tagad', guard: 'drošības robeža', requests: 'pieprasījumi', noAreas: 'Vēl nav uzraudzītu teritoriju.',
-      noAreasHint: 'Pievienojiet sektoru vai izmantojiet “Pievienot satelītu monitoringam” sadaļā LVM GEO.',
-      noEvents: 'Šajā teritorijā nav iespējamo izmaiņu notikumu.', noEventsHint: 'Uzraudzība darbojas; izmaiņas nav konstatētas.',
-      noDataYet: 'Uzraudzība vēl nav sniegusi datus. Pirmā ielāde notiek, kad apstrādes process paņem uzdevumu.',
-      backfill: 'Notiek vēsturisko datu ielāde.', degraded: 'Copernicus piekļuves problēma', notConfigured: 'Apstrādes process ziņoja, ka trūkst Copernicus piekļuves datu.',
-      unknownProvider: 'Statuss nav zināms: apstrādes process vēl nav ziņojis par Copernicus piekļuvi.',
-      dbUnavailable: 'Satelītu monitoringa dati nav pieejami (satellite.db).', error: 'Kļūda',
-      lastAcq: 'Pēdējais satelīta uzņēmums', lastAnalysis: 'Pēdējā veiksmīgā analīze', lastCheck: 'Pēdējā sistēmas pārbaude',
-      system: 'sistēma', optical: 'S2 Optiskais', radar: 'S1 Radars', trueC: 'Patiesās krāsas', falseC: 'Viltus krāsas',
-      compare: 'Salīdzināt', layers: 'Slāņi', theme: 'Tēma', light: 'Gaišā', dark: 'Tumšā', back: '← Visas teritorijas',
-      events: 'Izmaiņu notikumi', lBoundary: 'Robeža', lBuffer: 'Buferzona', lChange: 'Izmaiņu poligoni',
-      lFootprint: 'Novērojuma pārklājums', lImage: 'Sentinel attēls', lVmd: 'VMD meža nogabali', lBase: 'Fona karte (OSM)',
-      inside: 'robežās', outside: 'ārpus robežas', onset: 'sākums',
-      cRed: 'Iespējams meža zudums — augsta/vidēja ticamība', cOrange: 'Iespējams meža zudums — zema ticamība',
-      cYellow: 'Iespējamas sezonālas vai vides izmaiņas / nepietiekami pierādījumi', cBlueGrey: 'Apstiprināts pārskatīšanā',
-      cGrey: 'Noraidīts vai atjaunojies', cUnknown: 'Cits statuss', hatch: 'Svītrots = ārpus robežas',
-      clsLOSS: 'Iespējams meža zudums', clsOUT: 'Iespējamas izmaiņas ārpus robežas', clsSEAS: 'Iespējamas sezonālas vai vides izmaiņas',
-      clsINS: 'Nepietiekami pierādījumi', shortLOSS: 'meža zudums?', shortOUT: 'ārpus robežas?', shortSEAS: 'sezonāls?', shortINS: 'nepietiek datu',
-      sSUSPECTED: 'Iespējamas izmaiņas', sRECOVERED: 'Atjaunojies', sREVIEW_CONFIRMED: 'Apstiprināts pārskatīšanā',
-      sREVIEW_REJECTED: 'Noraidīts pārskatīšanā', sFIELD_CHECK_REQUESTED: 'Pieprasīta lauka pārbaude',
-      confidence: 'Noteikšanas ticamība', evidence: 'Pierādījumu kvalitāte', HIGH: 'Augsta', MEDIUM: 'Vidēja', LOW: 'Zema',
-      GOOD: 'Laba', LIMITED: 'Ierobežota', POOR: 'Vāja',
-      story: 'Kas mainījās', storyTpl: 'Starp {before} un {after} satelīts reģistrēja veģetācijas izzušanu {ha} platībā — {cls}, dabā nav pārbaudīts.',
-      storyVmd: 'VMD dati: lielākā daļa — {ha} — ir {zkat}.', storyNoBefore: 'Pirms attēla datums nav pieejams',
-      zkat14Note: 'VMD šos nogabalus uzskaita kā izcirtumu — iespējams, ciršana ir reģistrēta.',
-      observation: 'Novērojums (izejdati)', measurement: 'Mērījums (apstrādāti dati)', interpretation: 'Interpretācija (sistēma)',
-      decision: 'Lēmums (cilvēks)', lastClear: 'Pēdējais tīrais uzņēmums bez izmaiņām', firstChange: 'Pirmais uzņēmums ar izmaiņām',
-      latestAfter: 'Jaunākais uzņēmums ar izmaiņām', detected: 'Noteikts (apstrādes laiks)',
-      curHa: 'Pašreizējā maska', insideHa: 'Robežās', outsideHa: 'Ārpus robežas (buferzonā)', share: 'Teritorijas daļa',
-      cluster: 'Lielākais klasteris', maxDist: 'Maks. attālums ārpus robežas', unionHa: 'Visu pēcattēlu apvienojums', maxHa: 'Lielākā platība līdz šim',
-      classification: 'Klasifikācija', caveat: 'Sezonāls brīdinājums', vmdTitle: 'VMD nogabali pašreizējā maskā (metadati)',
-      vmdNote: 'Metadati no VMD reģistra; tie nemaina klasifikāciju, ticamību vai statusu.', vmdNone: 'Nav VMD nogabalu pašreizējā maskā.',
-      vmdUnavailable: 'VMD dati nav pieejami', kvNog: 'kv.–nog.', zkat: 'zkat', haInMask: 'ha maskā', pCirg: 'cirt. gads', pCirp: 'cirt. veids',
-      zkat10: 'mežaudze (zkat 10)', zkat14: 'izcirtums (zkat 14)', zkatOther: 'zkat {z}',
-      status: 'Statuss', reviewLog: 'Pārskatīšanas žurnāls', noReview: 'Vēl nav pārskatīts.',
-      aCompare: 'Salīdzināt pirms/pēc', aField: 'Pieprasīt lauka pārbaudi', aRisk: 'Izveidot risku', aReject: 'Noraidīt', aUndo: 'Atsaukt',
-      cField: 'Nosūtīt lauka pārbaudes pieprasījumu dispečeram (Telegram)?', cRisk: 'Izveidot risku šīm iespējamajām izmaiņām?',
-      cReject: 'Atzīmēt šīs iespējamās izmaiņas kā noraidītas (nav reālas izmaiņas)?', cUndo: 'Atsaukt pēdējo pārskatīšanas lēmumu?',
-      superseded: 'Šis notikums ir aizstāts ar #{id} (jaunāka noteikšanas paaudze).', supersededNone: 'Šis notikums ir aizstāts; pēctecis nav atrasts.',
-      openSuccessor: 'Atvērt #{id}', suspectedLine: 'Iespējamas izmaiņas — automātiska noteikšana, dabā nav pārbaudīts.',
-      modeA: 'A Pārvilkt', modeB: 'B Blakus', modeC: 'C Pēc + izmaiņas', modeD: 'D Tikai izmaiņas', before: 'Pirms', after: 'Pēc',
-      pairMissing: 'Nav derīga pirms/pēc pāra', pairSame: 'Izvēlēts tas pats uzņēmums', pairSensor: 'Salīdzināt var tikai viena sensora uzņēmumus',
-      pairGeometry: 'S1 salīdzina tikai vienas orbītas ģeometrijas (virziens + relatīvā orbīta) uzņēmumus', pairNoImage: 'Uzņēmumam nav attēla',
-      pairOrder: '“Pirms” jābūt agrākam par “pēc”', compositeNote: 'Patiesās krāsas nav abiem attēliem — abās pusēs rādītas viltus krāsas.',
-      s1Label: 'Radara attēls — nav fotogrāfija (VH, −25…−5 dB)', falseNote: 'Viltus krāsas (B11/B08/B04): veselīgs mežs zaļš, izcirtums violets/brūns.',
-      trueNote: 'Patiesās krāsas (B04/B03/B02)', validPct: 'Derīgi %', product: 'Produkts', copy: 'Kopēt', copied: 'Nokopēts',
-      timeline: 'Uzņēmumu laika josla', days120: '120 d', allDays: 'Viss', s1Filter: 'S1 ģeometrija', allGeom: 'visas',
-      stOk: 'Derīgs', stLow: 'Zem derīguma sliekšņa', stCloud: 'Mākoņi — izlaists', stInvalid: 'Nav derīgu pikseļu / kļūda', stPending: 'Gaida',
-      cloud: 'Mākoņi', analysis: 'Analīze', analysisNote: 'Teritorijas mediāna. Notikuma poligona līkne — vēlāk.',
-      technical: 'Tehniskie dati', thTime: 'Uzņemts', thSensor: 'Sensors', thStatus: 'Statuss', thValid: 'Derīgi %', thOutcome: 'Noteikšana',
-      acqCard: 'Uzņēmums', sensing: 'Uzņemts', platform: 'Platforma', geometry: 'Orbīta', metrics: 'Mediāna teritorijā',
-      showOnMap: 'Rādīt kartē', setBefore: 'Iestatīt kā “pirms”', shiftHint: 'Klikšķis — rādīt; Shift+klikšķis — “pirms”.',
-      attribution: 'Contains modified Copernicus Sentinel data {year}', outcome: 'Noteikšanas rezultāts',
-      o_NO_BASELINE: 'Nav bāzes uzņēmuma', o_NO_CHANGE: 'Nav izmaiņu', o_SINGLE_DROP: 'Vienreizējs radara kritums — nav notikums',
-      o_RADAR_ANOMALY: 'Radara anomālija (gaida apstiprinājumu)', o_EVENT_UPDATED: 'Notikums atjaunināts', o_EVENT_CREATED: 'Notikums izveidots',
-      o_NOT_USABLE: 'Nav izmantojams', o_PENDING_CONFIRMATION: 'Gaida apstiprinājumu', o_CANDIDATE_BELOW_MIN: 'Kandidāts zem minimālās platības',
-      o_UNIFORM_DROP_ATMOSPHERIC: 'Vienmērīgs kritums (atmosfēra)', s_SKIPPED_CLOUD: 'Mākoņi — izlaists', s_NO_VALID_PIXELS: 'Nav derīgu pikseļu',
-      s_OK: 'Apstrādāts', s_PENDING: 'Gaida', s_ERROR: 'Kļūda', dOK: 'Dati kārtībā', dNO_DATA_YET: 'Vēl nav datu',
-      dBACKFILL_OR_FETCH_IN_PROGRESS: 'Notiek ielāde', dSTOPPED: 'Apturēts', srcSECTOR: 'Sektors', srcLVM_GEO: 'LVM GEO', srcEVAL_BBOX: 'Novērtējuma teritorija',
-      wIDLE: 'Dīkstāvē', wRUNNING: 'Darbojas', wNOT_INSTALLED: 'Nav uzstādīts', wTIMERS_OFF: 'Taimeri izslēgti', wUNKNOWN: 'Statuss nav zināms',
-      nextDaily: 'nākamā ikdienas palaišana', open: 'Atvērt', ha: 'ha', loading: 'Ielādē…', imgLoading: 'Ielādē attēlu…', imgFailed: 'Attēlu neizdevās ielādēt.'
-    },
-    en: {
-      title: 'Satellite Monitoring', refresh: 'Refresh', na: 'Not available', notStated: 'not stated',
-      areas: 'Monitored areas', monitoredHa: 'Monitored area', openEvents: 'Open suspected changes', awaitingReview: 'Awaiting review',
-      lastSync: 'Last successful sync', usage: 'Copernicus usage this month', worker: 'Worker', latest: 'Latest changes', allAreas: 'All areas',
-      addSector: 'Add sector', fetchNow: 'Fetch now', guard: 'guard', requests: 'requests', noAreas: 'No monitored areas yet.',
-      noAreasHint: 'Add a sector here, or use “Add to satellite monitoring” in LVM GEO.', noEvents: 'No suspected change events in this area.',
-      noEventsHint: 'Monitoring is running; no change detected.', noDataYet: 'Monitoring has not produced data yet. The first fetch runs when the worker picks up the job.',
-      backfill: 'Backfill in progress.', degraded: 'Copernicus access problem', notConfigured: 'The worker reported missing Copernicus credentials.',
-      unknownProvider: 'Status unknown: the worker has not reported Copernicus access yet.', dbUnavailable: 'Satellite monitoring data is unavailable (satellite.db).',
-      error: 'Error', lastAcq: 'Last satellite acquisition', lastAnalysis: 'Last successful analysis', lastCheck: 'Last system check', system: 'system',
-      optical: 'S2 Optical', radar: 'S1 Radar', trueC: 'True colour', falseC: 'False colour', compare: 'Compare', layers: 'Layers', theme: 'Theme',
-      light: 'Light', dark: 'Dark', back: '← All areas', events: 'Change events', lBoundary: 'Boundary', lBuffer: 'Buffer ring',
-      lChange: 'Change polygons', lFootprint: 'Observation footprint', lImage: 'Sentinel image', lVmd: 'VMD forest compartments', lBase: 'Base map (OSM)',
-      inside: 'inside', outside: 'outside', onset: 'onset',
-      cRed: 'Potential forest loss — high/medium confidence', cOrange: 'Potential forest loss — low confidence',
-      cYellow: 'Possible seasonal/environmental change or insufficient evidence', cBlueGrey: 'Confirmed by review', cGrey: 'Rejected or recovered',
-      cUnknown: 'Other status', hatch: 'Hatched = outside the boundary',
-      clsLOSS: 'Potential forest loss', clsOUT: 'Potential change outside the boundary', clsSEAS: 'Possible seasonal or environmental change',
-      clsINS: 'Insufficient evidence', shortLOSS: 'forest loss?', shortOUT: 'outside?', shortSEAS: 'seasonal?', shortINS: 'insufficient',
-      sSUSPECTED: 'Suspected', sRECOVERED: 'Recovered', sREVIEW_CONFIRMED: 'Confirmed by review', sREVIEW_REJECTED: 'Rejected by review',
-      sFIELD_CHECK_REQUESTED: 'Field check requested', confidence: 'Detection confidence', evidence: 'Evidence quality',
-      HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low', GOOD: 'Good', LIMITED: 'Limited', POOR: 'Poor',
-      story: 'What changed', storyTpl: 'Between {before} and {after} the satellite recorded vegetation loss on {ha} — {cls}, not verified on the ground.',
-      storyVmd: 'VMD data: most of it — {ha} — is {zkat}.', storyNoBefore: 'Before-image date not available',
-      zkat14Note: 'VMD lists these compartments as clear-cut land — a felling may be registered.',
-      observation: 'Observation (raw)', measurement: 'Measurement (processed)', interpretation: 'Interpretation (system)', decision: 'Decision (human)',
-      lastClear: 'Last clear acquisition without change', firstChange: 'First acquisition showing the change', latestAfter: 'Latest acquisition showing the change',
-      detected: 'Detected (processing time)', curHa: 'Current mask', insideHa: 'Inside the boundary', outsideHa: 'Outside the boundary (buffer)',
-      share: 'Share of the area', cluster: 'Largest cluster', maxDist: 'Max distance outside the boundary', unionHa: 'Union of all after-images',
-      maxHa: 'Largest area so far', classification: 'Classification', caveat: 'Seasonal caveat', vmdTitle: 'VMD compartments in the current mask (metadata)',
-      vmdNote: 'Metadata from the VMD register; it does not change the classification, confidence or status.', vmdNone: 'No VMD compartment in the current mask.',
-      vmdUnavailable: 'VMD data not available', kvNog: 'kv–comp.', zkat: 'zkat', haInMask: 'ha in mask', pCirg: 'felling year', pCirp: 'felling type',
-      zkat10: 'forest stand (zkat 10)', zkat14: 'clear-cut land (zkat 14)', zkatOther: 'zkat {z}', status: 'Status', reviewLog: 'Review log',
-      noReview: 'Not reviewed yet.', aCompare: 'Compare before/after', aField: 'Request field check', aRisk: 'Create risk', aReject: 'Reject', aUndo: 'Undo',
-      cField: 'Send a field check request to the dispatcher (Telegram)?', cRisk: 'Create a risk for this suspected change?',
-      cReject: 'Mark this suspected change as rejected (not a real change)?', cUndo: 'Undo the last review decision?',
-      superseded: 'This event was superseded by #{id} (newer detection generation).', supersededNone: 'This event was superseded; no successor found.',
-      openSuccessor: 'Open #{id}', suspectedLine: 'Suspected change — automated detection, not verified on the ground.',
-      modeA: 'A Swipe', modeB: 'B Side by side', modeC: 'C After + change', modeD: 'D Change only', before: 'Before', after: 'After',
-      pairMissing: 'No valid before/after pair', pairSame: 'Same acquisition selected', pairSensor: 'Only acquisitions of the same sensor can be compared',
-      pairGeometry: 'S1 compares only acquisitions of the same orbit geometry (direction + relative orbit)', pairNoImage: 'No image for this acquisition',
-      pairOrder: '“Before” must be earlier than “after”', compositeNote: 'True colour is not available for both images — false colour on both sides.',
-      s1Label: 'Radar image — not a photograph (VH, −25…−5 dB)', falseNote: 'False colour (B11/B08/B04): healthy forest green, clear-cut magenta/brown.',
-      trueNote: 'True colour (B04/B03/B02)', validPct: 'Valid %', product: 'Product', copy: 'Copy', copied: 'Copied',
-      timeline: 'Acquisition timeline', days120: '120 d', allDays: 'All', s1Filter: 'S1 geometry', allGeom: 'all',
-      stOk: 'Valid', stLow: 'Below validity threshold', stCloud: 'Clouds — skipped', stInvalid: 'No valid pixels / error', stPending: 'Pending',
-      cloud: 'Clouds', analysis: 'Analysis', analysisNote: 'Area median. Event polygon curve — later.',
-      technical: 'Technical data', thTime: 'Acquired', thSensor: 'Sensor', thStatus: 'Status', thValid: 'Valid %', thOutcome: 'Detection',
-      acqCard: 'Acquisition', sensing: 'Acquired', platform: 'Platform', geometry: 'Orbit', metrics: 'Median in the area', showOnMap: 'Show on map',
-      setBefore: 'Set as “before”', shiftHint: 'Click — show; Shift+click — “before”.', attribution: 'Contains modified Copernicus Sentinel data {year}',
-      outcome: 'Detection outcome', o_NO_BASELINE: 'No baseline acquisition', o_NO_CHANGE: 'No change', o_SINGLE_DROP: 'Single radar drop — not an event',
-      o_RADAR_ANOMALY: 'Radar anomaly (awaiting confirmation)', o_EVENT_UPDATED: 'Event updated', o_EVENT_CREATED: 'Event created', o_NOT_USABLE: 'Not usable',
-      o_PENDING_CONFIRMATION: 'Awaiting confirmation', o_CANDIDATE_BELOW_MIN: 'Candidate below minimum area', o_UNIFORM_DROP_ATMOSPHERIC: 'Uniform drop (atmospheric)',
-      s_SKIPPED_CLOUD: 'Clouds — skipped', s_NO_VALID_PIXELS: 'No valid pixels', s_OK: 'Processed', s_PENDING: 'Pending', s_ERROR: 'Error',
-      dOK: 'Data OK', dNO_DATA_YET: 'No data yet', dBACKFILL_OR_FETCH_IN_PROGRESS: 'Fetching', dSTOPPED: 'Stopped', srcSECTOR: 'Sector',
-      srcLVM_GEO: 'LVM GEO', srcEVAL_BBOX: 'Evaluation area', wIDLE: 'Idle', wRUNNING: 'Running', wNOT_INSTALLED: 'Not installed',
-      wTIMERS_OFF: 'Timers off', wUNKNOWN: 'Status unknown', nextDaily: 'next daily run', open: 'Open', ha: 'ha', loading: 'Loading…',
-      imgLoading: 'Loading image…', imgFailed: 'The image could not be loaded.'
+  // D2: event-level evidence quality WITH its source. The event value is the best over its after-images
+  // (pipeline.py, unchanged); per-acquisition values come from /events/{id} after[].evidence_quality.
+  // → {eq, source: {sensor, time} | null, others: [{sensor, eq}]}  (others = best value of every OTHER sensor)
+  var EQ_ORDER = {POOR: 0, LIMITED: 1, GOOD: 2};
+  function evidenceSource(ev) {
+    var eq = ev && ev.evidence_quality || null;
+    var after = ((ev && ev.after) || []).filter(function (a) { return a && a.evidence_quality; });
+    if (!eq || !after.length) return {eq: eq, source: null, others: []};
+    var src = after.filter(function (a) { return a.evidence_quality === eq; })
+                   .sort(function (x, y) { return String(x.sensing_time_utc).localeCompare(String(y.sensing_time_utc)); })[0] || null;
+    var others = {};
+    after.forEach(function (a) {
+      if (src && a.sensor === src.sensor) return;
+      if (!(a.sensor in others) || EQ_ORDER[a.evidence_quality] > EQ_ORDER[others[a.sensor]]) others[a.sensor] = a.evidence_quality;
+    });
+    return {eq: eq, source: src ? {sensor: src.sensor, time: src.sensing_time_utc} : null,
+            others: Object.keys(others).sort().map(function (k) { return {sensor: k, eq: others[k]}; })};
+  }
+
+  // Coordinate search: an EXACT copy of parseCoordinates() in assets/forest-map.js (owner Q3: copied, not shared, so
+  // forest-map.js stays byte-identical). tests/test_sat_workspace.js runs both copies on the same inputs.
+  function parseCoordinates(text){const raw=String(text||'').trim();if(!raw)return null;const commas=(raw.match(/,/g)||[]).length;let parts;if(raw.includes(';'))parts=raw.split(';');else if(/,\s/.test(raw))parts=raw.split(/,\s+/);else if(/\s/.test(raw))parts=raw.split(/\s+/);else if(commas===1)parts=raw.split(',');else if(commas===3&&!raw.includes('.')){const c=raw.split(',');parts=[c[0]+'.'+c[1],c[2]+'.'+c[3]];}else return null;parts=parts.map(x=>x.trim().replace(/,$/,'').trim()).filter(Boolean);if(parts.length!==2)return null;const nums=parts.map(x=>{const v=x.replace(',','.');return /^[+-]?\d+(\.\d+)?$/.test(v)?Number(v):NaN;});if(!nums.every(Number.isFinite))return null;const lat=nums[0],lon=nums[1];return {lat,lon,inLatvia:lat>=55&&lat<=59&&lon>=20&&lon<=29};}
+
+  // Point in a GeoJSON Polygon / MultiPolygon (WGS84 lon/lat, ray casting; holes respected). No projection needed.
+  function inRing(lon, lat, ring) {
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
     }
+    return inside;
+  }
+  function inGeometry(lon, lat, g) {
+    if (!g) return false;
+    var polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+    return polys.some(function (p) { return p.length && inRing(lon, lat, p[0]) && !p.slice(1).some(function (h) { return inRing(lon, lat, h); }); });
+  }
+
+  // ── strings: EN + LV (LV = the i18n-lv.js translation of EN, checked by tests) ────────────────────────────────────
+  var T_EN = {
+    title: 'Satellite Monitoring', refresh: 'Refresh', na: 'Not available', notStated: 'not stated', loading: 'Loading…', error: 'Error',
+    tabTerritory: 'Territory', tabChanges: 'Changes', tabEvidence: 'Evidence', tabsLabel: 'Satellite monitoring views',
+    searchPh: 'Coordinates, cadastre no. (11 digits), VMD:… or area name', searchBtn: 'Search', searchLabel: 'Search a place',
+    searchHint: 'Coordinates in WGS84 (latitude, longitude); decimal comma is accepted.', searchNone: 'Nothing found.',
+    searchCoordsBad: 'Enter latitude, longitude in Latvia (55–59, 20–29).', searchFound: 'Found: {n}', modesLabel: 'Comparison mode',
+    modeSwipe: 'Swipe', modeSide: 'Side by side', modeChange: 'Change only', modeOff: 'Choose an event or a "before" acquisition (Shift+click on the timeline) to compare.',
+    langSwitch: 'Language',
+    areas: 'Territories', areasCount: '{n} areas', areaSelect: 'Monitored area', srcSECTOR: 'Sector', srcLVM_GEO: 'LVM GEO', srcEVAL_BBOX: 'Evaluation area',
+    dOK: 'Data OK', dNO_DATA_YET: 'No data yet', dBACKFILL_OR_FETCH_IN_PROGRESS: 'Fetching', dSTOPPED: 'Stopped',
+    lastAcq: 'Last acquisition', lastValidS2: 'Last valid S2', lastAnalysis: 'Last analysis', lastCheck: 'System check',
+    onMap: 'Acquisition on the map', optical: 'S2 · Optical', radar: 'S1 · Radar', noSensor: 'No processed acquisitions of this sensor.',
+    prevAcq: 'Previous acquisition', nextAcq: 'Next acquisition', valid: 'valid {v} %', px10: '10 m/px',
+    imageKind: 'Image type', trueC: 'True colour', trueSub: 'B04 · B03 · B02 — as the eye sees it', falseC: 'False colour',
+    falseSub: 'Vegetation and clearings in contrast', radarC: 'Radar image (VH)', radarSub: 'Not a photograph',
+    compositeNote: 'True colour is not available for both images — false colour on both sides.',
+    layers: 'Layers', lBoundary: 'Area boundary', lBuffer: 'Buffer zone', lChange: 'Change polygons', lVmd: 'VMD compartments', lBase: 'Background map',
+    eventsTitle: 'Changes in the area', eventsCount: '{open} open · {rec} recovered', noEvents: 'No suspected change events in this area.',
+    noEventsHint: 'Monitoring is running; no change has been detected.', noDataYet: 'Monitoring has not produced data yet.',
+    inside: 'inside the boundary', outside: 'outside the boundary', confShort: 'confidence {c}',
+    cRed: 'Potential forest loss — high/medium confidence', cOrange: 'Potential forest loss — low confidence',
+    cYellow: 'Possible seasonal/environmental change or insufficient evidence', cBlueGrey: 'Confirmed by review', cGrey: 'Rejected or recovered',
+    cUnknown: 'Other status',
+    clsLOSS: 'Potential forest loss', clsOUT: 'Potential change outside the boundary', clsSEAS: 'Possible seasonal or environmental change',
+    clsINS: 'Insufficient evidence', shortLOSS: 'Pot. forest loss', shortOUT: 'Outside boundary', shortSEAS: 'Seasonal?', shortINS: 'Insufficient',
+    sSUSPECTED: 'Suspected change', sRECOVERED: 'Recovered', sREVIEW_CONFIRMED: 'Confirmed by review', sREVIEW_REJECTED: 'Rejected by review',
+    sFIELD_CHECK_REQUESTED: 'Field check requested', seasonalTag: 'seasonal caveat',
+    HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low', GOOD: 'Good', LIMITED: 'Limited', POOR: 'Poor',
+    confidence: 'Confidence', evidence: 'Evidence', eventN: 'EVENT #{id}', story: 'What changed',
+    storyTpl: 'Between {before} and {after} the satellite recorded vegetation loss on {ha} — suspected change, not verified on the ground.',
+    storyNoBefore: 'Before-image date not available',
+    eqFrom: 'from {sensor} {date}', eqOthers: '{sensor}: {eq}', eqNoSource: 'source per image not available',
+    sensS1: 'radar (S1)', sensS2: 'optical (S2)', othS1: 'radar', othS2: 'optical',
+    pillBefore: 'BEFORE', pillAfter: 'AFTER', pillShown: 'SHOWN',
+    aEvidence: 'Open evidence', aField: 'Field check', aRisk: 'Create risk', aReject: 'Reject', aUndo: 'Undo',
+    cField: 'Send a field check request to the dispatcher (Telegram)?', cRisk: 'Create a risk for this suspected change?',
+    cReject: 'Mark this suspected change as rejected (not a real change)?', cUndo: 'Undo the last review decision?', close: 'Close',
+    superseded: 'This event was superseded by #{id} (newer detection generation).', supersededNone: 'This event was superseded; no successor found.',
+    toolWhatHere: 'What is here?', toolWhatHereTip: 'Click anywhere on the map: coordinates, cadastre, VMD compartment, whether the place is monitored — and "Add to monitoring".',
+    hintDismiss: 'Got it', zoomIn: 'Zoom in', zoomOut: 'Zoom out', copyLink: 'Copy link to this view', copied: 'Copied', copy: 'Copy',
+    whCoords: 'Coordinates (WGS84)', whMonitored: 'Monitored', whArea: 'Monitored area', whNotMonitored: 'This place is not monitored',
+    whCompartment: 'VMD compartment', whCadastre: 'Cadastre', whZoomIn: 'Zoom in to inspect compartments.', whZoomBtn: 'Zoom in',
+    whNoForest: 'No forest compartment at this location.', whDense: 'Dense location; zoom in to inspect.', whComplex: 'Complex geometry; use the cadastre search.',
+    whAdd: 'Add to monitoring', whQueued: 'Queued for monitoring', whAlready: 'Already monitored', whMulti: 'Multi-part compartment: add each part via LVM GEO',
+    whOpenArea: 'Open the area', whLoading: 'Checking…',
+    addQ: 'Add “{name}” to satellite monitoring?', addCost: 'Expected Copernicus cost: Not available.',
+    addMonth: 'This month: {pu} of {puGuard} PU, {req} of {reqGuard} requests (guard).', addFirst: 'The last 120 days are fetched first.',
+    addDone: 'Queued. The worker fetches the data within minutes.',
+    analysis: 'Analysis', tsS2: 'Sentinel-2 indices (median inside the area)', tsS1: 'Sentinel-1 backscatter (median inside the area)',
+    timeline: 'Time axis', tlS2: 'S2 optical', tlS1: 'S1 radar', days120: '120 days', allDays: 'All time', shiftHint: 'Click — show; Shift+click — set as “before”.',
+    stOk: 'Valid', stLow: 'Below validity threshold', stCloud: 'Clouds — skipped', stInvalid: 'No valid pixels / error', stPending: 'Pending',
+    cloudPct: 'clouds', validPct: 'valid', orbit: 'orbit',
+    copOk: 'Copernicus OK', copDegraded: 'Copernicus problem', copUnknown: 'Copernicus status unknown', reqGuard: 'requests {v} / {g}',
+    puGuard: 'PU {v} / {g}', nextRun: 'next fetch {t}', autoRiskOff: 'automatic risks: off', autoRiskOn: 'automatic risks: ON',
+    basemapNote: 'Background map: OpenStreetMap (not dated, not Sentinel)', attribution: 'Contains modified Copernicus Sentinel data {year}',
+    dbUnavailable: 'Satellite monitoring data is unavailable (satellite.db).', retry: 'Try again',
+    latest: 'Latest changes', allAreas: 'All areas', addSector: 'Add sector', fetchNow: 'Fetch now', thArea: 'Territory', thStatus: 'Status',
+    thOpen: 'Open events', thLast: 'Last acquisition', open: 'Open', noAreas: 'No monitored areas yet.', firstArea: 'Add the first area',
+    noAreasHint: 'Search a place above, or use “Add to satellite monitoring” in LVM GEO.', ndvi: 'NDVI (median)',
+    noThumb: 'No image', thumbsNote: 'before | after', evPick: 'Choose an event to open its evidence.', imgLoading: 'Loading image…',
+    imgFailed: 'The image could not be loaded.', fetchConfirm: 'Fetch new Sentinel-1/2 observations for all areas now?',
+    sectorAddConfirm: 'Add {name} to satellite monitoring? The last 120 days are fetched first.', monitored: 'Monitored', queued: 'Queued',
+    noPolygon: 'No polygon', add: 'Add', copLink: 'Link copied'
+  };
+  var T_LV = {
+    title: 'Satelītu monitorings', refresh: 'Atjaunot', na: 'Nav pieejams', notStated: 'nav norādīts', loading: 'Ielādē…', error: 'Kļūda',
+    tabTerritory: 'Teritorija', tabChanges: 'Izmaiņas', tabEvidence: 'Pierādījumi', tabsLabel: 'Satelītu monitoringa skati',
+    searchPh: 'Koordinātas, kadastra nr. (11 cipari), VMD:… vai teritorijas nosaukums', searchBtn: 'Meklēt', searchLabel: 'Meklēt vietu',
+    searchHint: 'Koordinātas WGS84 (platums, garums); decimālais komats ir atļauts.', searchNone: 'Nekas netika atrasts.',
+    searchCoordsBad: 'Ievadiet platumu, garumu Latvijā (55–59, 20–29).', searchFound: 'Atrasti: {n}', modesLabel: 'Salīdzināšanas režīms',
+    modeSwipe: 'Pārvilkt', modeSide: 'Blakus', modeChange: 'Tikai izmaiņas', modeOff: 'Izvēlieties notikumu vai “pirms” uzņēmumu (Shift+klikšķis laika asī), lai salīdzinātu.',
+    langSwitch: 'Valoda',
+    areas: 'Teritorijas', areasCount: '{n} teritorijas', areaSelect: 'Uzraudzītā teritorija', srcSECTOR: 'Sektors', srcLVM_GEO: 'LVM GEO', srcEVAL_BBOX: 'Novērtējuma teritorija',
+    dOK: 'Dati kārtībā', dNO_DATA_YET: 'Vēl nav datu', dBACKFILL_OR_FETCH_IN_PROGRESS: 'Notiek ielāde', dSTOPPED: 'Apturēts',
+    lastAcq: 'Pēdējais uzņēmums', lastValidS2: 'Pēdējais derīgais S2', lastAnalysis: 'Pēdējā analīze', lastCheck: 'Sistēmas pārbaude',
+    onMap: 'Uzņēmums kartē', optical: 'S2 · Optiskais', radar: 'S1 · Radars', noSensor: 'Šim sensoram nav apstrādātu uzņēmumu.',
+    prevAcq: 'Iepriekšējais uzņēmums', nextAcq: 'Nākamais uzņēmums', valid: 'derīgi {v} %', px10: '10 m/px',
+    imageKind: 'Attēla veids', trueC: 'Patiesās krāsas', trueSub: 'B04 · B03 · B02 — kā redz acs', falseC: 'Viltus krāsas',
+    falseSub: 'Veģetācija un izcirtumi kontrastā', radarC: 'Radara attēls (VH)', radarSub: 'Nav fotogrāfija',
+    compositeNote: 'Patiesās krāsas nav abiem attēliem — abās pusēs rādītas viltus krāsas.',
+    layers: 'Slāņi', lBoundary: 'Teritorijas robeža', lBuffer: 'Buferzona', lChange: 'Izmaiņu poligoni', lVmd: 'VMD nogabali', lBase: 'Fona karte',
+    eventsTitle: 'Izmaiņas teritorijā', eventsCount: '{open} atvērtas · {rec} atjaunojušās', noEvents: 'Šajā teritorijā nav iespējamo izmaiņu notikumu.',
+    noEventsHint: 'Uzraudzība darbojas; izmaiņas nav konstatētas.', noDataYet: 'Uzraudzība vēl nav sniegusi datus.',
+    inside: 'robežās', outside: 'ārpus robežas', confShort: 'ticamība {c}',
+    cRed: 'Iespējams meža zudums — augsta/vidēja ticamība', cOrange: 'Iespējams meža zudums — zema ticamība',
+    cYellow: 'Iespējamas sezonālas vai vides izmaiņas / nepietiekami pierādījumi', cBlueGrey: 'Apstiprināts pārskatīšanā', cGrey: 'Noraidīts vai atjaunojies',
+    cUnknown: 'Cits statuss',
+    clsLOSS: 'Iespējams meža zudums', clsOUT: 'Iespējamas izmaiņas ārpus robežas', clsSEAS: 'Iespējamas sezonālas vai vides izmaiņas',
+    clsINS: 'Nepietiekami pierādījumi', shortLOSS: 'Iesp. meža zudums', shortOUT: 'Ārpus robežas', shortSEAS: 'Sezonāls?', shortINS: 'Nepietiek datu',
+    sSUSPECTED: 'Iespējamas izmaiņas', sRECOVERED: 'Atjaunojies', sREVIEW_CONFIRMED: 'Apstiprināts pārskatīšanā', sREVIEW_REJECTED: 'Noraidīts pārskatīšanā',
+    sFIELD_CHECK_REQUESTED: 'Pieprasīta lauka pārbaude', seasonalTag: 'sezonāls brīdinājums',
+    HIGH: 'Augsta', MEDIUM: 'Vidēja', LOW: 'Zema', GOOD: 'Laba', LIMITED: 'Ierobežota', POOR: 'Vāja',
+    confidence: 'Ticamība', evidence: 'Pierādījumi', eventN: 'NOTIKUMS #{id}', story: 'Kas mainījās',
+    storyTpl: 'Starp {before} un {after} satelīts reģistrēja veģetācijas izzušanu {ha} platībā — iespējamas izmaiņas, dabā nav pārbaudīts.',
+    storyNoBefore: 'Pirms attēla datums nav pieejams',
+    eqFrom: 'no {sensor} {date}', eqOthers: '{sensor}: {eq}', eqNoSource: 'avots pa attēliem nav pieejams',
+    sensS1: 'radara (S1)', sensS2: 'optiskā (S2)', othS1: 'radars', othS2: 'optiskie',
+    pillBefore: 'PIRMS', pillAfter: 'PĒC', pillShown: 'KARTĒ',
+    aEvidence: 'Atvērt pierādījumus', aField: 'Lauka pārbaude', aRisk: 'Izveidot risku', aReject: 'Noraidīt', aUndo: 'Atsaukt',
+    cField: 'Nosūtīt lauka pārbaudes pieprasījumu dispečeram (Telegram)?', cRisk: 'Izveidot risku šīm iespējamajām izmaiņām?',
+    cReject: 'Atzīmēt šīs iespējamās izmaiņas kā noraidītas (nav reālas izmaiņas)?', cUndo: 'Atsaukt pēdējo pārskatīšanas lēmumu?', close: 'Aizvērt',
+    superseded: 'Šis notikums ir aizstāts ar #{id} (jaunāka noteikšanas paaudze).', supersededNone: 'Šis notikums ir aizstāts; pēctecis nav atrasts.',
+    toolWhatHere: 'Kas šeit?', toolWhatHereTip: 'Klikšķis jebkurā kartes vietā: koordinātas, kadastrs, VMD nogabals, vai vieta tiek uzraudzīta — un “Pievienot monitoringam”.',
+    hintDismiss: 'Skaidrs', zoomIn: 'Tuvināt', zoomOut: 'Tālināt', copyLink: 'Kopēt saiti uz šo skatu', copied: 'Nokopēts', copy: 'Kopēt',
+    whCoords: 'Koordinātas (WGS84)', whMonitored: 'Tiek uzraudzīts', whArea: 'Uzraudzītā teritorija', whNotMonitored: 'Šī vieta netiek uzraudzīta',
+    whCompartment: 'VMD nogabals', whCadastre: 'Kadastrs', whZoomIn: 'Pietuviniet, lai redzētu nogabalus.', whZoomBtn: 'Tuvināt',
+    whNoForest: 'Šajā vietā nav meža nogabala.', whDense: 'Blīva vieta; pietuviniet.', whComplex: 'Sarežģīta ģeometrija; izmantojiet kadastra meklēšanu.',
+    whAdd: 'Pievienot monitoringam', whQueued: 'Gaida pievienošanu monitoringam', whAlready: 'Jau tiek uzraudzīts', whMulti: 'Daudzdaļu nogabals: pievienojiet katru daļu LVM GEO',
+    whOpenArea: 'Atvērt teritoriju', whLoading: 'Pārbauda…',
+    addQ: 'Pievienot “{name}” satelītu monitoringam?', addCost: 'Paredzamās Copernicus izmaksas: Nav pieejams.',
+    addMonth: 'Šomēnes: {pu} no {puGuard} PU, {req} no {reqGuard} pieprasījumiem (drošības robeža).', addFirst: 'Vispirms tiks ielādētas pēdējās 120 dienas.',
+    addDone: 'Ievietots rindā. Apstrādes process ielādēs datus dažu minūšu laikā.',
+    analysis: 'Analīze', tsS2: 'Sentinel-2 indeksi (mediāna teritorijā)', tsS1: 'Sentinel-1 atstarošana (mediāna teritorijā)',
+    timeline: 'Laika ass', tlS2: 'S2 optiskais', tlS1: 'S1 radars', days120: '120 dienas', allDays: 'Viss', shiftHint: 'Klikšķis — rādīt; Shift+klikšķis — iestatīt kā “pirms”.',
+    stOk: 'Derīgs', stLow: 'Zem derīguma sliekšņa', stCloud: 'Mākoņi — izlaists', stInvalid: 'Nav derīgu pikseļu / kļūda', stPending: 'Gaida',
+    cloudPct: 'mākoņi', validPct: 'derīgi', orbit: 'orbīta',
+    copOk: 'Copernicus OK', copDegraded: 'Copernicus problēma', copUnknown: 'Copernicus statuss nav zināms', reqGuard: 'pieprasījumi {v} / {g}',
+    puGuard: 'PU {v} / {g}', nextRun: 'nākamā ielāde {t}', autoRiskOff: 'automātiskie riski: izslēgti', autoRiskOn: 'automātiskie riski: IESLĒGTI',
+    basemapNote: 'Fona karte: OpenStreetMap (nav datēta, nav Sentinel)', attribution: 'Contains modified Copernicus Sentinel data {year}',
+    dbUnavailable: 'Satelītu monitoringa dati nav pieejami (satellite.db).', retry: 'Mēģināt vēlreiz',
+    latest: 'Jaunākās izmaiņas', allAreas: 'Visas teritorijas', addSector: 'Pievienot sektoru', fetchNow: 'Ielādēt tagad', thArea: 'Teritorija', thStatus: 'Statuss',
+    thOpen: 'Atvērtas', thLast: 'Pēdējais uzņēmums', open: 'Atvērt', noAreas: 'Vēl nav uzraudzītu teritoriju.', firstArea: 'Pievienojiet pirmo teritoriju',
+    noAreasHint: 'Meklējiet vietu augšā vai izmantojiet “Pievienot satelītu monitoringam” sadaļā LVM GEO.', ndvi: 'NDVI (mediāna)',
+    noThumb: 'Nav attēla', thumbsNote: 'pirms | pēc', evPick: 'Izvēlieties notikumu, lai atvērtu tā pierādījumus.', imgLoading: 'Ielādē attēlu…',
+    imgFailed: 'Attēlu neizdevās ielādēt.', fetchConfirm: 'Ielādēt jaunos Sentinel-1/2 uzņēmumus visām teritorijām tagad?',
+    sectorAddConfirm: 'Pievienot {name} satelītu monitoringam? Vispirms tiks ielādētas pēdējās 120 dienas.', monitored: 'Tiek uzraudzīts', queued: 'Rindā',
+    noPolygon: 'Nav poligona', add: 'Pievienot', copLink: 'Saite nokopēta'
   };
   var CLS = {POTENTIAL_FOREST_LOSS: 'LOSS', POTENTIAL_CHANGE_OUTSIDE_BOUNDARY: 'OUT', POSSIBLE_SEASONAL_OR_ENVIRONMENTAL: 'SEAS', INSUFFICIENT_EVIDENCE: 'INS'};
-  var GEOM_COLOURS = ['#4FA3D9', '#9B7BD8', '#3FB39A', '#D98C4F', '#C76C9A', '#8CA34F'];
+  var GEOM_COLOURS = ['#8FB4D9', '#B9A2E8', '#6FC7B1', '#E0A36F', '#D98CB5', '#A9C26F'];
 
-  // ── state ──────────────────────────────────────────────────────────────────────────────────────────────────────
+  // ── state ────────────────────────────────────────────────────────────────────────────────────────────────────────────
   function store(k, v) { try { if (v === undefined) return global.localStorage && global.localStorage.getItem(k); global.localStorage.setItem(k, v); } catch (e) { return null; } return null; }
-  var S = {lang: store('satMonitoring.lang') === 'en' ? 'en' : 'lv', theme: store('satWorkspace.theme') === 'light' ? 'light' : 'dark',
-           view: null, areaId: null, area: null, health: null, layer: null, events: [], byId: {}, sel: null, ev: null, acq: null,
-           sensor: 'S2', composite: 'true', compare: null, mode: 'B', window: 120, s1geom: 'all', maps: [], charts: [], drawer: true,
-           tech: false, panelLayers: true, seq: 0, rightOpen: false};
+  var S = {lang: store('satMonitoring.lang') === 'en' ? 'en' : 'lv', view: null, areaId: null, area: null, ov: null, health: null, layer: null,
+           events: [], byId: {}, sel: null, ev: null, acq: null, sensor: 'S2', composite: 'true', compare: null, mode: null, window: 120,
+           maps: [], seq: 0, whatHere: false, layersOn: {boundary: true, buffer: true, change: true, vmd: true, base: true}, target: null};
+  function T() { return S.lang === 'lv' ? T_LV : T_EN; }
   function t(k, vars) {
-    var s = (T[S.lang] && T[S.lang][k]) || T.en[k] || k;
+    var s = T()[k]; if (s === undefined) s = T_EN[k] === undefined ? k : T_EN[k];
     if (vars) Object.keys(vars).forEach(function (n) { s = s.split('{' + n + '}').join(vars[n]); });
     return s;
   }
   function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
-  function na() { return '<span class="satw-na">' + esc(t('na')) + '</span>'; }
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
-  function ha(v, d) { return isNum(v) ? v.toFixed(d === undefined ? 2 : d) + ' ha' : null; }
-  function val(v) { return v === null || v === undefined || v === '' ? na() : '<span data-no-i18n>' + esc(v) + '</span>'; }
-  function timeHtml(s) { var f = fmtTime(s); return f ? '<span class="satw-time" data-no-i18n>' + esc(f) + '</span>' : na(); }
-  function root() { return document.getElementById('satm-root'); }
-  function clsLabel(c) { return t('cls' + (CLS[c] || 'INS')); }
-  function attribution(iso) { var y = iso ? String(iso).slice(0, 4) : String(new Date().getUTCFullYear()); return '<div class="satw-attr" data-no-i18n>' + esc(t('attribution', {year: y})) + '</div>'; }
-  function badge(text, cls) { return '<span class="satw-badge ' + (cls || '') + '">' + esc(text) + '</span>'; }
-  function qBadge(kind, v) {
-    var c = {HIGH: 'g', GOOD: 'g', MEDIUM: 'a', LIMITED: 'a', LOW: 'r', POOR: 'r'}[v] || '';
-    return '<span class="satw-q"><span class="satw-q-l">' + esc(t(kind)) + '</span>' + (v ? badge(t(v), c) : na()) + '</span>';
+  function fmtNum(v, d) {
+    if (!isNum(v)) return null;
+    return S.lang === 'lv' ? v.toLocaleString('lv-LV', {minimumFractionDigits: d, maximumFractionDigits: d}).replace(/ /g, ' ') : v.toFixed(d);
   }
-  function dot(e) { var c = changeColour(e); return '<span class="satw-dot' + (c.dash ? ' dashed' : '') + '" style="--c:' + c.color + '"></span>'; }
+  function ha(v, d) { var n = fmtNum(v, d === undefined ? 2 : d); return n === null ? null : n + ' ha'; }
+  function na() { return '<span class="satw-na">' + esc(t('na')) + '</span>'; }
+  function val(v) { return v === null || v === undefined || v === '' ? na() : '<span class="satw-mono" data-no-i18n>' + esc(v) + '</span>'; }
+  function clsLabel(c) { return t('cls' + (CLS[c] || 'INS')); }
+  function shortCls(c) { return t('short' + (CLS[c] || 'INS')); }
+  function root() { return document.getElementById('satm-root'); }
+  function dot(e) { var c = changeColour(e); return '<span class="satw-dot' + (c.dash ? ' dashed' : '') + '" style="--c:' + c.color + '" aria-hidden="true"></span>'; }
+  function badge(text, cls) { return '<span class="satw-badge ' + (cls || '') + '">' + esc(text) + '</span>'; }
+  function qClass(v) { return {HIGH: 'g', GOOD: 'g', MEDIUM: 'a', LIMITED: 'a', LOW: 'r', POOR: 'r'}[v] || ''; }
+  function minValid() { return S.area && S.area.config ? S.area.config.min_valid_pct : null; }
+  function geomKey(a) { return (a.orbit_direction || '?').slice(0, 3) + ' ' + (a.relative_orbit === null || a.relative_orbit === undefined ? '?' : a.relative_orbit); }
 
   async function get(path) {
-    var r = await fetch(API + path, {credentials: 'same-origin', cache: 'no-store'}), d = {};
+    var r = await fetch(path.charAt(0) === '/' && path.indexOf('/api/') === 0 ? path : API + path, {credentials: 'same-origin', cache: 'no-store'}), d = {};
     try { d = await r.json(); } catch (e) { d = {}; }
-    if (!r.ok) { var err = new Error(d.error || ('HTTP ' + r.status)); err.status = r.status; err.body = d; throw err; }
+    if (!r.ok) { var err = new Error(d.error || d.detail || ('HTTP ' + r.status)); err.status = r.status; err.body = d; throw err; }
     return d;
   }
   async function post(path, body) {
     var r = await fetch(API + path, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})}), d = {};
     try { d = await r.json(); } catch (e) { d = {}; }
-    if (!r.ok) { var err = new Error(d.error || ('HTTP ' + r.status)); err.status = r.status; throw err; }
+    if (!r.ok) { var err = new Error(d.error || d.detail || ('HTTP ' + r.status)); err.status = r.status; err.body = d; throw err; }
     return d;
   }
   var leafletP = null;
@@ -295,270 +370,303 @@
     });
     return leafletP;
   }
+  function fonts() {
+    if (document.querySelector('link[href="' + FONTS_CSS + '"]')) return;
+    var c = document.createElement('link'); c.rel = 'stylesheet'; c.href = FONTS_CSS; document.head.appendChild(c);
+  }
   function cleanup() {
     S.maps.forEach(function (m) { try { m.remove(); } catch (e) { /* gone */ } });
-    S.charts.forEach(function (c) { try { c.destroy(); } catch (e) { /* gone */ } });
-    S.maps = []; S.charts = []; S.map = null; S.map2 = null;
+    S.maps = []; S.map = null; S.map2 = null; S.L = null; S.swipe = null;
   }
   function pageHead() {
     var pt = document.getElementById('page-title'), pr = document.getElementById('page-refresh');
     if (pt) pt.textContent = t('title'); if (pr) pr.textContent = '↻ ' + t('refresh');
   }
-  function shell(inner) {
+  function legacy() { var sm = global.SatMonitoring || {}; return sm._legacy || sm; }
+
+  // ── deep links: #sat-monitoring?area=&event=&tab=&acq=&before=&mode=&lat=&lon=&z= ─────────────────────────────────
+  function hashParams() {
+    var h = String(global.location && global.location.hash || ''), i = h.indexOf('?'), out = {};
+    if (h.indexOf('#sat-monitoring') !== 0 || i < 0) return out;
+    h.slice(i + 1).split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) out[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); });
+    return out;
+  }
+  function buildHash(p) {
+    var keys = ['area', 'event', 'tab', 'acq', 'before', 'mode', 'lat', 'lon', 'z'].filter(function (k) { return p[k] !== undefined && p[k] !== null && p[k] !== ''; });
+    return '#sat-monitoring' + (keys.length ? '?' + keys.map(function (k) { return k + '=' + encodeURIComponent(p[k]); }).join('&') : '');
+  }
+  function setHash(p, replace) {
+    var h = buildHash(p); if (global.location.hash === h) return;
+    try { global.history[replace ? 'replaceState' : 'pushState']({type: 'nav', id: 'sat-monitoring'}, '', h); } catch (e) { /* no history */ }
+  }
+  function viewParams() {
+    var p = {area: S.areaId, event: S.sel};
+    if (S.view === 'evidence') p.tab = 'evidence';
+    if (S.view === 'changes') {
+      if (S.acq) p.acq = S.acq.acq_id;
+      if (S.compare && S.compare.before && S.mode) { p.before = S.compare.before.acq_id; p.mode = S.mode; }
+      if (S.map) { var c = S.map.getCenter(); p.lat = c.lat.toFixed(5); p.lon = c.lng.toFixed(5); p.z = String(Math.round(S.map.getZoom() * 4) / 4); }
+    }
+    return p;
+  }
+  // index.html calls nav('sat-monitoring') (→ load) and then openArea / openEvent for the same deep link: open once.
+  function claim(key) { var now = Date.now(); if (S.target && S.target.key === key && now - S.target.at < 2000) return false; S.target = {key: key, at: now}; return true; }
+
+  // ── shell: header (tabs · search · compare modes · language) + body ──────────────────────────────────────────────────
+  function shell(view, body) {
     var r = root(); if (!r) return null;
-    r.className = 'satw satw-' + S.theme; r.setAttribute('data-lang', S.lang); r.innerHTML = inner; return r;
+    fonts();
+    S.view = view; r.className = 'satw'; r.setAttribute('data-view', view); r.setAttribute('data-lang', S.lang);
+    var tabs = [['territory', 'tabTerritory'], ['changes', 'tabChanges'], ['evidence', 'tabEvidence']];
+    r.innerHTML = '<header class="satw-hdr">' +
+      '<div class="satw-brand"><span class="satw-brand-a">Forest AI</span><span class="satw-brand-b">/ ' + esc(t('title')) + '</span></div>' +
+      '<nav class="satw-tabs" role="tablist" aria-label="' + esc(t('tabsLabel')) + '">' + tabs.map(function (x) {
+        return '<button type="button" role="tab" aria-selected="' + (x[0] === view) + '" class="satw-tab' + (x[0] === view ? ' on' : '') + '" data-tab="' + x[0] + '">' + esc(t(x[1])) + '</button>';
+      }).join('') + '</nav>' +
+      '<form class="satw-search" role="search"><label class="satw-sr" for="satw-q">' + esc(t('searchLabel')) + '</label>' +
+        '<input id="satw-q" type="search" autocomplete="off" placeholder="' + esc(t('searchPh')) + '" title="' + esc(t('searchHint')) + '">' +
+        '<span class="satw-search-tag" data-no-i18n>WGS84</span><button type="submit" class="satw-btn">' + esc(t('searchBtn')) + '</button>' +
+        '<div id="satw-search-msg" class="satw-search-msg" role="status" hidden></div></form>' +
+      '<div class="satw-modes" role="group" aria-label="' + esc(t('modesLabel')) + '">' + [['swipe', 'modeSwipe'], ['side', 'modeSide'], ['change', 'modeChange']].map(function (m) {
+        return '<button type="button" class="satw-mode" data-mode="' + m[0] + '" aria-pressed="false" disabled>' + esc(t(m[1])) + '</button>';
+      }).join('') + '</div>' +
+      '<button type="button" class="satw-btn satw-ghost satw-lang" data-act="lang" aria-label="' + esc(t('langSwitch')) + '" data-no-i18n>' + (S.lang === 'lv' ? 'EN' : 'LV') + '</button>' +
+      '</header><div class="satw-body">' + body + '</div>';
+    pageHead();
+    r.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { goTab(b.getAttribute('data-tab')); }; });
+    r.querySelector('[data-act=lang]').onclick = function () {
+      S.lang = S.lang === 'lv' ? 'en' : 'lv'; store('satMonitoring.lang', S.lang);
+      var lg = legacy(); if (lg._setLang) { try { lg._setLang(S.lang); } catch (e) { /* legacy page re-renders on open */ } }
+      rerender();
+    };
+    r.querySelector('.satw-search').onsubmit = function (e) { e.preventDefault(); search(document.getElementById('satw-q').value); };
+    r.querySelectorAll('[data-mode]').forEach(function (b) { b.onclick = function () { setMode(b.getAttribute('data-mode')); }; });
+    return r;
   }
-  function toolbarRight() {
-    return '<span class="satw-tools"><button class="satw-btn satw-ghost" data-act="theme" title="' + esc(t('theme')) + '">' +
-      (S.theme === 'dark' ? '☀ ' + esc(t('light')) : '☾ ' + esc(t('dark'))) + '</button>' +
-      '<button class="satw-btn satw-ghost" data-act="lang" data-no-i18n>' + (S.lang === 'lv' ? 'EN' : 'LV') + '</button></span>';
+  function rerender() {
+    if (S.view === 'changes' && S.areaId) openArea(S.areaId, Object.assign(viewParams(), {force: true}));
+    else if (S.view === 'evidence') openEvidence(S.sel, true);
+    else loadTerritory(true);
   }
-  function bindTools(rerender) {
-    var r = root(); if (!r) return;
-    r.querySelectorAll('[data-act=theme]').forEach(function (b) { b.onclick = function () { S.theme = S.theme === 'dark' ? 'light' : 'dark'; store('satWorkspace.theme', S.theme); r.className = 'satw satw-' + S.theme; b.innerHTML = S.theme === 'dark' ? '☀ ' + esc(t('light')) : '☾ ' + esc(t('dark')); }; });
-    r.querySelectorAll('[data-act=lang]').forEach(function (b) { b.onclick = function () { S.lang = S.lang === 'lv' ? 'en' : 'lv'; store('satMonitoring.lang', S.lang); rerender(); }; });
+  function goTab(tab) {
+    if (tab === 'territory') { S.sel = null; setHash({}); loadTerritory(true); }
+    else if (tab === 'changes') {
+      var id = S.areaId || (S.ov && defaultAreaId(S.ov.areas, S.ovEvents || {}));
+      if (id) { setHash({area: id, event: S.sel}); openArea(id, {event: S.sel, force: true}); } else loadTerritory(true);
+    } else { setHash({area: S.areaId, event: S.sel, tab: 'evidence'}); openEvidence(S.sel, true); }
   }
-  function providerBanner(h) {
-    var p = h && h.provider;
-    if (!p || p.state === 'OK') return '';
-    if (p.state === 'UNKNOWN') return '<div class="satw-banner info">' + esc(t('unknownProvider')) + '</div>';
-    if (p.state === 'NOT_CONFIGURED') return '<div class="satw-banner warn">' + esc(t('notConfigured')) + ' ' + timeHtml(p.at_utc) + '</div>';
-    return '<div class="satw-banner warn">' + esc(t('degraded')) + ': ' + timeHtml(p.at_utc) + ' <span data-no-i18n>' + esc((p.error || '').slice(0, 160)) + '</span></div>';
-  }
-  function errorView(e) {
+  function errorView(e, retry) {
     var msg = e && e.status === 503 ? t('dbUnavailable') : t('error') + ': ' + (e && e.message ? e.message : e);
-    shell('<div class="satw-error"><div class="satw-error-card"><h2>' + esc(t('title')) + '</h2><p>' + esc(msg) + '</p></div></div>');
+    var r = shell(S.view || 'territory', '<div class="satw-error" role="alert"><div class="satw-error-card"><h2>' + esc(t('title')) + '</h2><p>' + esc(msg) + '</p>' +
+      '<button type="button" class="satw-btn" data-act="retry">' + esc(t('retry')) + '</button></div></div>');
+    if (r) r.querySelector('[data-act=retry]').onclick = retry || function () { loadTerritory(true); };
   }
 
-  // ── OVERVIEW ───────────────────────────────────────────────────────────────────────────────────────────────────
-  async function loadOverview() {
-    var seq = ++S.seq; S.view = 'overview'; S.areaId = null; cleanup(); pageHead();
-    shell('<div class="satw-loading">' + esc(t('loading')) + '</div>');
+  // ── status bar (both tabs): Copernicus · requests vs guard · next run · automatic risks · basemap ───────────────────
+  function statusBar(h) {
+    h = h || {};
+    var p = h.provider || {}, m = h.month || {}, u = h.worker && h.worker.units && h.worker.units.sync;
+    var cop = p.state === 'OK' ? ['ok', t('copOk')] : p.state === 'UNKNOWN' || !p.state ? ['unk', t('copUnknown')] : ['bad', t('copDegraded')];
+    var detail = p.state && p.state !== 'OK' ? (p.error || p.state) : '';
+    var num = function (v, d) { return isNum(v) ? fmtNum(v, d) : t('na'); };
+    return '<footer class="satw-status" role="contentinfo">' +
+      '<button type="button" class="satw-cop ' + cop[0] + '" data-act="cop" aria-expanded="false" title="' + esc(detail) + '"><span class="satw-led" aria-hidden="true"></span>' + esc(cop[1]) + '</button>' +
+      '<span data-no-i18n class="satw-mono">' + esc(t('reqGuard', {v: num(m.requests, 0), g: num(m.request_guard, 0)})) + '</span>' +
+      '<span data-no-i18n class="satw-mono">' + esc(t('puGuard', {v: num(m.pu, 1), g: num(m.pu_guard, 0)})) + '</span>' +
+      '<span>' + esc(t('nextRun', {t: u && u.next_run_utc ? fmtClock(u.next_run_utc).split(' · ')[0] : t('na')})) + '</span>' +
+      '<span>' + esc(h.auto_risk_enabled === true ? t('autoRiskOn') : t('autoRiskOff')) + '</span>' +
+      '<span class="satw-status-right">' + esc(t('basemapNote')) + '</span>' +
+      '<div id="satw-cop-detail" class="satw-cop-detail" hidden><b>' + esc(cop[1]) + '</b><br><span data-no-i18n class="satw-mono">' + esc(detail || '—') + '</span>' +
+        (p.at_utc ? '<br>' + esc(fmtClock(p.at_utc)) : '') + '</div></footer>';
+  }
+  function bindStatus() {
+    var b = document.querySelector('.satw-cop'), d = document.getElementById('satw-cop-detail'); if (!b || !d) return;
+    b.onclick = function () { d.hidden = !d.hidden; b.setAttribute('aria-expanded', String(!d.hidden)); };
+  }
+
+  // ── TERITORIJA ───────────────────────────────────────────────────────────────────────────────────────────────────────
+  function defaultAreaId(areas, evByArea) {
+    var best = null;
+    (areas || []).filter(function (a) { return a.active; }).forEach(function (a) {
+      var w = worstOpenEvent(evByArea[a.id] || []); if (!w) return;
+      if (!best || changeColour(w).rank > changeColour(best.e).rank ||
+          (changeColour(w).rank === changeColour(best.e).rank && String(w.first_after_time_utc) > String(best.e.first_after_time_utc))) best = {id: a.id, e: w};
+    });
+    return best ? best.id : null;
+  }
+  async function loadTerritory(force) {
+    if (!force && !claim('territory')) return;
+    var seq = ++S.seq; cleanup(); S.areaId = null; S.sel = null; S.ev = null; S.area = null;
+    shell('territory', '<div class="satw-loading">' + esc(t('loading')) + '</div>');
     var ov, h, layer;
-    try { var r = await Promise.all([get('/overview'), get('/health'), get('/map-layer').catch(function () { return {features: []}; })]); ov = r[0]; h = r[1]; layer = r[2]; }
+    try { var r = await Promise.all([get('/overview'), get('/health').catch(function () { return {}; }), get('/map-layer').catch(function () { return {features: []}; })]); ov = r[0]; h = r[1]; layer = r[2]; }
     catch (e) { if (seq === S.seq) errorView(e); return; }
     if (seq !== S.seq) return;
-    S.health = h;
+    S.ov = ov; S.health = h; S.layer = layer;
     var areas = ov.areas.filter(function (a) { return a.active; });
-    var evByArea = {};
-    (layer.features || []).forEach(function (f) { var p = f.properties || {}; if (p.kind === 'event') (evByArea[p.area_id] = evByArea[p.area_id] || {})[p.event_id] = p; });
-    var totalHa = areas.reduce(function (s, a) { return s + (isNum(a.area_ha) ? a.area_ha : 0); }, 0);
-    var awaiting = (ov.latest_events || []).filter(function (e) { return e.status === 'SUSPECTED'; }).length;
-    var m = h.month || {}, w = (h.worker || {}).state;
-    var sync = h.last_successful_sync;
-    var html = '<div class="satw-overview"><div id="satw-ov-map" class="satw-map"></div>' +
-      '<div class="satw-float satw-summary"><div class="satw-float-head"><b>' + esc(t('title')) + '</b>' + toolbarRight() + '</div>' + providerBanner(h) +
-      '<div class="satw-kpis">' +
-        kpi(t('areas'), areas.length) + kpi(t('monitoredHa'), ha(totalHa, 1)) +
-        kpi(t('openEvents'), ov.kpis.open_suspected_events, ov.kpis.open_suspected_events ? 'amber' : '') + kpi(t('awaitingReview'), awaiting) + '</div>' +
-      '<dl class="satw-dl"><dt>' + esc(t('lastSync')) + '</dt><dd>' + (sync ? timeHtml(sync.finished_at) : na()) + '</dd>' +
-        '<dt>' + esc(t('usage')) + '</dt><dd data-no-i18n>' + (isNum(m.pu) ? m.pu.toFixed(1) : '—') + ' / ' + esc(m.pu_guard) + ' PU · ' + esc(m.requests) + ' / ' + esc(m.request_guard) + ' ' + esc(t('requests')) + ' (' + esc(t('guard')) + ')</dd>' +
-        '<dt>' + esc(t('worker')) + '</dt><dd>' + badge(t('w' + (w || 'UNKNOWN')), w === 'IDLE' ? '' : w === 'RUNNING' ? 'a' : 'a') + workerNext(h) + '</dd></dl>' +
-      '<div class="satw-actions"><button class="satw-btn" data-act="add-sector">' + esc(t('addSector')) + '</button><button class="satw-btn" data-act="fetch">' + esc(t('fetchNow')) + '</button></div>' +
-      '<div id="satw-sectors"></div></div>';
-    html += '<div class="satw-float satw-latest"><div class="satw-float-head"><b>' + esc(t('latest')) + '</b></div>' +
-      ((ov.latest_events || []).length ? '<ul class="satw-list">' + ov.latest_events.map(function (e) {
-        return '<li><a data-event="' + e.id + '" data-area="' + e.monitored_area_id + '">' + dot(e) + '<span><b data-no-i18n>#' + e.id + '</b> ' + esc(clsLabel(e.classification)) +
-          '<br><small><span data-no-i18n>' + esc(e.area_name || '') + ' · ' + esc(ha(e.changed_area_ha) || '—') + ' · ' + esc(fmtDate(e.first_after_time_utc) || '—') + '</span></small></span></a></li>';
-      }).join('') + '</ul>' : '<p class="satw-muted">' + esc(t('noEvents')) + '</p>') + '</div>';
-    html += '<details class="satw-drawer satw-areas-drawer"' + (areas.length ? '' : ' open') + '><summary>' + esc(t('allAreas')) + ' (' + areas.length + ')</summary>' +
-      (areas.length ? '<table class="satw-table"><thead><tr><th>' + esc(t('areas')) + '</th><th>' + esc(t('status')) + '</th><th>ha</th><th>' + esc(t('openEvents')) + '</th><th>' + esc(t('lastAcq')) + '</th><th></th></tr></thead><tbody>' +
-        areas.map(function (a) {
-          var c = worstColour(Object.values(evByArea[a.id] || {}));
-          return '<tr><td>' + (c ? '<span class="satw-dot" style="--c:' + c.color + '"></span>' : '<span class="satw-dot empty"></span>') + '<span data-no-i18n>' + esc(a.name) + '</span> <small>' + esc(t('src' + a.source)) + '</small></td><td>' + esc(t('d' + a.data_status)) + '</td>' +
-            '<td data-no-i18n>' + esc(isNum(a.area_ha) ? a.area_ha.toFixed(2) : '—') + '</td><td>' + esc(a.open_suspected_events) + '</td><td>' + (a.last_s1_utc || a.last_valid_s2_utc ? '<span data-no-i18n>' + esc(fmtDate([a.last_s1_utc, a.last_valid_s2_utc].filter(Boolean).sort().pop())) + '</span>' : na()) + '</td>' +
-            '<td><button class="satw-btn satw-small" data-area="' + a.id + '">' + esc(t('open')) + '</button></td></tr>';
-        }).join('') + '</tbody></table>' : '<div class="satw-empty"><b>' + esc(t('noAreas')) + '</b><p>' + esc(t('noAreasHint')) + '</p></div>') + '</details></div>';
-    var r = shell(html); if (!r) return;
-    bindTools(loadOverview);
-    r.querySelectorAll('[data-area]').forEach(function (b) { b.onclick = function () { var ev = b.getAttribute('data-event'); openArea(+b.getAttribute('data-area'), ev ? +ev : null); }; });
-    r.querySelector('[data-act=fetch]').onclick = async function () { if (!global.confirm(S.lang === 'lv' ? 'Ielādēt jaunos Sentinel-1/2 uzņēmumus visām teritorijām tagad?' : 'Fetch new Sentinel-1/2 observations for all areas now?')) return; try { await post('/fetch', {all: true}); loadOverview(); } catch (e) { global.alert(t('error') + ': ' + e.message); } };
+    var details = await Promise.all(areas.map(function (a) { return get('/areas/' + a.id + '?geometry=0').catch(function () { return null; }); }));
+    if (seq !== S.seq) return;
+    var det = {}; S.ovEvents = {};
+    areas.forEach(function (a, i) { det[a.id] = details[i]; S.ovEvents[a.id] = details[i] ? details[i].events : []; });
+    var html = '<div class="satw-work"><aside class="satw-left" aria-label="' + esc(t('areas')) + '">' +
+        '<div class="satw-sec"><div class="satw-sec-h"><b>' + esc(t('areas')) + '</b><span class="satw-muted" data-no-i18n>' + areas.length + '</span></div>' +
+        (areas.length ? areas.map(function (a) { return areaCard(a, det[a.id]); }).join('') :
+          '<div class="satw-empty"><b>' + esc(t('noAreas')) + '</b><p>' + esc(t('noAreasHint')) + '</p><button type="button" class="satw-btn" data-act="focus-search">' + esc(t('firstArea')) + '</button></div>') + '</div>' +
+        latestList(ov.latest_events || []) +
+        '<details class="satw-sec satw-drawer"><summary>' + esc(t('allAreas')) + ' (' + areas.length + ')</summary>' + areasTable(areas) +
+          '<div class="satw-actions"><button type="button" class="satw-btn" data-act="add-sector">' + esc(t('addSector')) + '</button>' +
+          '<button type="button" class="satw-btn" data-act="fetch">' + esc(t('fetchNow')) + '</button></div><div id="satw-sectors"></div></details>' +
+      '</aside><div class="satw-main"><div id="satw-mapwrap" class="satw-mapwrap"><div id="satw-map" class="satw-map" aria-label="Map"></div></div>' + statusBar(h) + '</div></div>';
+    var r = shell('territory', html); if (!r) return;
+    bindStatus();
+    r.querySelectorAll('[data-area]').forEach(function (b) { b.onclick = function () { var ev = b.getAttribute('data-event'); var id = +b.getAttribute('data-area'); setHash({area: id, event: ev ? +ev : null}); openArea(id, {event: ev ? +ev : null, force: true}); }; });
+    var fs = r.querySelector('[data-act=focus-search]'); if (fs) fs.onclick = function () { document.getElementById('satw-q').focus(); };
+    r.querySelector('[data-act=fetch]').onclick = async function () { if (!global.confirm(t('fetchConfirm'))) return; try { await post('/fetch', {all: true}); loadTerritory(true); } catch (e) { global.alert(t('error') + ': ' + e.message); } };
     r.querySelector('[data-act=add-sector]').onclick = showSectors;
     var L = await leaflet(); if (seq !== S.seq) return;
-    var map = L.map('satw-ov-map', {zoomControl: false}); S.maps.push(map); L.control.zoom({position: 'bottomright', zoomInTitle: S.lang === 'lv' ? 'Tuvināt' : 'Zoom in', zoomOutTitle: S.lang === 'lv' ? 'Tālināt' : 'Zoom out'}).addTo(map);
-    L.tileLayer(OSM, {maxZoom: 19, attribution: '© OpenStreetMap contributors'}).addTo(map);
-    var g = L.featureGroup().addTo(map);
+    var map = baseMap(L, 'satw-map');
+    var g = L.featureGroup().addTo(map), imgs = L.layerGroup().addTo(map);
     areas.forEach(function (a) {
-      if (!a.geometry) return;
-      var c = worstColour(Object.values(evByArea[a.id] || {}));
-      L.geoJSON(a.geometry, {style: {color: c ? c.color : '#3E8E5E', weight: 2.5, fillOpacity: 0.18, fillColor: c ? c.color : '#3E8E5E'}})
-        .bindTooltip(esc(a.name), {sticky: true}).on('click', function () { openArea(a.id); }).addTo(g);
+      var d = det[a.id]; if (!a.geometry) return;
+      var latest = d && latestValidOf(d.timeline, 'S2', d.config ? d.config.min_valid_pct : null);
+      if (latest && a.grid_bbox) {
+        var comp = singleComposite(latest, 'true');
+        imgStatus(document.getElementById('satw-mapwrap'), L.imageOverlay(imageUrl(latest, comp), bboxBounds(a.grid_bbox), {pane: 'satwImg', opacity: 0.95})).addTo(imgs);
+      }
+      var c = worstColour((d && d.events || []).filter(isOpen));
+      L.geoJSON(a.geometry, {pane: 'satwBoundary', style: {color: '#F5F5F0', weight: 1.6, opacity: 0.9, fill: true, fillOpacity: 0.02, fillColor: c ? c.color : '#7FBF8E'}})
+        .bindTooltip(esc(a.name), {sticky: true}).on('click', function () { setHash({area: a.id}); openArea(a.id, {force: true}); }).addTo(g);
     });
-    if (g.getLayers().length) map.fitBounds(g.getBounds(), {padding: [60, 60], maxZoom: 13}); else map.setView([56.9, 24.6], 7);
+    drawPolys(L, map, (layer.features || []).filter(function (f) { return f.properties && f.properties.kind === 'event' && isOpen(f.properties); }), null);
+    mapRail(L, map);
+    var did = defaultAreaId(areas, S.ovEvents), target = did && areas.filter(function (a) { return a.id === did; })[0];
+    if (target && target.grid_bbox) map.fitBounds(bboxBounds(target.grid_bbox), {padding: [24, 24]});
+    else if (g.getLayers().length) map.fitBounds(g.getBounds(), {padding: [40, 40], maxZoom: 14});
+    else map.setView([56.95, 24.1], 10);                             // no areas: Riga region, never country zoom
+    copernicusAttr(map, areas.map(function (a) { var d = det[a.id]; var x = d && latestValidOf(d.timeline, 'S2', null); return x && x.sensing_time_utc; }));
   }
-  function kpi(label, v, cls) { return '<div class="satw-kpi ' + (cls || '') + '"><span>' + esc(label) + '</span><b data-no-i18n>' + (v === null || v === undefined ? '—' : esc(v)) + '</b></div>'; }
-  function workerNext(h) { var u = h.worker && h.worker.units && h.worker.units.sync; return u && u.next_run_utc ? ' <small>' + esc(t('nextDaily')) + ': ' + timeHtml(u.next_run_utc) + '</small>' : ''; }
+  function latestValidOf(tl, sensor, mv) {
+    return (tl || []).filter(function (x) { return x.sensor === sensor && x.quicklook_url && acqState(x, mv) === 'ok'; })
+      .sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0] || null;
+  }
+  function areaCard(a, d) {
+    var evs = d ? d.events : [], openN = evs.filter(isOpen), c = worstColour(openN);
+    var counts = {}; openN.forEach(function (e) { var k = changeColour(e); counts[k.key] = counts[k.key] || {c: k, n: 0}; counts[k.key].n++; });
+    var lastAny = [a.last_s1_utc, a.last_s2_any].filter(Boolean).sort().pop();
+    return '<button type="button" class="satw-card" data-area="' + a.id + '">' +
+      '<div class="satw-card-h"><b data-no-i18n>' + esc(a.name) + '</b>' + (c ? '<span class="satw-dot" style="--c:' + c.color + '" aria-hidden="true"></span>' : '') + '</div>' +
+      '<div class="satw-muted">' + esc(t('src' + a.source)) + ' · <span data-no-i18n>' + esc(ha(a.area_ha, 1) || t('na')) + '</span></div>' +
+      cardVisual(a, d) +
+      '<div class="satw-card-f"><span>' + (Object.keys(counts).length ? Object.keys(counts).map(function (k) { return '<span class="satw-cnt" style="--c:' + counts[k].c.color + '" data-no-i18n>' + counts[k].n + '</span>'; }).join('') : '<span class="satw-muted">' + esc(t('thOpen')) + ': <span data-no-i18n>0</span></span>') + '</span>' +
+        '<span class="satw-muted">' + esc(t('thLast')) + ': ' + (lastAny ? '<span data-no-i18n>' + esc(fmtDay(lastAny)) + '</span>' : esc(t('na'))) + '</span></div></button>';
+  }
+  function cardVisual(a, d) {
+    if (!d) return '<div class="satw-card-v satw-na">' + esc(t('na')) + '</div>';
+    var mv = d.config ? d.config.min_valid_pct : null, by = {};
+    d.timeline.forEach(function (x) { by[x.acq_id] = x; });
+    if (isNum(a.area_ha) && a.area_ha >= BIG_AREA_HA) {
+      var w = worstOpenEvent(d.events), pr = w ? defaultPair(eventLists(w), by, mv) : {before: null, after: null};
+      if (!pr.after) {
+        var ok = d.timeline.filter(function (x) { return x.sensor === 'S2' && x.quicklook_url && acqState(x, mv) === 'ok'; })
+          .sort(function (x, y) { return String(x.sensing_time_utc).localeCompare(String(y.sensing_time_utc)); });
+        pr = ok.length >= 2 ? {before: ok[ok.length - 2], after: ok[ok.length - 1]} : {before: null, after: ok[ok.length - 1] || null};
+      }
+      var comp = pr.before && pr.after ? pairComposite(pr.before, pr.after, 'true') : singleComposite(pr.after, 'true');
+      var th = function (x) { return x ? '<span class="satw-thumb" role="img" aria-label="' + esc(fmtDay(x.sensing_time_utc)) + '" style="background-image:url(\'' + esc(imageUrl(x, comp)) + '\')"><span data-no-i18n>' + esc(fmtDay(x.sensing_time_utc, null, true)) + '</span></span>' : '<span class="satw-thumb empty">' + esc(t('noThumb')) + '</span>'; };
+      return '<div class="satw-card-v satw-thumbs" title="' + esc(t('thumbsNote')) + '">' + th(pr.before) + th(pr.after) + '</div>';
+    }
+    return '<div class="satw-card-v satw-mini">' + boundarySvg(a.geometry) + sparkline(d.timeline, mv) + '</div>';
+  }
+  function boundarySvg(g) {
+    if (!g || !g.coordinates) return '<svg class="satw-shape" viewBox="0 0 60 60" aria-hidden="true"></svg>';
+    var ring = g.type === 'Polygon' ? g.coordinates[0] : g.coordinates[0][0];
+    var lat0 = ring.reduce(function (s, c) { return s + c[1]; }, 0) / ring.length, k = Math.cos(lat0 * Math.PI / 180);
+    var xs = ring.map(function (c) { return c[0] * k; }), ys = ring.map(function (c) { return c[1]; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var s = 52 / Math.max(x1 - x0, y1 - y0 || 1e-9);
+    var pts = ring.map(function (c, i) { return (4 + (xs[i] - x0) * s).toFixed(1) + ',' + (4 + (y1 - c[1]) * s).toFixed(1); }).join(' ');
+    return '<svg class="satw-shape" viewBox="0 0 60 60" aria-hidden="true"><polygon points="' + pts + '"/></svg>';
+  }
+  function sparkline(tl, mv) {
+    var pts = (tl || []).filter(function (x) { return x.sensor === 'S2' && acqState(x, mv) === 'ok' && x.metrics_inside && x.metrics_inside.NDVI && isNum(x.metrics_inside.NDVI.median); })
+      .map(function (x) { return [parseUtc(x.sensing_time_utc).getTime(), x.metrics_inside.NDVI.median]; }).sort(function (a, b) { return a[0] - b[0]; });
+    if (pts.length < 2) return '<div class="satw-spark satw-na">' + esc(t('ndvi')) + ': ' + esc(t('na')) + '</div>';
+    var x0 = pts[0][0], x1 = pts[pts.length - 1][0], W = 150, H = 44;
+    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + (4 + (p[0] - x0) / (x1 - x0 || 1) * (W - 8)).toFixed(1) + ' ' + (H - 4 - Math.max(0, Math.min(1, p[1])) * (H - 8)).toFixed(1); }).join(' ');
+    return '<div class="satw-spark"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(t('ndvi')) + '"><path d="' + d + '"/></svg><small>' + esc(t('ndvi')) + '</small></div>';
+  }
+  function latestList(list) {
+    return '<details class="satw-sec satw-drawer"' + (list.length ? ' open' : '') + '><summary>' + esc(t('latest')) + ' (' + list.length + ')</summary>' +
+      (list.length ? '<ul class="satw-list">' + list.map(function (e) {
+        return '<li><button type="button" data-event="' + e.id + '" data-area="' + e.monitored_area_id + '">' + dot(e) + '<span><b data-no-i18n>#' + e.id + '</b> ' + esc(clsLabel(e.classification)) +
+          '<br><small data-no-i18n>' + esc((e.area_name || '') + ' · ' + (ha(e.changed_area_ha) || '—') + ' · ' + (fmtDay(e.first_after_time_utc) || '—')) + '</small></span></button></li>';
+      }).join('') + '</ul>' : '<p class="satw-muted">' + esc(t('noEvents')) + '</p>') + '</details>';
+  }
+  function areasTable(areas) {
+    if (!areas.length) return '<p class="satw-muted">' + esc(t('noAreas')) + '</p>';
+    return '<table class="satw-table"><thead><tr><th>' + esc(t('thArea')) + '</th><th>' + esc(t('thStatus')) + '</th><th>ha</th><th>' + esc(t('thOpen')) + '</th><th></th></tr></thead><tbody>' +
+      areas.map(function (a) {
+        return '<tr><td data-no-i18n>' + esc(a.name) + '</td><td>' + esc(t('d' + a.data_status)) + '</td><td data-no-i18n>' + esc(fmtNum(a.area_ha, 2) || '—') + '</td>' +
+          '<td data-no-i18n>' + esc(isNum(a.open_suspected_events) ? a.open_suspected_events : '—') + '</td><td><button type="button" class="satw-btn satw-small" data-area="' + a.id + '">' + esc(t('open')) + '</button></td></tr>';
+      }).join('') + '</tbody></table>';
+  }
   async function showSectors() {
     var box = document.getElementById('satw-sectors'); if (!box) return;
     if (box.innerHTML) { box.innerHTML = ''; return; }
     box.innerHTML = '<p class="satw-muted">' + esc(t('loading')) + '</p>';
     var d; try { d = await get('/sectors'); } catch (e) { box.innerHTML = '<p>' + esc(t('error') + ': ' + e.message) + '</p>'; return; }
     box.innerHTML = '<ul class="satw-list satw-sector-list">' + d.sectors.map(function (s) {
-      return '<li><span data-no-i18n>' + esc(s.name) + '</span>' + (s.monitored_area_id ? badge(S.lang === 'lv' ? 'Uzraudzīts' : 'Monitored') :
-        s.queued_job_id ? badge(S.lang === 'lv' ? 'Rindā' : 'Queued', 'a') : !s.has_polygon ? badge(S.lang === 'lv' ? 'Nav poligona' : 'No polygon', 'r') :
-        '<button class="satw-btn satw-small" data-add="' + s.id + '" data-name="' + esc(s.name) + '">' + esc(S.lang === 'lv' ? 'Pievienot' : 'Add') + '</button>') + '</li>';
+      return '<li><span data-no-i18n>' + esc(s.name) + '</span>' + (s.monitored_area_id ? badge(t('monitored')) : s.queued_job_id ? badge(t('queued'), 'a') : !s.has_polygon ? badge(t('noPolygon'), 'r') :
+        '<button type="button" class="satw-btn satw-small" data-add="' + s.id + '" data-name="' + esc(s.name) + '">' + esc(t('add')) + '</button>') + '</li>';
     }).join('') + '</ul>';
     box.querySelectorAll('[data-add]').forEach(function (b) {
       b.onclick = async function () {
-        if (!global.confirm((S.lang === 'lv' ? 'Pievienot ' : 'Add ') + b.getAttribute('data-name') + (S.lang === 'lv' ? ' satelītu monitoringam? Vispirms tiks ielādētas pēdējās 120 dienas.' : ' to satellite monitoring? The last 120 days are fetched first.'))) return;
-        try { await post('/areas', {source: 'SECTOR', source_ref: b.getAttribute('data-add')}); box.innerHTML = ''; showSectors(); } catch (e) { global.alert(t('error') + ': ' + e.message); }
+        if (!global.confirm(t('sectorAddConfirm', {name: b.getAttribute('data-name')}))) return;
+        try { await post('/areas', {source: 'SECTOR', source_ref: b.getAttribute('data-add'), name: b.getAttribute('data-name')}); box.innerHTML = ''; showSectors(); } catch (e) { global.alert(t('error') + ': ' + e.message); }
       };
     });
   }
 
-  // ── WORKSPACE ──────────────────────────────────────────────────────────────────────────────────────────────────
-  async function openArea(id, eventId) {
-    var seq = ++S.seq; S.view = 'area'; S.areaId = id; S.ev = null; S.sel = null; S.compare = null; S.acq = null; cleanup(); pageHead();
-    shell('<div class="satw-loading">' + esc(t('loading')) + '</div>');
-    var a, h, layer;
-    try { var r = await Promise.all([get('/areas/' + id + '?geometry=0'), get('/health').catch(function () { return {}; }), get('/map-layer?area_id=' + id).catch(function () { return {features: []}; })]); a = r[0]; h = r[1]; layer = r[2]; }
-    catch (e) { if (seq === S.seq) errorView(e); return; }
-    if (seq !== S.seq) return;
-    S.area = a; S.health = h; S.layer = layer; S.byId = {};
-    a.timeline.forEach(function (x) { S.byId[x.acq_id] = x; });
-    var order = function (e) { return (OPEN.indexOf(e.status) >= 0 ? 0 : 1); };
-    S.events = a.events.slice().sort(function (x, y) { return order(x) - order(y) || changeColour(y).rank - changeColour(x).rank || (y.changed_area_ha || 0) - (x.changed_area_ha || 0); });
-    S.acq = latestValid(S.sensor) || latestValid(S.sensor === 'S2' ? 'S1' : 'S2');
-    if (S.acq) S.sensor = S.acq.sensor;
-    renderWorkspace(seq);
-    var L = await leaflet(); if (seq !== S.seq) return;
-    buildMap(L);
-    renderTimeline(); renderAnalysis(L);
-    if (eventId) selectEvent(eventId, true);
-  }
-  function minValid() { return S.area && S.area.config ? S.area.config.min_valid_pct : null; }
-  function latestValid(sensor) {
-    var mv = minValid();
-    return S.area.timeline.filter(function (x) { return x.sensor === sensor && x.quicklook_url && acqState(x, mv) === 'ok' && (sensor !== 'S1' || S.s1geom === 'all' || geomKey(x) === S.s1geom); })
-      .sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0] || null;
-  }
-  function geomKey(a) { return (a.orbit_direction || '?').slice(0, 3) + ' ' + (a.relative_orbit === null || a.relative_orbit === undefined ? '?' : a.relative_orbit); }
-  function lastAcqTimes() {
-    var out = {};
-    S.area.timeline.forEach(function (x) { if (x.status === 'OK' && (!out[x.sensor] || x.sensing_time_utc > out[x.sensor])) out[x.sensor] = x.sensing_time_utc; });
-    return out;
-  }
-  function renderWorkspace() {
-    var a = S.area.area, la = lastAcqTimes(), lastAny = [la.S1, la.S2].filter(Boolean).sort().pop();
-    var catalog = ((S.health && S.health.provider_status) || []).filter(function (p) { return p.key === 'catalog'; })[0];
-    var sysCheck = catalog && (catalog.last_ok_utc || catalog.last_error_utc) ? [catalog.last_ok_utc, catalog.last_error_utc].filter(Boolean).sort().pop() : null;
-    var html = '<div class="satw-ws">' +
-      '<header class="satw-top">' +
-        '<a class="satw-back" data-act="back">' + esc(t('back')) + '</a>' +
-        '<div class="satw-title"><b data-no-i18n>' + esc(a.name) + '</b> ' + badge(t('src' + a.source)) + ' <span data-no-i18n>' + esc(ha(a.area_ha) || '—') + '</span> ' +
-          badge(t('d' + a.data_status), a.data_status === 'OK' ? 'g' : 'a') + '</div>' +
-        '<div class="satw-times">' +
-          '<span title="' + esc('S1: ' + (fmtTime(la.S1) || '—') + ' · S2: ' + (fmtTime(la.S2) || '—')) + '"><small>' + esc(t('lastAcq')) + '</small>' + timeHtml(lastAny) + '</span>' +
-          '<span><small>' + esc(t('lastAnalysis')) + '</small>' + timeHtml(S.area.last_successful_analysis_utc) + '</span>' +
-          '<span><small>' + esc(t('lastCheck')) + ' (' + esc(t('system')) + ')</small>' + timeHtml(sysCheck) + '</span></div>' +
-        '<div class="satw-switches">' +
-          seg('sensor', [['S2', t('optical')], ['S1', t('radar')]], S.sensor) +
-          '<span id="satw-composite"></span>' +
-          '<button class="satw-btn' + (S.compare ? ' on' : '') + '" data-act="compare">' + esc(t('compare')) + '</button>' +
-          '<button class="satw-btn' + (S.panelLayers ? ' on' : '') + '" data-act="layers">' + esc(t('layers')) + '</button>' + toolbarRight() + '</div>' +
-      '</header>' + providerBanner(S.health) +
-      (a.data_status === 'NO_DATA_YET' ? '<div class="satw-banner info">' + esc(t('noDataYet')) + '</div>' : '') +
-      (a.data_status === 'BACKFILL_OR_FETCH_IN_PROGRESS' ? '<div class="satw-banner warn">' + esc(t('backfill')) + '</div>' : '') +
-      '<div class="satw-stage">' +
-        '<div id="satw-maps" class="satw-maps"><div id="satw-map" class="satw-map"></div></div>' +
-        '<aside class="satw-left">' + eventList() + layerPanel() + legendHtml() + '</aside>' +
-        '<aside id="satw-right" class="satw-right" hidden></aside>' +
-        '<div id="satw-compare-bar" class="satw-compare-bar" hidden></div>' +
-      '</div>' +
-      '<details class="satw-drawer satw-analysis"' + (S.drawer ? ' open' : '') + '><summary>' + esc(t('analysis')) + '</summary><div id="satw-analysis-body"></div></details>' +
-      '<section class="satw-timeline"><div class="satw-tl-head"><b>' + esc(t('timeline')) + '</b> <small>' + esc(t('shiftHint')) + '</small>' +
-        '<span class="satw-tl-tools">' + seg('window', [['120', t('days120')], ['all', t('allDays')]], String(S.window)) +
-        '<label>' + esc(t('s1Filter')) + ' <select id="satw-s1geom"><option value="all">' + esc(t('allGeom')) + '</option>' + geomOptions() + '</select></label></span></div>' +
-        '<div id="satw-tl" class="satw-tl"></div><div id="satw-tip" class="satw-tip" hidden></div></section>' +
-      '<details class="satw-drawer satw-tech"' + (S.tech ? ' open' : '') + '><summary>' + esc(t('technical')) + '</summary><div id="satw-tech-body"></div></details>' +
-      '</div>';
-    var r = shell(html); if (!r) return;
-    bindTools(function () { openArea(S.areaId, S.sel); });
-    r.querySelector('[data-act=back]').onclick = function () { history.pushState({type: 'nav', id: 'sat-monitoring'}, '', '#sat-monitoring'); loadOverview(); };
-    r.querySelectorAll('[data-seg=sensor] button').forEach(function (b) { b.onclick = function () { S.sensor = b.getAttribute('data-v'); var x = latestValid(S.sensor); if (x) showAcq(x); syncSeg('sensor', S.sensor); }; });
-    r.querySelectorAll('[data-seg=window] button').forEach(function (b) { b.onclick = function () { S.window = b.getAttribute('data-v') === 'all' ? 'all' : 120; syncSeg('window', String(S.window)); renderTimeline(); }; });
-    var sel = r.querySelector('#satw-s1geom'); sel.value = S.s1geom; sel.onchange = function () { S.s1geom = sel.value; renderTimeline(); if (S.analysisL) renderAnalysis(S.analysisL); };
-    r.querySelector('[data-act=compare]').onclick = function () { toggleCompare(); };
-    r.querySelector('[data-act=layers]').onclick = function () { S.panelLayers = !S.panelLayers; r.querySelector('.satw-layers').hidden = !S.panelLayers; this.classList.toggle('on', S.panelLayers); };
-    r.querySelectorAll('[data-ev]').forEach(function (li) { li.onclick = function () { selectEvent(+li.getAttribute('data-ev')); }; });
-    r.querySelectorAll('.satw-layers input').forEach(function (c) { c.onchange = function () { setLayer(c.getAttribute('data-layer'), c.checked); }; });
-    r.querySelector('.satw-analysis').addEventListener('toggle', function (e) { S.drawer = e.target.open; });
-    r.querySelector('.satw-tech').addEventListener('toggle', function (e) { S.tech = e.target.open; if (S.tech) renderTech(); });
-    renderComposite(); if (S.tech) renderTech();
-  }
-  function seg(name, opts, cur) {
-    return '<span class="satw-seg" data-seg="' + name + '">' + opts.map(function (o) { return '<button class="' + (o[0] === cur ? 'on' : '') + '" data-v="' + o[0] + '">' + esc(o[1]) + '</button>'; }).join('') + '</span>';
-  }
-  function syncSeg(name, cur) { document.querySelectorAll('[data-seg=' + name + '] button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === cur); }); }
-  function geomOptions() {
-    var seen = {};
-    S.area.timeline.forEach(function (x) { if (x.sensor === 'S1') seen[geomKey(x)] = 1; });
-    return Object.keys(seen).sort().map(function (k) { return '<option value="' + esc(k) + '" data-no-i18n>' + esc(k) + '</option>'; }).join('');
-  }
-  function geomColour(a) {
-    var keys = []; S.area.timeline.forEach(function (x) { if (x.sensor === 'S1' && keys.indexOf(geomKey(x)) < 0) keys.push(geomKey(x)); });
-    keys.sort(); return GEOM_COLOURS[keys.indexOf(geomKey(a)) % GEOM_COLOURS.length];
-  }
-  function eventList() {
-    if (!S.events.length) return '<div class="satw-panel"><b>' + esc(t('events')) + '</b><div class="satw-empty"><b>' + esc(t('noEvents')) + '</b><p>' + esc(t('noEventsHint')) + '</p></div></div>';
-    return '<div class="satw-panel"><b>' + esc(t('events')) + ' (' + S.events.length + ')</b><ul class="satw-evlist">' + S.events.map(function (e) {
-      return '<li data-ev="' + e.id + '" class="' + (S.sel === e.id ? 'sel' : '') + '">' + dot(e) + '<div><div><b data-no-i18n>#' + e.id + '</b> ' + esc(clsLabel(e.classification)) + '</div>' +
-        '<small><span data-no-i18n>' + esc(ha(e.changed_area_ha_inside) || '—') + '</span> ' + esc(t('inside')) + ' · <span data-no-i18n>' + esc(ha(e.changed_area_ha_buffer) || '—') + '</span> ' + esc(t('outside')) +
-        ' · ' + esc(t('onset')) + ' <span data-no-i18n>' + esc(fmtDate(e.first_after_time_utc) || '—') + '</span></small>' +
-        '<div class="satw-evq">' + qBadge('confidence', e.confidence) + qBadge('evidence', e.evidence_quality) + '</div></div></li>';
-    }).join('') + '</ul></div>';
-  }
-  var LAYERS = [['image', 'lImage', true], ['change', 'lChange', true], ['boundary', 'lBoundary', true], ['buffer', 'lBuffer', true],
-                ['footprint', 'lFootprint', false], ['vmd', 'lVmd', true], ['base', 'lBase', true]];
-  function layerPanel() {
-    return '<div class="satw-panel satw-layers"' + (S.panelLayers ? '' : ' hidden') + '><b>' + esc(t('layers')) + '</b>' + LAYERS.map(function (l) {
-      return '<label><input type="checkbox" data-layer="' + l[0] + '"' + (layerOn(l[0]) ? ' checked' : '') + '> ' + esc(t(l[1])) + '</label>';
-    }).join('') + '</div>';
-  }
-  S.layersOn = {};
-  function layerOn(k) { if (!(k in S.layersOn)) S.layersOn[k] = LAYERS.filter(function (l) { return l[0] === k; })[0][2]; return S.layersOn[k]; }
-  function legendHtml() {
-    return '<div class="satw-panel satw-legend">' + CHANGE_COLOURS.map(function (c) {
-      return '<div><span class="satw-dot' + (c.dash ? ' dashed' : '') + '" style="--c:' + c.color + '"></span>' + esc(t(c.legend)) + '</div>';
-    }).join('') + '<div><span class="satw-hatch"></span>' + esc(t('hatch')) + '</div></div>';
-  }
-  function renderComposite() {
-    var box = document.getElementById('satw-composite'); if (!box) return;
-    var a = S.acq;
-    if (!a) { box.innerHTML = ''; return; }
-    if (a.sensor === 'S1') { box.innerHTML = '<span class="satw-note" data-no-i18n>' + esc(t('s1Label')) + '</span>'; return; }
-    var tc = !!a.truecolor_url, cur = S.composite === 'true' && tc ? 'true' : 'false';
-    box.innerHTML = '<span class="satw-seg" data-seg="composite"><button data-v="true" class="' + (cur === 'true' ? 'on' : '') + '"' + (tc ? '' : ' disabled title="' + esc(t('compositeNote')) + '"') + '>' + esc(t('trueC')) + '</button>' +
-      '<button data-v="false" class="' + (cur === 'false' ? 'on' : '') + '">' + esc(t('falseC')) + '</button></span>';
-    box.querySelectorAll('button').forEach(function (b) { b.onclick = function () { S.composite = b.getAttribute('data-v'); renderComposite(); drawImage(); }; });
-  }
-
-  // ── map ───────────────────────────────────────────────────────────────────────────────────────────────────────
-  function buildMap(L) {
-    var map = L.map('satw-map', {zoomControl: false, zoomSnap: 0.25, preferCanvas: false}); S.maps.push(map); S.map = map; S.L = L;
-    L.control.zoom({position: 'bottomright', zoomInTitle: S.lang === 'lv' ? 'Tuvināt' : 'Zoom in', zoomOutTitle: S.lang === 'lv' ? 'Tālināt' : 'Zoom out'}).addTo(map);
+  // ── shared map pieces ────────────────────────────────────────────────────────────────────────────────────────────────
+  function bboxBounds(bb) { return [[bb[1], bb[0]], [bb[3], bb[2]]]; }
+  function baseMap(L, elId) {
+    var map = L.map(elId, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); S.maps.push(map); S.map = map; S.L = L;
+    [['satwImg', 300], ['satwAfter', 310], ['satwVmd', 360], ['satwBoundary', 420], ['satwChange', 440], ['satwCallout', 650]].forEach(function (p) { map.createPane(p[0]).style.zIndex = p[1]; });
+    map.getPane('satwImg').style.pointerEvents = 'none'; map.getPane('satwAfter').style.pointerEvents = 'none';
+    S.base = L.tileLayer(OSM, {maxZoom: 19, opacity: 0.45, className: 'satw-basemap', attribution: '&copy; OpenStreetMap contributors · ' + esc(t('basemapNote'))});
+    if (S.layersOn.base) S.base.addTo(map);
+    L.control.attribution({prefix: false, position: 'bottomright'}).addTo(map);
     L.control.scale({imperial: false, position: 'bottomleft'}).addTo(map);
-    [['satwImg', 300], ['satwVmd', 360], ['satwBoundary', 420], ['satwChange', 440], ['satwCallout', 650]].forEach(function (p) { map.createPane(p[0]).style.zIndex = p[1]; });
-    map.getPane('satwImg').style.pointerEvents = 'none';
-    S.base = L.tileLayer(OSM, {maxZoom: 19, attribution: '© OpenStreetMap contributors'});
-    if (layerOn('base')) S.base.addTo(map);
-    var bb = S.area.area.grid_bbox, bounds = bb ? [[bb[1], bb[0]], [bb[3], bb[2]]] : null;
-    S.groups = {boundary: L.layerGroup(), buffer: L.layerGroup(), footprint: L.layerGroup(), change: L.layerGroup(), image: L.layerGroup()};
-    if (S.area.geometry) L.geoJSON(S.area.geometry, {pane: 'satwBoundary', style: {color: '#F5F5F0', weight: 2.5, fill: false, opacity: 0.95}}).addTo(S.groups.boundary);
-    if (S.area.buffer_ring) L.geoJSON(S.area.buffer_ring, {pane: 'satwBoundary', style: {color: '#9FC3E7', weight: 1.2, dashArray: '5 4', fill: false}}).addTo(S.groups.buffer);
-    if (bounds) L.rectangle(bounds, {pane: 'satwBoundary', color: '#C8C8C8', weight: 1, dashArray: '2 4', fill: false}).addTo(S.groups.footprint);
-    drawChange(L);
-    S.vmd = vmdLayer(L);
-    ['boundary', 'buffer', 'footprint', 'change', 'image'].forEach(function (k) { if (layerOn(k)) S.groups[k].addTo(map); });
-    if (layerOn('vmd')) S.vmd.addTo(map);
-    if (bounds) map.fitBounds(bounds, {padding: [20, 20]}); else map.setView([56.9, 24.6], 7);
-    drawImage();
+    map.on('click', function (e) { if (S.whatHere) whatHere(e.latlng); });
+    return map;
   }
-  function setLayer(k, on) {
-    S.layersOn[k] = on; var m = S.map; if (!m) return;
-    var l = k === 'vmd' ? S.vmd : k === 'base' ? S.base : S.groups[k];
-    if (!l) return;
-    if (on) l.addTo(m); else m.removeLayer(l);
+  function copernicusAttr(map, isoList) {
+    var years = (isoList || []).filter(Boolean).map(function (s) { return String(s).slice(0, 4); }).filter(function (y, i, a) { return a.indexOf(y) === i; }).sort();
+    var el = document.getElementById('satw-cop-attr'); if (el) el.remove();
+    if (!years.length) return;
+    var d = document.createElement('div'); d.id = 'satw-cop-attr'; d.className = 'satw-cop-attr'; d.setAttribute('data-no-i18n', '');
+    d.textContent = t('attribution', {year: years.join(', ')});
+    document.getElementById('satw-mapwrap').appendChild(d);
+  }
+  function imgStatus(div, overlay) {
+    if (!div) return overlay;
+    var st = document.createElement('div'); st.className = 'satw-img-status'; st.textContent = t('imgLoading'); div.appendChild(st);
+    overlay.on('load', function () { st.remove(); div.setAttribute('data-img', 'loaded'); });
+    overlay.on('error', function () { st.textContent = t('imgFailed'); st.classList.add('failed'); div.setAttribute('data-img', 'failed'); });
+    return overlay;
+  }
+  function drawPolys(L, map, feats, selId) {
+    var grp = L.layerGroup(), polys = {};
+    feats.forEach(function (f) {
+      var p = f.properties, c = changeColour(p), outside = p.zone === 'BUFFER';
+      var lyr = L.geoJSON(f, {pane: 'satwChange', style: {color: c.color, weight: p.event_id === selId ? 3.5 : 2, dashArray: c.dash, fillColor: c.color, fillOpacity: outside ? 0.85 : 0.28}});
+      lyr.on('add', function () { if (outside) lyr.eachLayer(function (x) { if (x._path) x._path.setAttribute('fill', hatchFill(x._path.ownerSVGElement, c.color)); }); });
+      lyr.on('click', function (e) { if (S.whatHere) return; L.DomEvent.stopPropagation(e); if (S.view === 'changes') selectEvent(p.event_id); else { setHash({area: p.area_id, event: p.event_id}); openArea(p.area_id, {event: p.event_id, force: true}); } });
+      lyr.bindTooltip('#' + p.event_id + ' · ' + clsLabel(p.classification) + ' · ' + (ha(p.zone_ha) || '—') + ' ' + (outside ? t('outside') : t('inside')), {sticky: true});
+      lyr.addTo(grp); (polys[p.event_id] = polys[p.event_id] || []).push(lyr);
+    });
+    grp.addTo(map);
+    return {group: grp, polys: polys};
   }
   function hatchFill(svg, color) {
     var id = 'satw-hatch-' + color.replace('#', '');
@@ -570,17 +678,314 @@
     }
     return 'url(#' + id + ')';
   }
-  function drawChange(L) {
-    S.groups.change.clearLayers(); S.polys = {};
-    var feats = (S.layer && S.layer.features || []).filter(function (f) { return f.properties && f.properties.kind === 'event'; });
-    feats.forEach(function (f) {
-      var p = f.properties, c = changeColour(p), outside = p.zone === 'BUFFER';
-      var lyr = L.geoJSON(f, {pane: 'satwChange', style: {color: c.color, weight: 2, dashArray: c.dash, fillColor: c.color, fillOpacity: outside ? 0.9 : 0.32}});
-      lyr.on('add', function () { if (outside) lyr.eachLayer(function (x) { if (x._path) x._path.setAttribute('fill', hatchFill(x._path.ownerSVGElement, c.color)); }); });
-      lyr.on('click', function () { selectEvent(p.event_id); });
-      lyr.bindTooltip('#' + p.event_id + ' · ' + clsLabel(p.classification) + ' · ' + (ha(p.zone_ha) || '—') + ' ' + (outside ? t('outside') : t('inside')), {sticky: true});
-      lyr.addTo(S.groups.change); (S.polys[p.event_id] = S.polys[p.event_id] || []).push(lyr);
+  // Tool rail: only implemented tools (Kas šeit?, zoom ±, copy link to the current view).
+  function mapRail(L, map) {
+    var wrap = document.getElementById('satw-mapwrap'); if (!wrap) return;
+    var rail = document.createElement('div'); rail.className = 'satw-rail'; rail.setAttribute('role', 'toolbar');
+    rail.innerHTML =
+      '<button type="button" class="satw-tool" data-tool="what" aria-pressed="' + S.whatHere + '" aria-label="' + esc(t('toolWhatHere')) + '" title="' + esc(t('toolWhatHereTip')) + '">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v.01M12 11v5"/></svg></button>' +
+      '<button type="button" class="satw-tool" data-tool="in" aria-label="' + esc(t('zoomIn')) + '" title="' + esc(t('zoomIn')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>' +
+      '<button type="button" class="satw-tool" data-tool="out" aria-label="' + esc(t('zoomOut')) + '" title="' + esc(t('zoomOut')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>' +
+      '<button type="button" class="satw-tool" data-tool="link" aria-label="' + esc(t('copyLink')) + '" title="' + esc(t('copyLink')) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg></button>';
+    L.DomEvent.disableClickPropagation(rail); L.DomEvent.disableScrollPropagation(rail);
+    wrap.appendChild(rail);
+    rail.querySelector('[data-tool=in]').onclick = function () { map.zoomIn(); };
+    rail.querySelector('[data-tool=out]').onclick = function () { map.zoomOut(); };
+    rail.querySelector('[data-tool=link]').onclick = function () {
+      var url = global.location.origin + global.location.pathname + buildHash(viewParams());
+      toast(t('copLink')); try { global.navigator.clipboard.writeText(url); } catch (e) { /* no clipboard: the URL is also in the address bar */ }
+      setHash(viewParams(), true);
+    };
+    var w = rail.querySelector('[data-tool=what]');
+    w.onclick = function () { S.whatHere = !S.whatHere; w.setAttribute('aria-pressed', String(S.whatHere)); wrap.classList.toggle('satw-picking', S.whatHere); if (!S.whatHere) closeWhat(); };
+    wrap.classList.toggle('satw-picking', S.whatHere);
+    if (store('satWorkspace.hintWhatHere') !== '1') {
+      var hint = document.createElement('div'); hint.className = 'satw-hint'; hint.setAttribute('role', 'note');
+      hint.innerHTML = '<b>' + esc(t('toolWhatHere')) + '</b> ' + esc(t('toolWhatHereTip')) + ' <button type="button" class="satw-btn satw-small">' + esc(t('hintDismiss')) + '</button>';
+      L.DomEvent.disableClickPropagation(hint); wrap.appendChild(hint);
+      hint.querySelector('button').onclick = function () { store('satWorkspace.hintWhatHere', '1'); hint.remove(); };
+    }
+  }
+  function toast(msg) {
+    var wrap = document.getElementById('satw-mapwrap') || root(); if (!wrap) return;
+    var d = document.createElement('div'); d.className = 'satw-toast'; d.setAttribute('role', 'status'); d.textContent = msg; wrap.appendChild(d);
+    setTimeout(function () { d.remove(); }, 2200);
+  }
+
+  // ── Kas šeit? (coordinates · monitored? · VMD compartment / cadastre · add to monitoring) ──────────────────────────
+  function closeWhat() { if (S.whatPopup && S.map) { S.map.closePopup(S.whatPopup); } S.whatPopup = null; }
+  function areasAt(lon, lat) {
+    var list = (S.ov && S.ov.areas) || [];
+    return list.filter(function (a) { return a.active && inGeometry(lon, lat, a.geometry); });
+  }
+  async function whatHere(latlng, feature) {
+    var L = S.L, map = S.map; if (!L || !map) return;
+    var lat = latlng.lat, lon = latlng.lng, coords = lat.toFixed(5) + ', ' + lon.toFixed(5);
+    var div = document.createElement('div'); div.className = 'satw-what';
+    var inside = areasAt(lon, lat);
+    div.innerHTML = '<div class="satw-what-row"><span class="satw-muted">' + esc(t('whCoords')) + '</span><span><code data-no-i18n>' + esc(coords) + '</code> <button type="button" class="satw-btn satw-small" data-act="copy">' + esc(t('copy')) + '</button></span></div>' +
+      '<div class="satw-what-row"><span class="satw-muted">' + esc(t('whMonitored')) + '</span><span>' + (inside.length ? inside.map(function (a) {
+        return '<button type="button" class="satw-link" data-open-area="' + a.id + '" data-no-i18n>' + esc(a.name) + '</button>'; }).join(', ') : esc(t('whNotMonitored'))) + '</span></div>' +
+      '<div class="satw-what-vmd"><span class="satw-muted">' + esc(t('whLoading')) + '</span></div>';
+    S.whatPopup = L.popup({maxWidth: 360, className: 'satw-popup', autoPanPadding: [24, 24]}).setLatLng(latlng).setContent(div).openOn(map);
+    div.querySelector('[data-act=copy]').onclick = function () { try { global.navigator.clipboard.writeText(coords); this.textContent = t('copied'); } catch (e) { /* no clipboard */ } };
+    div.querySelectorAll('[data-open-area]').forEach(function (b) { b.onclick = function () { var id = +b.getAttribute('data-open-area'); setHash({area: id}); openArea(id, {force: true}); }; });
+    var box = div.querySelector('.satw-what-vmd'), res;
+    if (feature) res = {feature: feature};
+    else {
+      try { res = await get(GEO + '/forest-map/identify?lat=' + lat + '&lon=' + lon + '&zoom=' + Math.round(map.getZoom())); }
+      catch (e) { box.innerHTML = '<span class="satw-muted">' + esc(t('whCompartment')) + ': ' + esc(t('na')) + '</span>'; return; }
+    }
+    var f = res.feature;
+    if (!f) {
+      var msg = {zoom_in: 'whZoomIn', none: 'whNoForest', dense: 'whDense', complex: 'whComplex'}[res.notice_code] || 'na';
+      box.innerHTML = '<span class="satw-muted">' + esc(t(msg)) + '</span>' + (res.notice_code === 'zoom_in' ? ' <button type="button" class="satw-btn satw-small" data-act="zoom">' + esc(t('whZoomBtn')) + '</button>' : '');
+      var z = box.querySelector('[data-act=zoom]'); if (z) z.onclick = function () { map.setView(latlng, 15); setTimeout(function () { whatHere(latlng); }, 400); };
+      return;
+    }
+    var p = f.properties || {};
+    box.innerHTML = '<div class="satw-what-row"><span class="satw-muted">' + esc(t('whCompartment')) + '</span><span data-no-i18n>' + esc((p.kvart || '?') + '-' + (p.nog || '?')) +
+        (p.zkat ? ' · zkat ' + esc(p.zkat) : '') + (isNum(p.nog_plat) ? ' · ' + esc(ha(p.nog_plat)) : '') + '</span></div>' +
+      '<div class="satw-what-row"><span class="satw-muted">' + esc(t('whCadastre')) + '</span>' + val(p.kadastrs) + '</div>' +
+      '<div class="satw-what-add"></div>';
+    addButton(box.querySelector('.satw-what-add'), f);
+  }
+  // "Pievienot monitoringam": existing LVM GEO path (lookup → POST /areas LVM_GEO), D5 confirm (cost "Nav pieejams" + month vs guard).
+  function addButton(container, f) {
+    var lg = legacy(), g = lg._lvmGeometry ? lg._lvmGeometry(f) : {error: 'noPolygon'}, ref = String(f.id), p = f.properties || {};
+    var name = 'VMD ' + (p.kvart !== undefined ? p.kvart + '-' + p.nog : ref) + (p.kadastrs ? ' (' + p.kadastrs + ')' : '');
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'satw-btn primary'; b.textContent = t('whLoading'); b.disabled = true; container.appendChild(b);
+    if (g.error) { b.textContent = t('whMulti'); return; }
+    get('/lookup?source=LVM_GEO&source_ref=' + encodeURIComponent(ref)).then(function (r) {
+      if (r.monitored) { b.textContent = t('whAlready'); return; }
+      if (r.queued_job_id) { b.textContent = t('whQueued'); return; }
+      b.textContent = t('whAdd'); b.disabled = false;
+    }).catch(function () { b.textContent = t('whAdd'); b.disabled = false; });
+    b.onclick = function () {
+      var m = (S.health && S.health.month) || {};
+      var msg = t('addQ', {name: name}) + '\n\n' + t('addCost') + '\n' + t('addMonth', {pu: isNum(m.pu) ? fmtNum(m.pu, 1) : t('na'), puGuard: isNum(m.pu_guard) ? fmtNum(m.pu_guard, 0) : t('na'),
+        req: isNum(m.requests) ? fmtNum(m.requests, 0) : t('na'), reqGuard: isNum(m.request_guard) ? fmtNum(m.request_guard, 0) : t('na')}) + '\n' + t('addFirst');
+      if (!global.confirm(msg)) return;
+      b.disabled = true;
+      post('/areas', {source: 'LVM_GEO', source_ref: ref, name: name, geometry: g.geometry}).then(function () { b.textContent = t('whQueued'); toast(t('addDone')); })
+        .catch(function (e) { if (e.status === 409) b.textContent = t('whAlready'); else { b.disabled = false; global.alert(t('error') + ': ' + e.message); } });
+    };
+  }
+
+  // ── search: coordinates (WGS84) · 11-digit cadastre · VMD source id · area name ────────────────────────────────────
+  function searchMsg(text) { var m = document.getElementById('satw-search-msg'); if (!m) return; m.textContent = text || ''; m.hidden = !text; }
+  async function search(q) {
+    q = String(q || '').trim(); searchMsg(''); if (!q) return;
+    var L = S.L || await leaflet(), map = S.map;
+    var c = parseCoordinates(q);
+    if (c || /^[+-]?\d+([.,]\d+)?[\s,;]+[+-]?\d+([.,]\d+)?$/.test(q)) {
+      if (!c || !c.inLatvia) { searchMsg(t('searchCoordsBad')); return; }
+      var hit = areasAt(c.lon, c.lat)[0];
+      if (hit && (S.view !== 'changes' || S.areaId !== hit.id)) { setHash({area: hit.id}); await openArea(hit.id, {force: true, lat: c.lat, lon: c.lon, z: 15}); }
+      map = S.map; if (!map) return;
+      map.setView([c.lat, c.lon], 15); whatHere(L.latLng(c.lat, c.lon)); return;
+    }
+    var feats = [];
+    try {
+      if (/^\d{11}$/.test(q)) feats = (await get(GEO + '/vmd/cadastre?kadastrs=' + q + '&limit=100&offset=0')).features || [];
+      else if (/^VMD:[A-Za-z0-9:_-]{1,190}$/.test(q)) { var r = await get(GEO + '/forest-map/feature?id=' + encodeURIComponent(q)); if (r && (r.feature || r.geometry)) feats = [r.feature || r]; }
+    } catch (e) { searchMsg(t('error') + ': ' + e.message); return; }
+    if (!feats.length && !/^\d{11}$/.test(q) && !/^VMD:/.test(q)) {
+      var ql = q.toLowerCase(), area = ((S.ov && S.ov.areas) || []).filter(function (a) { return a.active && String(a.name).toLowerCase().indexOf(ql) >= 0; })[0];
+      if (area) { setHash({area: area.id}); openArea(area.id, {force: true}); return; }
+    }
+    if (!feats.length) { searchMsg(t('searchNone')); return; }
+    map = S.map; if (!map) return;
+    var lay = L.geoJSON({type: 'FeatureCollection', features: feats}, {pane: 'satwCallout', style: {color: '#F2C14E', weight: 2.5, fill: false}});
+    if (S.searchLayer) map.removeLayer(S.searchLayer); S.searchLayer = lay.addTo(map);
+    var b = lay.getBounds(), ctr = b.getCenter(), hitA = areasAt(ctr.lng, ctr.lat)[0];
+    if (hitA && (S.view !== 'changes' || S.areaId !== hitA.id)) { setHash({area: hitA.id}); await openArea(hitA.id, {force: true}); map = S.map; S.searchLayer = L.geoJSON({type: 'FeatureCollection', features: feats}, {pane: 'satwCallout', style: {color: '#F2C14E', weight: 2.5, fill: false}}).addTo(map); }
+    map.fitBounds(b, {padding: [60, 60], maxZoom: 16});
+    if (feats.length > 1) searchMsg(t('searchFound', {n: feats.length}));
+    whatHere(ctr, feats[0]);
+  }
+
+  // ── IZMAIŅAS (area workspace) ──────────────────────────────────────────────────────────────────────────────────────
+  async function openArea(id, opts) {
+    opts = opts || {}; id = +id;
+    if (!opts.force && !claim('area:' + id + ':' + (opts.event || ''))) return;
+    var seq = ++S.seq; cleanup(); S.areaId = id; S.ev = null; S.sel = null; S.compare = null; S.mode = null; S.acq = null;
+    shell('changes', '<div class="satw-loading">' + esc(t('loading')) + '</div>');
+    var a, h, layer, ov;
+    try {
+      var r = await Promise.all([get('/areas/' + id + '?geometry=0'), get('/health').catch(function () { return {}; }),
+        get('/map-layer?area_id=' + id).catch(function () { return {features: []}; }), S.ov ? Promise.resolve(S.ov) : get('/overview')]);
+      a = r[0]; h = r[1]; layer = r[2]; ov = r[3];
+    } catch (e) { if (seq === S.seq) errorView(e, function () { openArea(id, {force: true}); }); return; }
+    if (seq !== S.seq) return;
+    S.area = a; S.health = h; S.layer = layer; S.ov = ov; S.byId = {};
+    a.timeline.forEach(function (x) { S.byId[x.acq_id] = x; });
+    S.events = a.events.slice().sort(function (x, y) { return (isOpen(x) ? 0 : 1) - (isOpen(y) ? 0 : 1) || changeColour(y).rank - changeColour(x).rank || String(y.first_after_time_utc).localeCompare(String(x.first_after_time_utc)); });
+    var start = opts.acq && S.byId[+opts.acq];
+    S.acq = start || latestValid('S2') || latestValid('S1');
+    if (S.acq) S.sensor = S.acq.sensor;
+    renderChanges();
+    var L = await leaflet(); if (seq !== S.seq) return;
+    buildAreaMap(L);
+    renderTimeline();
+    var evId = opts.event ? +opts.event : null;
+    if (evId) await selectEvent(evId, {before: opts.before, acq: opts.acq, mode: opts.mode, keepView: opts.lat !== undefined});
+    else {
+      if (opts.before && S.byId[+opts.before] && S.acq) { S.compare = {before: S.byId[+opts.before], after: S.acq}; S.mode = opts.mode || 'swipe'; }
+      renderImagery();
+    }
+    if (opts.lat !== undefined && opts.lon !== undefined && S.map) S.map.setView([+opts.lat, +opts.lon], +(opts.z || 15), {animate: false});
+  }
+  function latestValid(sensor) {
+    var mv = minValid();
+    return S.area.timeline.filter(function (x) { return x.sensor === sensor && x.quicklook_url && acqState(x, mv) === 'ok'; })
+      .sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0] || null;
+  }
+  function stepList(sensor) {
+    return S.area.timeline.filter(function (x) { return x.sensor === sensor && x.status === 'OK' && x.quicklook_url; })
+      .sort(function (x, y) { return String(x.sensing_time_utc).localeCompare(String(y.sensing_time_utc)); });
+  }
+  function lastAcqOk() {
+    var best = null;
+    S.area.timeline.forEach(function (x) { if (x.status === 'OK' && (!best || x.sensing_time_utc > best.sensing_time_utc)) best = x; });
+    return best;
+  }
+  function renderChanges() {
+    var ar = S.area.area, la = lastAcqOk();
+    var catalog = ((S.health && S.health.provider_status) || []).filter(function (p) { return p.key === 'catalog'; })[0];
+    var sysCheck = catalog ? [catalog.last_ok_utc, catalog.last_error_utc].filter(Boolean).sort().pop() : null;
+    var areas = ((S.ov && S.ov.areas) || []).filter(function (x) { return x.active; });
+    var openN = S.events.filter(isOpen).length, recN = S.events.filter(function (e) { return e.status === 'RECOVERED'; }).length;
+    var html = '<div class="satw-work"><aside class="satw-left" aria-label="' + esc(t('areaSelect')) + '">' +
+      '<div class="satw-sec satw-area-sel"><label class="satw-sr" for="satw-area">' + esc(t('areaSelect')) + '</label>' +
+        '<select id="satw-area">' + areas.map(function (x) { return '<option value="' + x.id + '"' + (x.id === S.areaId ? ' selected' : '') + ' data-no-i18n>' + esc(x.name) + '</option>'; }).join('') + '</select>' +
+        '<span class="satw-muted">' + esc(t('areasCount', {n: areas.length})) + '</span></div>' +
+      '<div class="satw-sec"><div class="satw-muted">' + esc(t('src' + ar.source)) + ' · <span data-no-i18n>' + esc(ha(ar.area_ha, 1) || t('na')) + '</span></div>' +
+        '<span class="satw-chip ' + (ar.data_status === 'OK' ? 'g' : 'a') + '">' + esc(t('d' + ar.data_status)) + '</span>' +
+        '<dl class="satw-kv">' +
+          '<dt>' + esc(t('lastAcq')) + '</dt><dd>' + (la ? '<span class="satw-mono" data-no-i18n>' + esc(fmtDay(la.sensing_time_utc) + ' · ' + la.sensor) + '</span>' : na()) + '</dd>' +
+          '<dt>' + esc(t('lastValidS2')) + '</dt><dd>' + (ar.last_valid_s2_utc ? '<span class="satw-mono" data-no-i18n>' + esc(fmtDay(ar.last_valid_s2_utc) + (isNum(ar.last_valid_s2_valid_pct) ? ' · ' + fmtNum(ar.last_valid_s2_valid_pct, 0) + ' %' : '')) + '</span>' : na()) + '</dd>' +
+          '<dt>' + esc(t('lastAnalysis')) + '</dt><dd>' + (S.area.last_successful_analysis_utc ? '<span class="satw-mono" data-no-i18n>' + esc(fmtClock(S.area.last_successful_analysis_utc)) + '</span>' : na()) + '</dd>' +
+          '<dt>' + esc(t('lastCheck')) + '</dt><dd>' + (sysCheck ? '<span class="satw-mono" data-no-i18n>' + esc(fmtClock(sysCheck)) + '</span>' : na()) + '</dd></dl></div>' +
+      '<div class="satw-sec"><div class="satw-sec-h"><b>' + esc(t('onMap')) + '</b></div><div id="satw-acqbox"></div></div>' +
+      '<div class="satw-sec"><div class="satw-sec-h"><b>' + esc(t('imageKind')) + '</b></div><div id="satw-composites"></div></div>' +
+      '<div class="satw-sec"><div class="satw-sec-h"><b>' + esc(t('layers')) + '</b></div>' + layerPanel() + '</div>' +
+      '<div class="satw-sec"><div class="satw-sec-h"><b>' + esc(t('eventsTitle')) + '</b><span class="satw-muted">' + esc(t('eventsCount', {open: openN, rec: recN})) + '</span></div>' + eventList() + '</div>' +
+      legendHtml() +
+      '</aside><div class="satw-main">' +
+        '<div id="satw-mapwrap" class="satw-mapwrap"><div id="satw-maps" class="satw-maps"><div id="satw-map" class="satw-map"></div></div>' +
+          '<aside id="satw-card" class="satw-evcard" hidden aria-live="polite"></aside></div>' +
+        '<details class="satw-drawer satw-analysis"><summary>' + esc(t('analysis')) + '</summary><div id="satw-analysis-body"></div></details>' +
+        '<section class="satw-timeline" aria-label="' + esc(t('timeline')) + '"><div class="satw-tl-head"><b>' + esc(t('timeline')) + '</b><small class="satw-muted">' + esc(t('shiftHint')) + '</small>' +
+          '<span class="satw-seg" data-seg="window"><button type="button" data-v="120" class="' + (S.window === 120 ? 'on' : '') + '">' + esc(t('days120')) + '</button><button type="button" data-v="all" class="' + (S.window === 'all' ? 'on' : '') + '">' + esc(t('allDays')) + '</button></span></div>' +
+          '<div id="satw-tl" class="satw-tl"></div><div id="satw-tip" class="satw-tip" role="tooltip" hidden></div></section>' +
+        statusBar(S.health) +
+      '</div></div>';
+    var r = shell('changes', html); if (!r) return;
+    bindStatus();
+    r.querySelector('#satw-area').onchange = function () { var id = +this.value; setHash({area: id}); openArea(id, {force: true}); };
+    r.querySelectorAll('[data-ev]').forEach(function (li) { li.onclick = function () { selectEvent(+li.getAttribute('data-ev')); }; });
+    r.querySelectorAll('.satw-layers input').forEach(function (c) { c.onchange = function () { setLayer(c.getAttribute('data-layer'), c.checked); }; });
+    r.querySelectorAll('[data-seg=window] button').forEach(function (b) { b.onclick = function () { S.window = b.getAttribute('data-v') === 'all' ? 'all' : 120; r.querySelectorAll('[data-seg=window] button').forEach(function (x) { x.classList.toggle('on', x === b); }); renderTimeline(); }; });
+    r.querySelector('.satw-analysis').addEventListener('toggle', function (e) { if (e.target.open) renderAnalysis(); });
+    renderAcqBox(); renderComposites(); syncModes();
+  }
+  var LAYERS = [['boundary', 'lBoundary'], ['buffer', 'lBuffer'], ['change', 'lChange'], ['vmd', 'lVmd'], ['base', 'lBase']];
+  function layerPanel() {
+    return '<div class="satw-layers">' + LAYERS.map(function (l) {
+      return '<label class="satw-check"><input type="checkbox" data-layer="' + l[0] + '"' + (S.layersOn[l[0]] ? ' checked' : '') + '> ' + esc(t(l[1])) + '</label>';
+    }).join('') + '</div>';
+  }
+  function legendHtml() {
+    return '<details class="satw-sec satw-drawer satw-legend"><summary>' + esc(t('layers')) + ' · ' + esc(t('lChange')) + '</summary>' + CHANGE_COLOURS.map(function (c) {
+      return '<div><span class="satw-dot' + (c.dash ? ' dashed' : '') + '" style="--c:' + c.color + '" aria-hidden="true"></span>' + esc(t(c.legend)) + '</div>';
+    }).join('') + '</details>';
+  }
+  function eventList() {
+    if (!S.events.length) return '<div class="satw-empty"><b>' + esc(t('noEvents')) + '</b><p>' + esc(t('noEventsHint')) + '</p></div>';
+    return '<ul class="satw-evlist">' + S.events.map(function (e) {
+      var before = lastClearBeforeOf(eventLists(e), S.byId, minValid());
+      var when = before ? fmtDay(before.sensing_time_utc, null, true) + ' → ' + (fmtDay(e.first_after_time_utc) || '?') : fmtDay(e.first_after_time_utc) || '—';
+      return '<li><button type="button" data-ev="' + e.id + '" class="' + (S.sel === e.id ? 'sel' : '') + '" aria-pressed="' + (S.sel === e.id) + '">' + dot(e) + '<span class="satw-ev-t">' +
+        '<b data-no-i18n>#' + e.id + '</b> ' + esc(clsLabel(e.classification)) + ' <span class="satw-mono" data-no-i18n>' + esc(ha(e.changed_area_ha) || '—') + '</span>' +
+        '<small><span data-no-i18n>' + esc(when) + '</span> · ' + esc(e.sensor_basis || '') + ' · ' + esc(t('confShort', {c: t(e.confidence || 'na').toLowerCase()})) +
+        (e.seasonal_caveat ? ' · <span class="satw-tag">' + esc(t('seasonalTag')) + '</span>' : '') + '</small></span></button></li>';
+    }).join('') + '</ul>';
+  }
+  function renderAcqBox() {
+    var box = document.getElementById('satw-acqbox'); if (!box) return;
+    var has = {S2: stepList('S2').length > 0, S1: stepList('S1').length > 0}, a = S.acq, list = stepList(S.sensor);
+    var idx = a ? list.map(function (x) { return x.acq_id; }).indexOf(a.acq_id) : -1;
+    box.innerHTML = '<div class="satw-seg satw-seg-full" data-seg="sensor">' + [['S2', 'optical'], ['S1', 'radar']].map(function (s) {
+        return '<button type="button" data-v="' + s[0] + '" class="' + (S.sensor === s[0] ? 'on' : '') + '"' + (has[s[0]] ? '' : ' disabled title="' + esc(t('noSensor')) + '"') + '>' + esc(t(s[1])) + '</button>'; }).join('') + '</div>' +
+      '<div class="satw-stepper"><button type="button" class="satw-btn" data-step="-1" aria-label="' + esc(t('prevAcq')) + '"' + (idx > 0 ? '' : ' disabled') + '>‹</button>' +
+        '<span class="satw-mono" data-no-i18n>' + (a ? esc(fmtDay(a.sensing_time_utc) + ' ' + String(a.sensing_time_utc).slice(11, 16) + ' UTC') : esc(t('na'))) + '</span>' +
+        '<button type="button" class="satw-btn" data-step="1" aria-label="' + esc(t('nextAcq')) + '"' + (idx >= 0 && idx < list.length - 1 ? '' : ' disabled') + '>›</button></div>' +
+      (a ? '<div class="satw-chips">' + (a.platform ? '<span class="satw-chip" data-no-i18n>' + esc(a.platform) + '</span>' : '') +
+        (isNum(a.valid_pct_inside) ? '<span class="satw-chip">' + esc(t('valid', {v: fmtNum(a.valid_pct_inside, 1)})) + '</span>' : '') +
+        (a.sensor === 'S2' ? '<span class="satw-chip" data-no-i18n>' + esc(t('px10')) + '</span>' : '<span class="satw-chip" data-no-i18n>' + esc(geomKey(a)) + '</span>') + '</div>' : '');
+    box.querySelectorAll('[data-seg=sensor] button').forEach(function (b) { b.onclick = function () { var s = b.getAttribute('data-v'); var x = latestValid(s) || stepList(s).pop(); if (x) showAcq(x); }; });
+    box.querySelectorAll('[data-step]').forEach(function (b) { b.onclick = function () { var x = list[idx + +b.getAttribute('data-step')]; if (x) showAcq(x); }; });
+  }
+  // Composite list: only kinds that exist for what is shown (pair: true colour only when BOTH have it). No mask entry (Q4).
+  function renderComposites() {
+    var box = document.getElementById('satw-composites'); if (!box) return;
+    var pair = S.mode && S.mode !== 'change' && S.compare && comparePair(S.compare.before, S.compare.after).ok ? S.compare : null;
+    var shown = pair ? pair.after : S.acq;
+    if (!shown) { box.innerHTML = na(); return; }
+    if (shown.sensor === 'S1') {
+      box.innerHTML = '<div class="satw-comp on"><span class="satw-comp-th" style="background-image:url(\'' + esc(shown.quicklook_url) + '\')"></span><span><b>' + esc(t('radarC')) + '</b><small>' + esc(t('radarSub')) + '</small></span></div>';
+      return;
+    }
+    var tcOk = pair ? !!(pair.before.truecolor_url && pair.after.truecolor_url) : !!shown.truecolor_url;
+    var cur = tcOk && S.composite === 'true' ? 'true' : 'false';
+    var item = function (k, title, sub, url) {
+      return '<button type="button" class="satw-comp' + (cur === k ? ' on' : '') + '" data-comp="' + k + '" aria-pressed="' + (cur === k) + '"><span class="satw-comp-th" style="background-image:url(\'' + esc(url) + '\')"></span><span><b>' + esc(t(title)) + '</b><small>' + esc(t(sub)) + '</small></span></button>';
+    };
+    box.innerHTML = (tcOk ? item('true', 'trueC', 'trueSub', shown.truecolor_url) : '') + item('false', 'falseC', 'falseSub', shown.quicklook_url) +
+      (!tcOk && pair && (pair.before.truecolor_url || pair.after.truecolor_url) ? '<p class="satw-note">' + esc(t('compositeNote')) + '</p>' : '');
+    box.querySelectorAll('[data-comp]').forEach(function (b) { b.onclick = function () { S.composite = b.getAttribute('data-comp'); renderComposites(); renderImagery(); }; });
+  }
+  function syncModes() {
+    var ok = S.view === 'changes' && S.compare && comparePair(S.compare.before, S.compare.after).ok;
+    document.querySelectorAll('[data-mode]').forEach(function (b) {
+      var on = !!ok && S.mode === b.getAttribute('data-mode');
+      b.disabled = !ok; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+      b.title = ok ? '' : t('modeOff');
     });
+  }
+  function setMode(m) {
+    if (!S.compare || !comparePair(S.compare.before, S.compare.after).ok) return;
+    S.mode = S.mode === m ? null : m; renderComposites(); renderImagery(); setHash(viewParams(), true);
+  }
+  function setLayer(k, on) {
+    S.layersOn[k] = on; var m = S.map; if (!m) return;
+    [m, S.map2].forEach(function (mm) {
+      if (!mm) return; var l = k === 'vmd' ? (mm === S.map ? S.vmd : S.vmd2) : k === 'base' ? (mm === S.map ? S.base : S.base2) : (mm === S.map ? S.groups[k] : (S.groups2 || {})[k]);
+      if (!l) return; if (on) l.addTo(mm); else mm.removeLayer(l);
+    });
+  }
+
+  // ── area map: boundary, buffer, polygons, VMD, imagery, compare, callout, selection ring ───────────────────────────
+  function buildAreaMap(L) {
+    var map = baseMap(L, 'satw-map');
+    S.groups = areaLayers(L, map);
+    S.vmd = vmdLayer(L); if (S.layersOn.vmd) S.vmd.addTo(map);
+    var bb = S.area.area.grid_bbox;
+    if (bb) map.fitBounds(bboxBounds(bb), {padding: [20, 20]}); else map.setView([56.95, 24.1], 10);
+    mapRail(L, map);
+    map.on('moveend', function () { if (S.view === 'changes') setHash(viewParams(), true); });
+  }
+  function areaLayers(L, map) {
+    var g = {boundary: L.layerGroup(), buffer: L.layerGroup(), change: null};
+    if (S.area.geometry) L.geoJSON(S.area.geometry, {pane: 'satwBoundary', style: {color: '#F5F5F0', weight: 2.2, fill: false, opacity: 0.95}}).addTo(g.boundary);
+    if (S.area.buffer_ring) L.geoJSON(S.area.buffer_ring, {pane: 'satwBoundary', style: {color: '#9FC3E7', weight: 1.2, dashArray: '5 4', fill: false}}).addTo(g.buffer);
+    var dp = drawPolys(L, map, (S.layer && S.layer.features || []).filter(function (f) { return f.properties && f.properties.kind === 'event'; }), S.sel);
+    g.change = dp.group; if (map === S.map) S.polys = dp.polys;
+    if (!S.layersOn.change) map.removeLayer(dp.group);
+    ['boundary', 'buffer'].forEach(function (k) { if (S.layersOn[k]) g[k].addTo(map); });
+    return g;
   }
   function vmdLayer(L) {
     var GL = L.GridLayer.extend({
@@ -598,8 +1003,8 @@
   }
   function drawVmdTile(cv, d, coords) {
     var ctx = cv.getContext('2d'); ctx.clearRect(0, 0, 256, 256);
-    if (!d || !d.features || !S.map) return;
-    var hl = S.vmdHighlight || {}, n = Math.pow(2, coords.z), dark = S.theme === 'dark';
+    if (!d || !d.features) return;
+    var n = Math.pow(2, coords.z);
     function px(lon, lat) {
       var x = (lon + 180) / 360 * n * 256 - coords.x * 256;
       var s = Math.sin(lat * Math.PI / 180), y = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n * 256 - coords.y * 256;
@@ -608,382 +1013,342 @@
     d.features.forEach(function (f) {
       var p = f.properties || {}, g = f.geometry; if (!g) return;
       var polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
-      var on = hl[p.id];
       ctx.beginPath();
       polys.forEach(function (poly) { poly.forEach(function (ring) { ring.forEach(function (c, i) { var q = px(c[0], c[1]); if (i) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); }); ctx.closePath(); }); });
-      ctx.lineWidth = on ? 3 : 1; ctx.strokeStyle = on ? '#F2C14E' : (dark ? 'rgba(116,196,132,.85)' : 'rgba(30,107,52,.9)'); ctx.stroke();
+      ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(127,191,142,.8)'; ctx.stroke();
       if (coords.z >= 15 && polys[0] && polys[0][0]) {
         var r0 = polys[0][0], sx = 0, sy = 0; r0.forEach(function (c) { var q = px(c[0], c[1]); sx += q[0]; sy += q[1]; });
         var cx = sx / r0.length, cy = sy / r0.length;
-        if (cx > 4 && cx < 252 && cy > 4 && cy < 252) { ctx.font = (on ? 'bold ' : '') + '11px Inter, system-ui, sans-serif'; ctx.fillStyle = on ? '#F2C14E' : (dark ? '#D9EBDD' : '#1E3A2A'); ctx.textAlign = 'center'; ctx.fillText((p.kvart || '?') + '-' + (p.nog || '?'), cx, cy); }
+        if (cx > 4 && cx < 252 && cy > 4 && cy < 252) { ctx.font = '11px Inter, system-ui, sans-serif'; ctx.fillStyle = '#E6ECE5'; ctx.textAlign = 'center'; ctx.fillText((p.kvart || '?') + '-' + (p.nog || '?'), cx, cy); }
       }
     });
   }
-  function redrawVmd() {
-    if (!S.vmd || !S.vmd._tiles) return;
-    Object.keys(S.vmd._tiles).forEach(function (k) { var tl = S.vmd._tiles[k]; if (tl.el && tl.el._satwData) drawVmdTile(tl.el, tl.el._satwData, tl.coords); });
-  }
-  function imgStatus(div, overlay) {
-    if (!div) return overlay;
-    var st = document.createElement('div'); st.className = 'satw-img-status'; st.textContent = t('imgLoading'); div.appendChild(st);
-    overlay.on('load', function () { st.remove(); div.setAttribute('data-img', 'loaded'); });
-    overlay.on('error', function () { st.textContent = t('imgFailed'); st.classList.add('failed'); div.setAttribute('data-img', 'failed'); });
-    return overlay;
-  }
-  function drawImage() {
-    var L = S.L, m = S.map; if (!L || !m || S.compare) return;
-    S.groups.image.clearLayers();
-    var a = S.acq, bb = S.area.area.grid_bbox;
-    var lab = document.getElementById('satw-img-label');
-    if (lab) lab.remove();
-    if (!a || !bb || !a.quicklook_url) return;
-    var comp = a.sensor === 'S1' ? 's1' : (S.composite === 'true' && a.truecolor_url ? 'true' : 'false');
-    imgStatus(document.getElementById('satw-map'), L.imageOverlay(imageUrl(a, comp), [[bb[1], bb[0]], [bb[3], bb[2]]], {pane: 'satwImg', opacity: 1})).addTo(S.groups.image);
-    var box = document.createElement('div'); box.id = 'satw-img-label'; box.className = 'satw-img-label';
-    box.innerHTML = acqLabel(a, comp); document.getElementById('satw-map').appendChild(box);
-    renderTimeline();
-  }
-  function acqLabel(a, comp) {
-    return '<b data-no-i18n>' + esc(fmtTime(a.sensing_time_utc) || '—') + '</b><br><span data-no-i18n>' + esc(a.sensor + ' · ' + (a.platform || '') + (a.sensor === 'S1' ? ' · ' + geomKey(a) : '')) + '</span> · ' +
-      esc(t('validPct')) + ' <span data-no-i18n>' + (isNum(a.valid_pct_inside) ? a.valid_pct_inside.toFixed(1) : '—') + '</span><br><span>' +
-      esc(comp === 's1' ? t('s1Label') : comp === 'true' ? t('trueNote') : t('falseNote')) + '</span>' + attribution(a.sensing_time_utc);
-  }
-  function showAcq(a) { S.acq = a; S.sensor = a.sensor; syncSeg('sensor', S.sensor); renderComposite(); drawImage(); if (!S.sel) openAcqPanel(a); }
 
-  // ── event selection + right panel ──────────────────────────────────────────────────────────────────────────────
-  async function selectEvent(id, fromDeepLink) {
-    S.sel = id; var seq = S.seq;
-    document.querySelectorAll('.satw-evlist li').forEach(function (li) { li.classList.toggle('sel', +li.getAttribute('data-ev') === id); });
-    var right = document.getElementById('satw-right'); if (right) { right.hidden = false; right.innerHTML = '<div class="satw-loading">' + esc(t('loading')) + '</div>'; }
-    var ev; try { ev = await get('/events/' + id); } catch (e) { if (right) right.innerHTML = '<p>' + esc(t('error') + ': ' + e.message) + '</p>'; return; }
-    if (seq !== S.seq || S.sel !== id) return;
-    S.ev = ev;
-    if (ev.monitored_area_id !== S.areaId) { openArea(ev.monitored_area_id, id); return; }
-    S.vmdHighlight = {}; (ev.compartments || []).forEach(function (c) { S.vmdHighlight[c.external_id] = 1; }); redrawVmd();
-    highlight(id); callout(ev);
-    var pair = defaultPair(ev, S.byId, minValid());
-    S.pairDefault = pair;
-    if (pair.after) { S.acq = pair.after; S.sensor = pair.after.sensor; syncSeg('sensor', S.sensor); renderComposite(); drawImage(); }
-    renderEventPanel(ev);
-    var polys = S.polys[id] || [];
-    if (polys.length && S.map) { var b = S.L.latLngBounds([]); polys.forEach(function (p) { b.extend(p.getBounds()); }); S.map.fitBounds(b.pad(0.6), {maxZoom: 16}); }
-    if (fromDeepLink === true && S.compare === null && global.SAT_WS_COMPARE_ON_DEEPLINK) toggleCompare(true);
+  // Imagery: single acquisition, or a validated pair in swipe / side-by-side / change-only. Never mixed composites.
+  function teardownImagery() {
+    var L = S.L;
+    if (S.map2) { try { S.map2.remove(); } catch (e) { /* gone */ } S.maps = S.maps.filter(function (m) { return m !== S.map2; }); S.map2 = null; S.vmd2 = null; S.base2 = null; S.groups2 = null; }
+    var wrap = document.getElementById('satw-maps'); if (wrap) wrap.classList.remove('split');
+    var mw = document.getElementById('satw-mapwrap'); if (mw) mw.classList.remove('satw-muted-map');
+    ['satw-map2', 'satw-divider', 'satw-pill-b', 'satw-pill-a', 'satw-pill-s', 'satw-pill-b2', 'satw-pill-a2'].forEach(function (id) { var x = document.getElementById(id); if (x) x.remove(); });
+    if (S.imgLayers && S.map) S.imgLayers.forEach(function (l) { S.map.removeLayer(l); });
+    S.imgLayers = [];
+    if (S.swipe && S.map) { S.map.off('move zoom zoomanim viewreset resize moveend zoomend', S.swipe); S.swipe = null; }
+    if (S.map) { var p = S.map.getPane('satwAfter'); if (p) p.style.clip = ''; }
+    return L;
   }
+  function pillText(kind, a, comp) {
+    var parts = [t(kind), fmtDay(a.sensing_time_utc), a.sensor];
+    if (isNum(a.valid_pct_inside)) parts.push(fmtNum(a.valid_pct_inside, 1) + ' %');
+    if (comp === 'false' && a.sensor === 'S2') parts.push(t('falseC'));
+    return parts.join(' · ');
+  }
+  function pill(id, text, cls, parent) {
+    var d = document.createElement('div'); d.id = id; d.className = 'satw-pill ' + (cls || ''); d.setAttribute('data-no-i18n', ''); d.textContent = text;
+    (parent || document.getElementById('satw-mapwrap')).appendChild(d); return d;
+  }
+  function renderImagery() {
+    var L = teardownImagery(), map = S.map; if (!L || !map) return;
+    var bb = S.area.area.grid_bbox; if (!bb) { syncModes(); return; }
+    var bounds = bboxBounds(bb), mw = document.getElementById('satw-mapwrap');
+    var pair = S.compare && comparePair(S.compare.before, S.compare.after).ok ? S.compare : null;
+    var mode = pair ? S.mode : null;
+    if (!mode) {
+      var a = S.acq;
+      if (a && a.quicklook_url) {
+        var comp = singleComposite(a, S.composite);
+        S.imgLayers.push(imgStatus(mw, L.imageOverlay(imageUrl(a, comp), bounds, {pane: 'satwImg'})).addTo(map));
+        pill('satw-pill-s', pillText('pillShown', a, comp), 'single');
+      }
+      copernicusAttr(map, [a && a.sensing_time_utc]);
+    } else {
+      var c = pairComposite(pair.before, pair.after, S.composite);
+      if (mode === 'change') {
+        mw.classList.add('satw-muted-map');
+        pill('satw-pill-s', pillText('pillAfter', pair.after, c), 'single');
+      } else if (mode === 'swipe') {
+        S.imgLayers.push(imgStatus(mw, L.imageOverlay(imageUrl(pair.before, c), bounds, {pane: 'satwImg'})).addTo(map));
+        S.imgLayers.push(L.imageOverlay(imageUrl(pair.after, c), bounds, {pane: 'satwAfter'}).addTo(map));
+        swipe(L, map, mw, pillText('pillBefore', pair.before, c), pillText('pillAfter', pair.after, c));
+      } else {
+        sideBySide(L, map, pair, c, bounds);
+      }
+      copernicusAttr(map, [pair.before.sensing_time_utc, pair.after.sensing_time_utc]);
+    }
+    syncModes(); renderTimeline();
+  }
+  // Swipe (Stage A design): divider + handle + pills are DOM in the map container at a fixed container x; the "after"
+  // pane is clipped to the right of it and recomputed on every movement incl. the zoom animation.
+  function swipe(L, map, mw, beforeText, afterText) {
+    var pane = map.getPane('satwAfter'), frac = isNum(S.swipeFrac) ? S.swipeFrac : 0.5;
+    var line = document.createElement('div'); line.id = 'satw-divider'; line.className = 'satw-divider';
+    var handle = document.createElement('div'); handle.className = 'satw-handle'; handle.setAttribute('role', 'slider'); handle.setAttribute('tabindex', '0');
+    handle.setAttribute('aria-label', t('modeSwipe')); handle.setAttribute('aria-valuemin', '0'); handle.setAttribute('aria-valuemax', '100');
+    line.appendChild(handle);
+    var pb = pill('satw-pill-b', beforeText, 'before', line), pa = pill('satw-pill-a', afterText, 'after', line);
+    L.DomEvent.disableClickPropagation(line); L.DomEvent.disableScrollPropagation(line); mw.appendChild(line);
+    function clip() {
+      var size = map.getSize(), x = Math.round(size.x * frac);
+      var nw = map.containerPointToLayerPoint([x, 0]), se = map.containerPointToLayerPoint([size.x, size.y]);
+      pane.style.clip = 'rect(' + nw.y + 'px,' + se.x + 'px,' + se.y + 'px,' + nw.x + 'px)';
+      line.style.left = x + 'px'; handle.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
+      mw.setAttribute('data-swipe-x', String(x));
+      pb.hidden = x < 140; pa.hidden = size.x - x < 140;
+    }
+    function setFrac(f) { frac = Math.max(0, Math.min(1, f)); S.swipeFrac = frac; clip(); }
+    handle.addEventListener('pointerdown', function (ev) { ev.preventDefault(); ev.stopPropagation(); map.dragging.disable(); handle.setPointerCapture(ev.pointerId); mw.classList.add('satw-swiping'); });
+    handle.addEventListener('pointermove', function (ev) { if (handle.hasPointerCapture(ev.pointerId)) { var r = mw.getBoundingClientRect(); setFrac((ev.clientX - r.left) / r.width); } });
+    function release(ev) { if (handle.hasPointerCapture(ev.pointerId)) handle.releasePointerCapture(ev.pointerId); map.dragging.enable(); mw.classList.remove('satw-swiping'); }
+    handle.addEventListener('pointerup', release); handle.addEventListener('pointercancel', release);
+    handle.addEventListener('keydown', function (ev) {
+      var step = {ArrowLeft: -0.05, ArrowRight: 0.05}[ev.key];
+      if (step) { ev.preventDefault(); setFrac(frac + step); } else if (ev.key === 'Home' || ev.key === 'End') { ev.preventDefault(); setFrac(ev.key === 'Home' ? 0 : 1); }
+    });
+    S.swipe = clip; map.on('move zoom zoomanim viewreset resize moveend zoomend', clip); clip();
+  }
+  function sideBySide(L, map, pair, c, bounds) {
+    var wrap = document.getElementById('satw-maps'); wrap.classList.add('split');
+    var m2el = document.createElement('div'); m2el.id = 'satw-map2'; m2el.className = 'satw-map'; wrap.appendChild(m2el);
+    map.invalidateSize();
+    var mw = document.getElementById('satw-mapwrap');
+    S.imgLayers.push(imgStatus(mw, L.imageOverlay(imageUrl(pair.before, c), bounds, {pane: 'satwImg'})).addTo(map));
+    var m2 = L.map(m2el, {zoomControl: false, attributionControl: false, zoomSnap: 0.25}); S.map2 = m2; S.maps.push(m2);
+    [['satwImg', 300], ['satwVmd', 360], ['satwBoundary', 420], ['satwChange', 440]].forEach(function (p) { m2.createPane(p[0]).style.zIndex = p[1]; });
+    m2.getPane('satwImg').style.pointerEvents = 'none';
+    S.base2 = L.tileLayer(OSM, {maxZoom: 19, opacity: 0.45, className: 'satw-basemap'}); if (S.layersOn.base) S.base2.addTo(m2);
+    imgStatus(m2el, L.imageOverlay(imageUrl(pair.after, c), bounds, {pane: 'satwImg'})).addTo(m2);
+    var saved = S.polys; S.groups2 = areaLayers(L, m2); S.polys = saved;
+    S.vmd2 = vmdLayer(L); if (S.layersOn.vmd) S.vmd2.addTo(m2);
+    m2.setView(map.getCenter(), map.getZoom(), {animate: false});
+    var busy = false;
+    function sync(a, b) { a.on('move', function () { if (busy) return; busy = true; b.setView(a.getCenter(), a.getZoom(), {animate: false}); busy = false; }); }
+    sync(map, m2); sync(m2, map);
+    pill('satw-pill-b2', pillText('pillBefore', pair.before, c), 'side', document.getElementById('satw-map'));
+    pill('satw-pill-a2', pillText('pillAfter', pair.after, c), 'side', m2el);
+  }
+  function showAcq(a) {
+    if (S.mode && S.compare) { S.compare.after = a; } else { S.acq = a; }
+    S.acq = a; S.sensor = a.sensor;
+    renderAcqBox(); renderComposites(); renderImagery(); setHash(viewParams(), true);
+  }
+  function setBefore(a) {
+    S.compare = {before: a, after: S.compare && S.compare.after || S.acq};
+    if (!S.mode && comparePair(S.compare.before, S.compare.after).ok) S.mode = 'swipe';
+    renderComposites(); renderImagery(); setHash(viewParams(), true);
+  }
+
+  // ── event selection + right card ───────────────────────────────────────────────────────────────────────────────────
+  async function selectEvent(id, o) {
+    o = o || {}; S.sel = id; var seq = S.seq;
+    document.querySelectorAll('.satw-evlist [data-ev]').forEach(function (b) { var on = +b.getAttribute('data-ev') === id; b.classList.toggle('sel', on); b.setAttribute('aria-pressed', String(on)); });
+    var card = document.getElementById('satw-card'); if (card) { card.hidden = false; card.innerHTML = '<div class="satw-loading">' + esc(t('loading')) + '</div>'; }
+    var ev; try { ev = await get('/events/' + id); } catch (e) { if (card) card.innerHTML = '<p>' + esc(t('error') + ': ' + e.message) + '</p>'; return; }
+    if (seq !== S.seq || S.sel !== id) return;
+    if (ev.monitored_area_id !== S.areaId) { setHash({area: ev.monitored_area_id, event: id}); openArea(ev.monitored_area_id, {event: id, force: true}); return; }
+    S.ev = ev;
+    var pair = defaultPair(ev, S.byId, minValid());
+    if (o.before && S.byId[+o.before]) pair.before = S.byId[+o.before];
+    if (o.acq && S.byId[+o.acq]) pair.after = S.byId[+o.acq];
+    S.compare = pair.before && pair.after ? {before: pair.before, after: pair.after} : null;
+    S.mode = S.compare && comparePair(S.compare.before, S.compare.after).ok ? (o.mode || 'swipe') : null;
+    if (pair.after) { S.acq = pair.after; S.sensor = pair.after.sensor; }
+    highlight(id); renderCard(ev); renderAcqBox(); renderComposites(); renderImagery(); callout(ev);
+    if (!o.keepView) fitEvent(id);
+    setHash(viewParams(), true);
+  }
+  function polyBounds(id) {
+    var polys = (S.polys || {})[id] || []; if (!polys.length) return null;
+    var b = S.L.latLngBounds([]); polys.forEach(function (p) { b.extend(p.getBounds()); }); return b.isValid() ? b : null;
+  }
+  function fitEvent(id) { var b = polyBounds(id); if (b && S.map) S.map.fitBounds(b, {padding: [70, 70], maxZoom: 16, animate: false}); }
   function highlight(id) {
-    Object.keys(S.polys || {}).forEach(function (k) { S.polys[k].forEach(function (l) { l.setStyle({weight: +k === id ? 4 : 2, opacity: +k === id || !id ? 1 : 0.55}); }); });
+    Object.keys(S.polys || {}).forEach(function (k) { S.polys[k].forEach(function (l) { l.setStyle({weight: +k === id ? 3.5 : 2, opacity: +k === id || !id ? 1 : 0.55}); }); });
   }
   function callout(ev) {
-    if (S.calloutLayer) S.map.removeLayer(S.calloutLayer);
-    var polys = S.polys[ev.id] || []; if (!polys.length) return;
-    var b = S.L.latLngBounds([]); polys.forEach(function (p) { b.extend(p.getBounds()); });
-    var before = lastClearBefore(ev);
-    var html = '<b data-no-i18n>' + esc(ha(ev.changed_area_ha) || '—') + '</b> · ' + esc(t('short' + (CLS[ev.classification] || 'INS'))) + ' · <span data-no-i18n>' +
-      esc((fmtDate(before && before.sensing_time_utc) || '?') + ' → ' + (fmtDate(ev.first_after_time_utc) || '?')) + '</span> · ' + esc(t(ev.confidence || 'na'));
-    S.calloutLayer = S.L.tooltip({permanent: true, direction: 'top', className: 'satw-callout', pane: 'satwCallout', offset: [0, -6]}).setLatLng([b.getNorth(), b.getCenter().lng]).setContent(html).addTo(S.map);
+    if (S.calloutLayer) { S.map.removeLayer(S.calloutLayer); S.calloutLayer = null; }
+    if (S.ringLayer) { S.map.removeLayer(S.ringLayer); S.ringLayer = null; }
+    var b = polyBounds(ev.id); if (!b) return;
+    S.ringLayer = S.L.rectangle(b.pad(0.08), {pane: 'satwCallout', color: '#F5F5F0', weight: 1.5, dashArray: '6 5', fill: false, interactive: false}).addTo(S.map);
+    var before = lastClearBeforeOf(ev, S.byId, minValid());
+    var parts = ['#' + ev.id, shortCls(ev.classification)];
+    if (isNum(ev.changed_area_ha)) parts.push(ha(ev.changed_area_ha));
+    var b1 = before && fmtDay(before.sensing_time_utc, null, true), a1 = fmtDay(ev.first_after_time_utc, null, true);
+    if (b1 && a1) parts.push(b1 + '→' + a1); else if (a1) parts.push(a1);
+    if (ev.confidence) parts.push(t(ev.confidence));
+    S.calloutLayer = S.L.tooltip({permanent: true, direction: 'top', className: 'satw-callout', pane: 'satwCallout', offset: [0, -4]})
+      .setLatLng([b.pad(0.08).getNorth(), b.getCenter().lng]).setContent('<span data-no-i18n>' + esc(parts.join(' · ')) + '</span>').addTo(S.map);
   }
-  // The event's `before` list holds the baselines of EVERY after-image, so it can contain acquisitions later than the
-  // onset. "Last clear acquisition without change" = latest valid baseline strictly before the first after-image.
-  function lastClearBefore(ev) { return lastClearBeforeOf(ev, S.byId, minValid()); }
-  function lastClearBeforeOf(ev, byId, mv) {
-    var onset = ev.first_after_time_utc ? String(parseUtc(ev.first_after_time_utc).toISOString()) : null;
-    var list = (ev.before || []).map(function (x) { return byId[x.acq_id] || x; }).filter(function (x) {
-      var d = parseUtc(x.sensing_time_utc);
-      return acqState(x, mv) === 'ok' && d && (!onset || d.toISOString() < onset);
-    });
-    return list.sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0] || null;
+  function evidenceLine(ev) {
+    var src = evidenceSource(ev);
+    if (!src.eq) return na();
+    var head = badge(t(src.eq), qClass(src.eq));
+    if (!src.source) return head + ' <small class="satw-muted">' + esc(t('eqNoSource')) + '</small>';
+    var s = t('eqFrom', {sensor: t('sens' + src.source.sensor), date: fmtDay(src.source.time, null, true)});
+    var o = src.others.map(function (x) { return t('eqOthers', {sensor: t('oth' + x.sensor), eq: t(x.eq).toLowerCase()}); });
+    return head + ' <small>' + esc(s + (o.length ? '; ' + o.join('; ') : '')) + '</small>';
   }
-  function zkatLabel(z) { return String(z) === '10' ? t('zkat10') : String(z) === '14' ? t('zkat14') : t('zkatOther', {z: z === null || z === undefined ? '?' : z}); }
-  function storyHtml(ev) {
-    var before = lastClearBefore(ev), cls = clsLabel(ev.classification).toLowerCase();
-    var s = t('storyTpl', {before: fmtDate(before && before.sensing_time_utc) || t('storyNoBefore'), after: fmtDate(ev.first_after_time_utc) || t('na'),
-      ha: ha(ev.changed_area_ha) || t('na'), cls: cls});
-    var split = ev.compartment_split || {}, parts = [['zkat14', split.clearcut_zkat14_ha], ['zkat10', split.stand_zkat10_ha], ['other', split.other_compartments_ha]].filter(function (p) { return isNum(p[1]); });
-    parts.sort(function (x, y) { return y[1] - x[1]; });
-    var vmd = '';
-    if (parts.length && parts[0][1] > 0) vmd = t('storyVmd', {ha: ha(parts[0][1]), zkat: parts[0][0] === 'other' ? (S.lang === 'lv' ? 'citi nogabali' : 'other compartments') : t(parts[0][0])});
-    return '<div class="satw-story"><b>' + esc(t('story')) + '</b><p>' + esc(s) + '</p>' + (vmd ? '<p>' + esc(vmd) + '</p>' : '') +
-      (parts.length && parts[0][0] === 'zkat14' ? '<p class="satw-muted">' + esc(t('zkat14Note')) + '</p>' : '') + '</div>';
+  function storyText(ev) {
+    var before = lastClearBeforeOf(ev, S.byId, minValid());
+    return t('storyTpl', {before: fmtDay(before && before.sensing_time_utc) || t('storyNoBefore'), after: fmtDay(ev.first_after_time_utc) || t('na'), ha: ha(ev.changed_area_ha) || t('na')});
   }
-  function trServer(s) { var sm = global.SatMonitoring && (global.SatMonitoring._legacy || global.SatMonitoring); return sm && sm._trServer && S.lang === 'lv' ? sm._trServer(s) : s; }
-  function renderEventPanel(ev) {
-    var right = document.getElementById('satw-right'); if (!right) return;
-    var c = changeColour(ev), before = lastClearBefore(ev);
-    var after = (ev.after || []).map(function (x) { return S.byId[x.acq_id] || x; });
-    var first = after.slice().sort(function (x, y) { return String(x.sensing_time_utc).localeCompare(String(y.sensing_time_utc)); })[0];
-    var latest = after.slice().sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0];
-    var sup = ev.current === false ? '<div class="satw-banner warn">' + (ev.successor ? esc(t('superseded', {id: ev.successor.event_id})) + ' <a data-goto="' + ev.successor.event_id + '">' + esc(t('openSuccessor', {id: ev.successor.event_id})) + '</a>' : esc(t('supersededNone'))) + '</div>' : '';
-    var comps = ev.compartments || [], cst = ev.compartments_status || {};
-    var html = '<div class="satw-rp-head"><span class="satw-dot big' + (c.dash ? ' dashed' : '') + '" style="--c:' + c.color + '"></span><div><b data-no-i18n>#' + ev.id + '</b> ' + badge(t('s' + ev.status)) +
-      '<div class="satw-muted">' + esc(clsLabel(ev.classification)) + '</div></div><button class="satw-x" data-act="close" aria-label="×">×</button></div>' + sup + storyHtml(ev) +
-      '<section class="satw-block raw"><h4>' + esc(t('observation')) + '</h4><dl class="satw-dl">' +
-        '<dt>' + esc(t('lastClear')) + '</dt><dd>' + (before ? timeHtml(before.sensing_time_utc) + ' <small data-no-i18n>' + esc(before.sensor + ' · ' + (before.platform || '')) + '</small>' : na()) + '</dd>' +
-        '<dt>' + esc(t('firstChange')) + '</dt><dd>' + (first ? timeHtml(first.sensing_time_utc) + ' <small data-no-i18n>' + esc(first.sensor + ' · ' + (first.platform || '')) + '</small>' : timeHtml(ev.first_after_time_utc)) + '</dd>' +
-        '<dt>' + esc(t('latestAfter')) + '</dt><dd>' + (latest ? timeHtml(latest.sensing_time_utc) : timeHtml(ev.last_after_time_utc)) + '</dd></dl>' + attribution(ev.first_after_time_utc) + '</section>' +
-      '<section class="satw-block proc"><h4>' + esc(t('measurement')) + '</h4><dl class="satw-dl">' +
-        dd('curHa', ha(ev.changed_area_ha)) + dd('insideHa', ha(ev.changed_area_ha_inside)) + dd('outsideHa', ha(ev.changed_area_ha_buffer)) +
-        dd('share', isNum(ev.pct_of_area_affected) ? ev.pct_of_area_affected.toFixed(1) + ' %' : null) + dd('cluster', ha(ev.largest_cluster_ha)) +
-        dd('maxDist', isNum(ev.max_distance_outside_boundary_m) ? Math.round(ev.max_distance_outside_boundary_m) + ' m' : null) + dd('unionHa', ha(ev.union_area_ha)) + dd('maxHa', ha(ev.max_area_ha)) +
-        '<dt>' + esc(t('detected')) + '</dt><dd>' + timeHtml(ev.detected_at_utc) + '</dd></dl></section>' +
-      '<section class="satw-block interp"><h4>' + esc(t('interpretation')) + '</h4><p>' + esc(t('suspectedLine')) + '</p>' +
-        '<div class="satw-evq">' + qBadge('confidence', ev.confidence) + qBadge('evidence', ev.evidence_quality) + '</div>' +
-        (ev.seasonal_caveat ? '<p><b>' + esc(t('caveat')) + ':</b> <span data-no-i18n title="' + esc(ev.seasonal_caveat) + '">' + esc(trServer(ev.seasonal_caveat)) + '</span></p>' : '') +
-        '<h5>' + esc(t('vmdTitle')) + '</h5>' + (cst.available === false ? '<p>' + na() + ' <small data-no-i18n>' + esc(cst.reason || '') + '</small></p>' : comps.length ?
-          '<table class="satw-table satw-small"><thead><tr><th>' + esc(t('kvNog')) + '</th><th>' + esc(t('zkat')) + '</th><th>' + esc(t('haInMask')) + '</th><th>' + esc(t('pCirg')) + '</th><th>' + esc(t('pCirp')) + '</th></tr></thead><tbody>' +
-          comps.slice(0, 12).map(function (cp) {
-            return '<tr><td data-no-i18n title="' + esc(cp.external_id) + '">' + esc((cp.kvart || '?') + '-' + (cp.nog || '?')) + '</td><td>' + esc(zkatLabel(cp.zkat)) + '</td><td data-no-i18n>' + esc(cp.ha_in_mask.toFixed(2)) + '</td>' +
-              '<td>' + (vmdValue(cp.p_cirg) ? '<span data-no-i18n>' + esc(vmdValue(cp.p_cirg)) + '</span>' : '<span class="satw-na">' + esc(t('notStated')) + '</span>') + '</td>' +
-              '<td>' + (vmdValue(cp.p_cirp) ? '<span data-no-i18n>' + esc(vmdValue(cp.p_cirp)) + '</span>' : '<span class="satw-na">' + esc(t('notStated')) + '</span>') + '</td></tr>';
-          }).join('') + (comps.length > 12 ? '<tr><td colspan="5" class="satw-muted" data-no-i18n>+' + (comps.length - 12) + '</td></tr>' : '') + '</tbody></table>' +
-          '<p class="satw-muted">' + esc(t('vmdNote')) + ' <span data-no-i18n>' + esc((cst.dataset_version || '').slice(0, 12)) + '</span></p>' : '<p class="satw-muted">' + esc(t('vmdNone')) + '</p>') + '</section>' +
-      '<section class="satw-block human"><h4>' + esc(t('decision')) + '</h4><dl class="satw-dl"><dt>' + esc(t('status')) + '</dt><dd>' + badge(t('s' + ev.status)) + '</dd></dl>' +
-        '<h5>' + esc(t('reviewLog')) + '</h5>' + ((ev.review_log || []).length ? '<ul class="satw-log">' + ev.review_log.map(function (r) {
-          return '<li><span data-no-i18n>' + esc(fmtTime(r.created_at_utc) || '') + ' · ' + esc(r.action) + ' · ' + esc(r.actor) + (r.note ? ' · ' + esc(r.note) : '') + '</span></li>';
-        }).join('') + '</ul>' : '<p class="satw-muted">' + esc(t('noReview')) + '</p>') +
-        '<div class="satw-actions">' +
-          '<button class="satw-btn primary" data-act="cmp">' + esc(t('aCompare')) + '</button>' +
-          (ev.current !== false ? '<button class="satw-btn" data-rv="FIELD_CHECK">' + esc(t('aField')) + '</button>' +
-            (ev.risk_id ? '' : '<button class="satw-btn" data-rv="CREATE_RISK">' + esc(t('aRisk')) + '</button>') +
-            '<button class="satw-btn" data-rv="REJECT">' + esc(t('aReject')) + '</button>' +
-            (ev.undo_available ? '<button class="satw-btn" data-rv="UNDO">' + esc(t('aUndo')) + '</button>' : '') : '') +
-        '</div></section>';
-    right.innerHTML = html; right.hidden = false; right.setAttribute('data-kind', 'event');
-    right.querySelector('[data-act=close]').onclick = function () { right.hidden = true; S.sel = null; S.ev = null; highlight(null); if (S.calloutLayer) S.map.removeLayer(S.calloutLayer); S.vmdHighlight = {}; redrawVmd(); document.querySelectorAll('.satw-evlist li').forEach(function (li) { li.classList.remove('sel'); }); };
-    right.querySelector('[data-act=cmp]').onclick = function () { toggleCompare(true); };
-    right.querySelectorAll('[data-goto]').forEach(function (a) { a.onclick = function () { location.hash = 'sat-monitoring?event=' + a.getAttribute('data-goto'); }; });
-    right.querySelectorAll('[data-rv]').forEach(function (b) {
+  function renderCard(ev) {
+    var card = document.getElementById('satw-card'); if (!card) return;
+    var c = changeColour(ev), pair = S.compare;
+    var row = function (kind, a) { return a ? '<div class="satw-prod"><span>' + esc(t(kind)) + '</span><code data-no-i18n>' + esc(a.product_id || t('na')) + '</code><span class="satw-mono" data-no-i18n>' + esc(isNum(a.valid_pct_inside) ? fmtNum(a.valid_pct_inside, 1) + ' %' : t('na')) + '</span></div>' : ''; };
+    var sup = ev.current === false ? '<div class="satw-banner warn">' + (ev.successor ? esc(t('superseded', {id: ev.successor.event_id})) : esc(t('supersededNone'))) + '</div>' : '';
+    card.innerHTML = '<div class="satw-card-top"><span class="satw-eyebrow" data-no-i18n>' + esc(t('eventN', {id: ev.id})) + '</span><button type="button" class="satw-x" data-act="close" aria-label="' + esc(t('close')) + '">×</button></div>' +
+      '<span class="satw-chip st" style="--c:' + c.color + '">' + esc(t('s' + ev.status)) + '</span>' +
+      '<h3>' + esc(clsLabel(ev.classification)) + ' · <span data-no-i18n>' + esc(ha(ev.changed_area_ha) || t('na')) + '</span></h3>' + sup +
+      '<p class="satw-story"><b>' + esc(t('story')) + '.</b> ' + esc(storyText(ev)) + '</p>' +
+      '<dl class="satw-kv"><dt>' + esc(t('confidence')) + '</dt><dd>' + (ev.confidence ? badge(t(ev.confidence), qClass(ev.confidence)) : na()) + '</dd>' +
+        '<dt>' + esc(t('evidence')) + '</dt><dd class="satw-eq">' + evidenceLine(ev) + '</dd></dl>' +
+      (pair ? row('pillBefore', pair.before) + row('pillAfter', pair.after) : '') +
+      '<div class="satw-actions">' +
+        '<button type="button" class="satw-btn primary" data-act="evidence">' + esc(t('aEvidence')) + '</button>' +
+        (ev.current !== false ? '<button type="button" class="satw-btn" data-rv="FIELD_CHECK">' + esc(t('aField')) + '</button>' +
+          (ev.risk_id ? '' : '<button type="button" class="satw-btn" data-rv="CREATE_RISK">' + esc(t('aRisk')) + '</button>') +
+          '<button type="button" class="satw-btn" data-rv="REJECT">' + esc(t('aReject')) + '</button>' +
+          (ev.undo_available ? '<button type="button" class="satw-btn" data-rv="UNDO">' + esc(t('aUndo')) + '</button>' : '') : '') + '</div>';
+    card.hidden = false;
+    card.querySelector('[data-act=close]').onclick = function () {
+      card.hidden = true; S.sel = null; S.ev = null; S.compare = null; S.mode = null; highlight(null);
+      if (S.calloutLayer) { S.map.removeLayer(S.calloutLayer); S.calloutLayer = null; } if (S.ringLayer) { S.map.removeLayer(S.ringLayer); S.ringLayer = null; }
+      document.querySelectorAll('.satw-evlist [data-ev]').forEach(function (b) { b.classList.remove('sel'); b.setAttribute('aria-pressed', 'false'); });
+      renderComposites(); renderImagery(); setHash(viewParams(), true);
+    };
+    card.querySelector('[data-act=evidence]').onclick = function () { setHash({area: S.areaId, event: ev.id, tab: 'evidence'}); openEvidence(ev.id, true); };
+    card.querySelectorAll('[data-rv]').forEach(function (b) {
       b.onclick = async function () {
         var d = b.getAttribute('data-rv'), q = {FIELD_CHECK: 'cField', CREATE_RISK: 'cRisk', REJECT: 'cReject', UNDO: 'cUndo'}[d];
         if (!global.confirm(t(q))) return;
         b.disabled = true;
-        try { await post('/events/' + ev.id + '/review', {decision: d}); var id = ev.id; await openArea(S.areaId, id); }
+        try { await post('/events/' + ev.id + '/review', {decision: d}); await openArea(S.areaId, {event: ev.id, force: true}); }
         catch (e) { b.disabled = false; global.alert(t('error') + ': ' + e.message); }
       };
     });
   }
-  function dd(k, v) { return '<dt>' + esc(t(k)) + '</dt><dd>' + (v === null || v === undefined ? na() : '<span data-no-i18n>' + esc(v) + '</span>') + '</dd>'; }
-  function openAcqPanel(a) {
-    var right = document.getElementById('satw-right'); if (!right || S.sel) return;
-    var m = a.metrics_inside || {}, keys = a.sensor === 'S2' ? ['NDVI', 'NBR', 'NDMI'] : ['VV_DB', 'VH_DB'];
-    var outcome = a.detection ? (T[S.lang]['o_' + a.detection] || a.detection) : null;
-    right.innerHTML = '<div class="satw-rp-head"><div><b>' + esc(t('acqCard')) + '</b> <span data-no-i18n>#' + a.acq_id + '</span></div><button class="satw-x" data-act="close">×</button></div>' +
-      '<section class="satw-block raw"><dl class="satw-dl"><dt>' + esc(t('sensing')) + '</dt><dd>' + timeHtml(a.sensing_time_utc) + '</dd>' +
-        dd('platform', a.sensor + ' · ' + (a.platform || '—')) + (a.sensor === 'S1' ? dd('geometry', geomKey(a)) : dd('cloud', isNum(a.scene_cloud_pct) ? a.scene_cloud_pct.toFixed(1) + ' %' : null)) +
-        dd('validPct', isNum(a.valid_pct_inside) ? a.valid_pct_inside.toFixed(1) + ' %' : null) +
-        '<dt>' + esc(t('thStatus')) + '</dt><dd title="' + esc(a.status) + '">' + esc(T[S.lang]['s_' + a.status] || a.status) + '</dd>' +
-        '<dt>' + esc(t('product')) + '</dt><dd><code data-no-i18n>' + esc(a.product_id) + '</code> <button class="satw-btn satw-small" data-act="copy">' + esc(t('copy')) + '</button></dd></dl>' + attribution(a.sensing_time_utc) + '</section>' +
-      '<section class="satw-block proc"><h4>' + esc(t('metrics')) + '</h4><dl class="satw-dl">' + keys.map(function (k) {
-        var x = m[k]; return dd(k.replace('_DB', ' dB'), x && isNum(x.median) ? x.median.toFixed(3) : null);
-      }).join('') + '<dt>' + esc(t('outcome')) + '</dt><dd title="' + esc(a.detection || '') + '">' + (outcome ? esc(outcome) : na()) + '</dd></dl></section>' +
-      '<div class="satw-actions"><button class="satw-btn" data-act="before">' + esc(t('setBefore')) + '</button></div>';
-    right.hidden = false; right.setAttribute('data-kind', 'acq');
-    right.querySelector('[data-act=close]').onclick = function () { right.hidden = true; };
-    right.querySelector('[data-act=copy]').onclick = function () { try { navigator.clipboard.writeText(a.product_id); this.textContent = t('copied'); } catch (e) { /* no clipboard */ } };
-    right.querySelector('[data-act=before]').onclick = function () { setCompareBefore(a); };
-  }
 
-  // ── compare (A swipe · B side by side (default) · C after + change · D change only) ───────────────────────────
-  function toggleCompare(force) {
-    var on = force === true ? true : !S.compare;
-    var btn = document.querySelector('[data-act=compare]'); if (btn) btn.classList.toggle('on', on);
-    if (!on) { S.compare = null; teardownCompare(); drawImage(); return; }
-    var pair = S.ev ? defaultPair(S.ev, S.byId, minValid()) : {before: null, after: S.acq};
-    if (!pair.before && S.acq) {          // no event: latest valid before the shown acquisition, same sensor/geometry
-      pair.after = S.acq;
-      pair.before = S.area.timeline.filter(function (x) { return comparePair(x, S.acq).ok && acqState(x, minValid()) === 'ok'; })
-        .sort(function (x, y) { return String(y.sensing_time_utc).localeCompare(String(x.sensing_time_utc)); })[0] || null;
-    }
-    S.compare = {before: pair.before, after: pair.after};
-    renderCompare();
+  // ── timeline (S2 circles · S1 diamonds by orbit geometry · onset markers · before/after rings) ──────────────────────
+  function geomColour(a) {
+    var keys = []; S.area.timeline.forEach(function (x) { if (x.sensor === 'S1' && keys.indexOf(geomKey(x)) < 0) keys.push(geomKey(x)); });
+    keys.sort(); return GEOM_COLOURS[keys.indexOf(geomKey(a)) % GEOM_COLOURS.length];
   }
-  function setCompareBefore(a) {
-    if (!S.compare) { S.compare = {before: a, after: S.acq}; } else S.compare.before = a;
-    var btn = document.querySelector('[data-act=compare]'); if (btn) btn.classList.add('on');
-    renderCompare();
-  }
-  function teardownCompare() {
-    if (S.map2) { try { S.map2.remove(); } catch (e) { /* gone */ } S.maps = S.maps.filter(function (m) { return m !== S.map2; }); S.map2 = null; }
-    var wrap = document.getElementById('satw-maps'); if (wrap) wrap.classList.remove('split');
-    var p2 = document.getElementById('satw-map2'); if (p2) p2.remove();
-    ['satw-swipe', 'satw-cmp-l', 'satw-cmp-r'].forEach(function (id) { var x = document.getElementById(id); if (x) x.remove(); });
-    if (S.swipeLayers) { S.swipeLayers.forEach(function (l) { S.map.removeLayer(l); }); S.swipeLayers = null; }
-    var bar = document.getElementById('satw-compare-bar'); if (bar) bar.hidden = true;
-    var mapEl = document.getElementById('satw-map'); if (mapEl) mapEl.classList.remove('muted');
-    if (S.base && S.map && layerOn('base') && !S.map.hasLayer(S.base)) S.base.addTo(S.map);
-    if (S.map) { if (layerOn('image') && !S.map.hasLayer(S.groups.image)) S.groups.image.addTo(S.map); setTimeout(function () { S.map.invalidateSize(); }, 50); }
-  }
-  function renderCompare() {
-    var L = S.L, c = S.compare; if (!L || !c) return;
-    teardownCompare(); S.groups.image.clearLayers();
-    var lab = document.getElementById('satw-img-label'); if (lab) lab.remove();
-    var v = comparePair(c.before, c.after), comp = v.ok ? pairComposite(c.before, c.after, S.composite) : null;
-    var bar = document.getElementById('satw-compare-bar');
-    bar.hidden = false;
-    bar.innerHTML = seg('mode', [['A', t('modeA')], ['B', t('modeB')], ['C', t('modeC')], ['D', t('modeD')]], S.mode) +
-      (v.ok ? '' : '<span class="satw-banner warn inline">' + esc(t(v.reason)) + '</span>') +
-      (v.ok && c.before.sensor === 'S2' && S.composite === 'true' && comp === 'false' ? '<span class="satw-note">' + esc(t('compositeNote')) + '</span>' : '') +
-      '<button class="satw-x" data-act="cmp-close">×</button>';
-    bar.querySelectorAll('[data-seg=mode] button').forEach(function (b) { b.onclick = function () { S.mode = b.getAttribute('data-v'); renderCompare(); }; });
-    bar.querySelector('[data-act=cmp-close]').onclick = function () { toggleCompare(); };
-    var bb = S.area.area.grid_bbox, bounds = [[bb[1], bb[0]], [bb[3], bb[2]]];
-    var wrap = document.getElementById('satw-maps'), mapEl = document.getElementById('satw-map');
-    if (!v.ok) return;
-    var side = function (a, cls, id) { var d = document.createElement('div'); d.id = id; d.className = 'satw-cmp-side ' + cls; d.innerHTML = '<b>' + esc(cls === 'l' ? t('before') : t('after')) + '</b><br>' + acqLabel(a, comp) + '<div><small>' + esc(t('product')) + ': <code data-no-i18n>' + esc(a.product_id) + '</code></small></div>'; return d; };
-    if (S.mode === 'D') {
-      mapEl.classList.add('muted'); S.map.removeLayer(S.groups.image);
-      if (layerOn('change') && !S.map.hasLayer(S.groups.change)) S.groups.change.addTo(S.map);
-      mapEl.appendChild(side(c.after, 'r', 'satw-cmp-r'));
-      return;
-    }
-    if (S.mode === 'C') {
-      imgStatus(mapEl, L.imageOverlay(imageUrl(c.after, comp), bounds, {pane: 'satwImg'})).addTo(S.groups.image);
-      if (!S.map.hasLayer(S.groups.change)) S.groups.change.addTo(S.map);
-      mapEl.appendChild(side(c.after, 'r', 'satw-cmp-r'));
-      return;
-    }
-    if (S.mode === 'A') {
-      var lb = L.imageOverlay(imageUrl(c.before, comp), bounds, {pane: 'satwImg'}), la = L.imageOverlay(imageUrl(c.after, comp), bounds, {pane: 'satwAfter'});
-      if (!S.map.getPane('satwAfter')) { S.map.createPane('satwAfter').style.zIndex = 310; S.map.getPane('satwAfter').style.pointerEvents = 'none'; }
-      imgStatus(mapEl, lb).addTo(S.map); la.addTo(S.map); S.swipeLayers = [lb, la];
-      var sw = document.createElement('input'); sw.type = 'range'; sw.min = 0; sw.max = 100; sw.value = 50; sw.id = 'satw-swipe'; sw.className = 'satw-swipe';
-      mapEl.appendChild(sw); mapEl.appendChild(side(c.before, 'l', 'satw-cmp-l')); mapEl.appendChild(side(c.after, 'r', 'satw-cmp-r'));
-      var clip = function () {
-        var pane = S.map.getPane('satwAfter'), size = S.map.getSize(), x = size.x * sw.value / 100;
-        var nw = S.map.containerPointToLayerPoint([x, 0]), se = S.map.containerPointToLayerPoint(size);
-        pane.style.clip = 'rect(' + [nw.y, se.x, se.y, nw.x].join('px,') + 'px)';
-      };
-      sw.oninput = clip; S.map.on('move zoom', clip); setTimeout(clip, 30);
-      return;
-    }
-    // B — side by side, two synced maps
-    wrap.classList.add('split');
-    var m2el = document.createElement('div'); m2el.id = 'satw-map2'; m2el.className = 'satw-map'; wrap.appendChild(m2el);
-    S.map.invalidateSize();
-    var m2 = L.map(m2el, {zoomControl: false, attributionControl: true, zoomSnap: 0.25}); S.map2 = m2; S.maps.push(m2);
-    m2.createPane('satwImg').style.zIndex = 300; m2.getPane('satwImg').style.pointerEvents = 'none'; m2.createPane('satwChange').style.zIndex = 440; m2.createPane('satwBoundary').style.zIndex = 420;
-    if (layerOn('base')) L.tileLayer(OSM, {maxZoom: 19, attribution: '© OpenStreetMap contributors'}).addTo(m2);
-    imgStatus(mapEl, L.imageOverlay(imageUrl(c.before, comp), bounds, {pane: 'satwImg'})).addTo(S.groups.image);
-    imgStatus(m2el, L.imageOverlay(imageUrl(c.after, comp), bounds, {pane: 'satwImg'})).addTo(m2);
-    if (S.area.geometry) L.geoJSON(S.area.geometry, {pane: 'satwBoundary', style: {color: '#F5F5F0', weight: 2.5, fill: false}}).addTo(m2);
-    (S.layer.features || []).forEach(function (f) { if (f.properties.kind === 'event') { var cc = changeColour(f.properties); L.geoJSON(f, {pane: 'satwChange', style: {color: cc.color, weight: f.properties.event_id === S.sel ? 3.5 : 2, dashArray: cc.dash, fill: false}}).addTo(m2); } });
-    m2.setView(S.map.getCenter(), S.map.getZoom(), {animate: false});
-    var busy = false;
-    function sync(a, b) { a.on('move', function () { if (busy) return; busy = true; b.setView(a.getCenter(), a.getZoom(), {animate: false}); busy = false; }); }
-    sync(S.map, m2); sync(m2, S.map);
-    mapEl.appendChild(side(c.before, 'l', 'satw-cmp-l')); m2el.appendChild(side(c.after, 'r', 'satw-cmp-r'));
-  }
-
-  // ── timeline ──────────────────────────────────────────────────────────────────────────────────────────────────
   function renderTimeline() {
     var box = document.getElementById('satw-tl'); if (!box || !S.area) return;
     var tl = S.area.timeline, mv = minValid();
     if (!tl.length) { box.innerHTML = '<div class="satw-empty">' + esc(t('noDataYet')) + '</div>'; return; }
     var end = Date.now(), start = S.window === 'all' ? parseUtc(tl[0].sensing_time_utc).getTime() - DAY : end - S.window * DAY;
-    var W = Math.max(600, box.clientWidth || 1200), H = 96, x0 = 70, x1 = W - 16;
+    var W = Math.max(600, box.clientWidth || 1100), H = 78, x0 = 92, x1 = W - 14, yS2 = 22, yS1 = 52;
     var X = function (iso) { var d = parseUtc(iso); return d ? x0 + (d.getTime() - start) / (end - start) * (x1 - x0) : -99; };
-    var svg = '<svg width="' + W + '" height="' + H + '" class="satw-tl-svg"><text x="8" y="32" class="lbl">S2</text><text x="8" y="72" class="lbl">S1</text>' +
-      '<line x1="' + x0 + '" x2="' + x1 + '" y1="28" y2="28" class="trk"/><line x1="' + x0 + '" x2="' + x1 + '" y1="68" y2="68" class="trk"/>';
+    var svg = '<svg width="' + W + '" height="' + H + '" class="satw-tl-svg" role="img" aria-label="' + esc(t('timeline')) + '">' +
+      '<text x="6" y="' + (yS2 + 4) + '" class="lbl">' + esc(t('tlS2')) + '</text><text x="6" y="' + (yS1 + 4) + '" class="lbl">' + esc(t('tlS1')) + '</text>' +
+      '<line x1="' + x0 + '" x2="' + x1 + '" y1="' + yS2 + '" y2="' + yS2 + '" class="trk"/><line x1="' + x0 + '" x2="' + x1 + '" y1="' + yS1 + '" y2="' + yS1 + '" class="trk"/>';
     for (var m = new Date(start); m.getTime() <= end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
-      var mx = X(new Date(m.getFullYear(), m.getMonth(), 1).toISOString()); if (mx >= x0) svg += '<line x1="' + mx + '" x2="' + mx + '" y1="12" y2="84" class="tick"/><text x="' + (mx + 3) + '" y="92" class="tlbl" data-no-i18n>' + (m.getFullYear() + '-' + pad(m.getMonth() + 1)) + '</text>';
+      var mx = X(new Date(m.getFullYear(), m.getMonth(), 1).toISOString());
+      if (mx >= x0) svg += '<line x1="' + mx + '" x2="' + mx + '" y1="8" y2="64" class="tick"/><text x="' + (mx + 3) + '" y="74" class="tlbl" data-no-i18n>' + esc(new Date(m.getFullYear(), m.getMonth(), 1).toLocaleDateString(S.lang === 'lv' ? 'lv-LV' : 'en-GB', {month: 'short', year: '2-digit'})) + '</text>';
     }
     (S.events || []).forEach(function (e) {
-      var ex = X(e.first_after_time_utc); if (ex < x0) return; var y = e.onset_sensor === 'S1' ? 56 : 16, c = changeColour(e);
-      svg += '<path d="M' + ex + ' ' + (y + 6) + ' l-5 -8 h10 z" fill="' + c.color + '" class="onset"><title>#' + e.id + ' ' + esc(clsLabel(e.classification)) + '</title></path>';
+      var ex = X(e.first_after_time_utc); if (ex < x0) return; var c = changeColour(e);
+      svg += '<g class="onset"><path d="M' + ex + ' 6 l-5 -6 h10 z" transform="translate(0 4)" fill="' + c.color + '"/><text x="' + (ex + 6) + '" y="9" class="tlbl" data-no-i18n>#' + e.id + '</text><title>#' + e.id + ' ' + esc(clsLabel(e.classification)) + '</title></g>';
     });
+    var pair = S.mode && S.compare ? S.compare : null;
     tl.forEach(function (a) {
       var x = X(a.sensing_time_utc); if (x < x0 || x > x1 + 1) return;
-      if (a.sensor === 'S1' && S.s1geom !== 'all' && geomKey(a) !== S.s1geom) return;
-      var st = acqState(a, mv), y = a.sensor === 'S2' ? 28 : 68, col = a.sensor === 'S1' ? geomColour(a) : '#5DB37E', sel = S.acq && S.acq.acq_id === a.acq_id;
-      var inPair = S.compare && ((S.compare.before && S.compare.before.acq_id === a.acq_id) || (S.compare.after && S.compare.after.acq_id === a.acq_id));
+      var st = acqState(a, mv), y = a.sensor === 'S2' ? yS2 : yS1, col = a.sensor === 'S1' ? geomColour(a) : '#7FBF8E';
+      var sel = S.acq && S.acq.acq_id === a.acq_id, isB = pair && pair.before && pair.before.acq_id === a.acq_id, isA = pair && pair.after && pair.after.acq_id === a.acq_id;
       var shape;
-      if (st === 'cloud') shape = '<text x="' + x + '" y="' + (y + 4) + '" class="cloud">☁</text>';
+      if (st === 'cloud') shape = '<path d="M' + (x - 5) + ' ' + (y + 3) + ' a3 3 0 0 1 2 -6 a4 4 0 0 1 7 1 a2.5 2.5 0 0 1 1 5 z" class="cloud"/>';
       else if (st === 'invalid') shape = '<path d="M' + (x - 4) + ' ' + (y - 4) + ' l8 8 M' + (x + 4) + ' ' + (y - 4) + ' l-8 8" class="cross"/>';
       else if (a.sensor === 'S1') shape = '<path d="M' + x + ' ' + (y - 6) + ' l6 6 l-6 6 l-6 -6 z" fill="' + (st === 'ok' ? col : 'none') + '" stroke="' + col + '" stroke-width="1.6"/>';
-      else shape = '<circle cx="' + x + '" cy="' + y + '" r="5.5" fill="' + (st === 'ok' ? col : 'none') + '" stroke="' + col + '" stroke-width="1.6"/>';
-      svg += '<g class="acq' + (sel ? ' sel' : '') + (inPair ? ' pair' : '') + '" data-acq="' + a.acq_id + '">' + ((sel || inPair) ? '<circle cx="' + x + '" cy="' + y + '" r="10" class="ring"/>' : '') + shape +
+      else shape = '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + (st === 'ok' ? col : 'none') + '" stroke="' + col + '" stroke-width="1.6"/>';
+      svg += '<g class="acq' + (sel ? ' sel' : '') + (isB ? ' pb' : '') + (isA ? ' pa' : '') + '" data-acq="' + a.acq_id + '" data-state="' + st + '" tabindex="-1">' +
+        ((sel || isB || isA) ? '<circle cx="' + x + '" cy="' + y + '" r="9.5" class="ring' + (isB ? ' b' : '') + '"/>' : '') + shape +
         '<rect x="' + (x - 6) + '" y="' + (y - 10) + '" width="12" height="20" fill="transparent"/></g>';
     });
     box.innerHTML = svg + '</svg>';
     var tip = document.getElementById('satw-tip');
     box.querySelectorAll('[data-acq]').forEach(function (g) {
       var a = S.byId[+g.getAttribute('data-acq')];
-      g.onmouseenter = function (ev) {
+      g.onmouseenter = function () {
         var st = acqState(a, mv);
-        tip.innerHTML = '<b data-no-i18n>' + esc(fmtTime(a.sensing_time_utc)) + '</b><br><span data-no-i18n>' + esc(a.sensor + ' · ' + (a.platform || '') + (a.sensor === 'S1' ? ' · ' + geomKey(a) : '')) + '</span><br>' +
+        tip.innerHTML = '<b data-no-i18n>' + esc(fmtTime(a.sensing_time_utc)) + '</b><br><span data-no-i18n>' + esc(a.sensor + ' · ' + (a.platform || '') + (a.sensor === 'S1' ? ' · ' + t('orbit') + ' ' + geomKey(a) : '')) + '</span><br>' +
           esc(t({ok: 'stOk', low: 'stLow', cloud: 'stCloud', invalid: 'stInvalid', pending: 'stPending'}[st])) +
-          (a.sensor === 'S2' ? ' · ' + esc(t('cloud')) + ' <span data-no-i18n>' + (isNum(a.scene_cloud_pct) ? a.scene_cloud_pct.toFixed(0) + ' %' : '—') + '</span>' : '') +
-          ' · ' + esc(t('validPct')) + ' <span data-no-i18n>' + (isNum(a.valid_pct_inside) ? a.valid_pct_inside.toFixed(1) : '—') + '</span>' +
-          (a.detection ? '<br><span title="' + esc(a.detection) + '">' + esc(T[S.lang]['o_' + a.detection] || a.detection) + '</span>' : '') +
-          '<br><code data-no-i18n>' + esc(a.product_id) + '</code>';
+          (a.sensor === 'S2' ? ' · ' + esc(t('cloudPct')) + ' <span data-no-i18n>' + (isNum(a.scene_cloud_pct) ? fmtNum(a.scene_cloud_pct, 0) + ' %' : t('na')) + '</span>' : '') +
+          ' · ' + esc(t('validPct')) + ' <span data-no-i18n>' + (isNum(a.valid_pct_inside) ? fmtNum(a.valid_pct_inside, 1) + ' %' : t('na')) + '</span>' +
+          '<br><code data-no-i18n>' + esc(a.product_id || t('na')) + '</code>';
         tip.hidden = false; var r = box.getBoundingClientRect(), gr = g.getBoundingClientRect();
-        tip.style.left = Math.min(r.width - 330, Math.max(0, gr.left - r.left - 150)) + 'px'; tip.style.bottom = (r.bottom - gr.top + 8) + 'px';
+        tip.style.left = Math.min(r.width - 340, Math.max(0, gr.left - r.left - 150)) + 'px'; tip.style.bottom = (r.bottom - gr.top + 10) + 'px';
       };
       g.onmouseleave = function () { tip.hidden = true; };
       g.onclick = function (ev) {
-        if (!a.quicklook_url) return;
-        if (ev.shiftKey) { setCompareBefore(a); renderTimeline(); return; }
-        if (S.compare) { S.compare.after = a; renderCompare(); renderTimeline(); return; }
-        S.sel ? (S.acq = a, S.sensor = a.sensor, syncSeg('sensor', S.sensor), renderComposite(), drawImage()) : showAcq(a);
+        if (!a.quicklook_url || a.status !== 'OK') return;
+        if (ev.shiftKey) { setBefore(a); return; }
+        showAcq(a);
       };
     });
   }
-
-  // ── analysis drawer (area median; event polygon curve postponed) ───────────────────────────────────────────────
-  function renderAnalysis(L) {
-    S.analysisL = L;
-    var box = document.getElementById('satw-analysis-body'); if (!box || !global.Chart) { if (box) box.innerHTML = '<p class="satw-muted">' + esc(t('analysisNote')) + '</p>'; return; }
-    S.charts.forEach(function (c) { try { c.destroy(); } catch (e) { /* gone */ } }); S.charts = [];
-    box.innerHTML = '<div class="satw-charts"><div><canvas id="satw-ch-s2"></canvas></div><div><canvas id="satw-ch-s1"></canvas></div></div><p class="satw-muted">' + esc(t('analysisNote')) + '</p>';
-    var tl = S.area.timeline, mv = minValid();
-    function series(sensor, key) {
-      return tl.filter(function (a) { return a.sensor === sensor && (sensor !== 'S1' || S.s1geom === 'all' || geomKey(a) === S.s1geom); }).map(function (a) {
-        var m = (a.metrics_inside || {})[key], ok = a.status === 'OK' && acqState(a, mv) !== 'invalid';
-        return {x: parseUtc(a.sensing_time_utc).getTime(), y: ok && m && isNum(m.median) ? m.median : null};
-      });
-    }
-    var dark = S.theme === 'dark', grid = dark ? 'rgba(245,245,240,.08)' : 'rgba(16,25,20,.08)', txt = dark ? '#CFD8D2' : '#1F2A24';
-    function chart(id, sets, yTitle) {
-      var ev = (S.events || []).map(function (e) { return parseUtc(e.first_after_time_utc).getTime(); });
-      return new global.Chart(document.getElementById(id), {type: 'line', data: {datasets: sets.map(function (s) { return {label: s[0], data: s[1], borderColor: s[2], backgroundColor: s[2], spanGaps: false, pointRadius: 2, borderWidth: 1.5}; })},
-        options: {animation: false, responsive: true, maintainAspectRatio: false, parsing: false,
-          scales: {x: {type: 'linear', ticks: {color: txt, callback: function (v) { return fmtDate(new Date(v).toISOString()); }, maxTicksLimit: 6}, grid: {color: grid}},
-                   y: {title: {display: true, text: yTitle, color: txt}, ticks: {color: txt}, grid: {color: grid}}},
-          plugins: {legend: {labels: {color: txt, boxWidth: 10}}, tooltip: {callbacks: {title: function (it) { return fmtTime(new Date(it[0].parsed.x).toISOString()); }}}}}});
-    }
-    S.charts.push(chart('satw-ch-s2', [['NDVI', series('S2', 'NDVI'), '#5DB37E'], ['NBR', series('S2', 'NBR'), '#D4B23A'], ['NDMI', series('S2', 'NDMI'), '#4FA3D9']], 'S2'));
-    S.charts.push(chart('satw-ch-s1', [['VV dB', series('S1', 'VV_DB'), '#9B7BD8'], ['VH dB', series('S1', 'VH_DB'), '#4FA3D9']], 'S1 dB'));
-  }
-  function renderTech() {
-    var box = document.getElementById('satw-tech-body'); if (!box || !S.area) return;
-    var rows = S.area.timeline.slice().reverse();
-    box.innerHTML = '<table class="satw-table satw-small"><thead><tr><th>' + esc(t('thTime')) + '</th><th>' + esc(t('thSensor')) + '</th><th>' + esc(t('thStatus')) + '</th><th>' + esc(t('thValid')) + '</th><th>' + esc(t('thOutcome')) + '</th><th>' + esc(t('product')) + '</th></tr></thead><tbody>' +
-      rows.map(function (a) {
-        return '<tr><td data-no-i18n>' + esc(fmtTime(a.sensing_time_utc)) + '</td><td data-no-i18n>' + esc(a.sensor + (a.sensor === 'S1' ? ' ' + geomKey(a) : '')) + '</td>' +
-          '<td title="' + esc(a.status) + '">' + esc(T[S.lang]['s_' + a.status] || a.status) + '</td><td data-no-i18n>' + (isNum(a.valid_pct_inside) ? a.valid_pct_inside.toFixed(1) : '—') + '</td>' +
-          '<td title="' + esc(a.detection || '') + '">' + (a.detection ? esc(T[S.lang]['o_' + a.detection] || a.detection) : '—') + '</td><td><code data-no-i18n>' + esc(a.product_id) + '</code></td></tr>';
-      }).join('') + '</tbody></table>';
+  // Analysis drawer: the EXISTING index charts (sat-monitoring.js drawCharts, logic unchanged) on the same data.
+  function renderAnalysis() {
+    var box = document.getElementById('satw-analysis-body'); if (!box || !S.area) return;
+    box.innerHTML = '<div class="satw-charts"><div><div class="satw-chart-t">' + esc(t('tsS2')) + '</div><div class="satw-chart"><canvas id="satm-ch-s2"></canvas></div></div>' +
+      '<div><div class="satw-chart-t">' + esc(t('tsS1')) + '</div><div class="satw-chart"><canvas id="satm-ch-s1"></canvas></div></div></div>';
+    var core = legacy()._core; if (core && core.charts) core.charts(S.area);
   }
 
-  // ── deep links: superseded ids resolve to their own area with the successor notice ───────────────────────────
-  async function openEvent(id) {
-    var ev; try { ev = await get('/events/' + id); } catch (e) { errorView(e); return; }
-    await openArea(ev.monitored_area_id);
-    S.sel = id;
-    if (ev.current === false) {
-      S.ev = ev; var right = document.getElementById('satw-right'); if (right) renderEventPanel(ev);
+  // ── PIERĀDĪJUMI: the existing event page, unchanged, inside the workspace frame ─────────────────────────────────────
+  async function openEvidence(id, force) {
+    if (!force && !claim('evidence:' + id)) return;
+    ++S.seq; cleanup(); S.sel = id ? +id : null;
+    if (!S.sel) {
+      var list = S.ov ? S.ov.latest_events || [] : [];
+      if (!S.ov) { try { S.ov = await get('/overview'); list = S.ov.latest_events || []; } catch (e) { errorView(e); return; } }
+      var r0 = shell('evidence', '<div class="satw-pick"><p>' + esc(t('evPick')) + '</p>' + latestList(list) + '</div>'); if (!r0) return;
+      r0.querySelectorAll('[data-event]').forEach(function (b) { b.onclick = function () { var e = +b.getAttribute('data-event'); setHash({area: +b.getAttribute('data-area'), event: e, tab: 'evidence'}); openEvidence(e, true); }; });
       return;
     }
-    selectEvent(id);
+    var r = shell('evidence', '<div id="satm-evidence" class="satw-evidence"></div>'); if (!r) return;
+    var lg = legacy(); if (lg.openEvent) await lg.openEvent(S.sel);
+    syncModes();
   }
 
-  var api = {load: loadOverview, openArea: function (id) { return openArea(+id); }, openEvent: function (id) { return openEvent(+id); },
-             _changeColour: changeColour, _CHANGE_COLOURS: CHANGE_COLOURS, _worstColour: worstColour, _fmtTime: fmtTime, _rigaParts: rigaParts,
-             _acqState: acqState, _comparePair: comparePair, _pairComposite: pairComposite, _defaultPair: defaultPair, _vmdValue: vmdValue, _T: T,
-             _lastClearBefore: function (ev, byId, mv) { return lastClearBeforeOf(ev, byId, mv); },
+  // ── entry points (index.html: nav('sat-monitoring') → load; deep links → openArea / openEvent) ──────────────────────
+  function load() {
+    var p = hashParams();
+    if (p.tab === 'evidence') return openEvidence(p.event ? +p.event : null);
+    if (p.event) return openArea(+(p.area || 0) || null, p).catch(function () { /* handled inside */ });
+    if (p.area) return openArea(+p.area, p);
+    return loadTerritory();
+  }
+  async function openEventEntry(id) {
+    var p = hashParams();
+    if (p.tab === 'evidence') return openEvidence(+id);
+    if (!claim('area::' + id)) return;
+    var ev; try { ev = await get('/events/' + id); } catch (e) { errorView(e); return; }
+    return openArea(ev.monitored_area_id, Object.assign({}, p, {event: +id, force: true}));
+  }
+  // openArea(null, {event}) from load(): resolve the area of the event first.
+  var openAreaRaw = openArea;
+  openArea = async function (id, opts) {
+    if (!id && opts && opts.event) {
+      if (!claim('area::' + opts.event)) return;
+      var ev; try { ev = await get('/events/' + opts.event); } catch (e) { errorView(e); return; }
+      return openAreaRaw(ev.monitored_area_id, Object.assign({}, opts, {force: true}));
+    }
+    return openAreaRaw(id, opts);
+  };
+
+  var api = {load: load, openArea: function (id) { return openArea(+id, hashParams()); }, openEvent: function (id) { return openEventEntry(+id); },
+             _changeColour: changeColour, _CHANGE_COLOURS: CHANGE_COLOURS, _worstColour: worstColour, _worstOpenEvent: worstOpenEvent,
+             _fmtTime: fmtTime, _fmtDay: fmtDay, _fmtClock: fmtClock, _rigaParts: rigaParts, _acqState: acqState, _comparePair: comparePair,
+             _pairComposite: pairComposite, _singleComposite: singleComposite, _defaultPair: defaultPair, _vmdValue: vmdValue,
+             _evidenceSource: evidenceSource, _parseCoordinates: parseCoordinates, _inGeometry: inGeometry, _defaultAreaId: defaultAreaId,
+             _T: {lv: T_LV, en: T_EN}, _T_EN: T_EN, _T_LV: T_LV, _hashParams: hashParams, _buildHash: buildHash,
+             _lastClearBefore: function (ev, byId, mv) { return lastClearBeforeOf(ev, byId, mv); }, _setLang: function (l) { S.lang = l === 'en' ? 'en' : 'lv'; },
              get state() { return S; }};
   global.SatWorkspace = api;
-  // Route the section here; keep every other legacy hook (lvmButton, _trServer, …) of window.SatMonitoring.
+  // Route the section here; keep every other legacy hook (lvmButton, _trServer, _core, …) of window.SatMonitoring.
   if (global.SatMonitoring && !global.SAT_WORKSPACE_DISABLED) {
-    var legacy = global.SatMonitoring;
-    global.SatMonitoring = Object.assign({}, legacy, {load: api.load, openArea: api.openArea, openEvent: api.openEvent, _legacy: legacy});
+    var legacyApi = global.SatMonitoring;
+    global.SatMonitoring = Object.assign({}, legacyApi, {load: api.load, openArea: api.openArea, openEvent: api.openEvent, _legacy: legacyApi});
   }
 })(window);
