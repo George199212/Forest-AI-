@@ -11,7 +11,7 @@ change + restart) only after an explicit human OK in the chat.
 
 | port | unit | code location | git |
 |---|---|---|---|
-| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-satellite-monitoring-20261116T1545Z` (via drop-in `98-satellite-monitoring-release.conf`; `97-satellite-monitoring.conf` sets `SAT_DATA_DIR` / `SAT_DB_PATH` / `SAT_RASTER_DIR`; `90-` still supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `feature/satellite-monitoring` @ `7bd2bbb`, dashboard version `geo-178d80bd1896`, backend `42ca313c1c67` (since 2026-11-16 15:52 UTC) |
+| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-sectors-workspace-20261118T1017Z` (via drop-in `99-zz-sectors-workspace-release.conf`, sorts last; `97-satellite-monitoring.conf` sets `SAT_*`; `99-bind-localhost.conf` sets ExecStart `--host 127.0.0.1`; `90-` supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `feature/sectors-workspace` @ `574e535` (tag `prod-2026-11-18-sectors-workspace`, local), dashboard `geo-621ad7f28437`, backend `06c49c04bb64` (since 2026-11-18 10:33:58 UTC) |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
 | 8003 | `forest-review-api` | `/root/forest_ai_review` (copy of `84cb00b`) | 84cb00b |
@@ -67,6 +67,8 @@ these are committed, a release built from git alone would revert them.
 | 2026-11-10 10:32 | `forest-api-forest-map-contrast-20261110T0949Z` | d0015b1f82a0 | `96-` drop-in (row added 2026-11-16) |
 | 2026-11-16 15:52 | `forest-api-satellite-monitoring-20261116T1545Z` | 178d80bd1896 | `97-` env + `98-` release drop-ins; satellite.db migrated; worker units + timers installed |
 | 2026-11-09 16:28 | `forest-api-forest-map-violations-20261109T1623Z` | 3b9cdfaac106 | `90-` drop-in; `80-` removed |
+| 2026-11-18 05:33 | `forest-api-remove-integrations-page-20261118T0532Z` | e546c26f549f | `98-` drop-in edited in place (row added 2026-11-18 by the Sectors release; activation time from systemd) |
+| 2026-11-18 10:33 | `forest-api-sectors-workspace-20261118T1017Z` | 621ad7f28437 | new drop-in `99-zz-sectors-workspace-release.conf` (98- left unchanged) |
 
 - **Name:** `forest-api-<feature-slug>-<UTC timestamp YYYYMMDDTHHMM[SS]Z>`. The timestamp is
   when the release was cut. The audit candidate's folder name includes `1645Z`.
@@ -281,13 +283,46 @@ sorted-key JSON of `{path: sha256}`. The paths are `index.html`,
    re-entry flags and the "Pārkāpumi" list with incident #62 without clicks; sidebar change present;
    `#lvm-geodata`, Risks, sector Map tab (11 min 00 s / 3 min 21 s) unchanged; no tracebacks.
 
+## Activation record: sectors-workspace (2026-11-18 10:33:58 UTC, owner "approved release", conditional gates)
+
+- Gates (all YES before step 1): G1 console 404 fixed (574e535, 0 404s); G2 active `…remove-integrations-page-20261118T0532Z`
+  = b86ebf4, 0 drift, no live-only file overwritten; G3 pytest failure set == b86ebf4 baseline (49 ids, diff empty), JS
+  106/106; G4 rollback dry-run (paths exist, active folder's check OK); G5 `bc8c428..574e535` does not contain the bot-capture
+  commit d1ebfe0. Order: Sectors first, `feature/swipe-fix` to be rebuilt on top (separate release + approval).
+- Step 1 backups (`.backup`, integrity ok): `/root/backups/sectors_release_20261118T1017Z/` forest_ai.db sha256
+  `b05a6b79…c7824`, satellite.db `b727162e…c9cb66` (SHA256SUMS in the folder). No migration.
+- Step 2: `/root/forest_ai/releases/forest-api-sectors-workspace-20261118T1017Z` = copy of the active folder + 7 files from 574e535 (changed: api.py, index.html,
+  assets/forest-map.js, services/geodata/forest_map.py; added: assets/sectors-cards.{js,css}, services/sector_cards.py);
+  manifest 100 files, `pre-activation-check.sh` OK, 0 drift vs 574e535 (92 runtime files). Drop-in named `99-zz-…` so it sorts
+  after `99-bind-localhost.conf` (last among WorkingDirectory/ExecStart files; `geodata.conf` after it sets only
+  Environment). `daemon-reload` → WorkingDirectory resolved to the new folder; ExecStart unchanged.
+- Step 3: `systemctl restart forest-api` only (PID 372710 → 523354). Checks: `/api/deployment` = `geo-621ad7f28437` /
+  backend `06c49c04bb64` (computed from the folder beforehand; the endpoint has no folder name), `/proc/<pid>/cwd` and
+  WorkingDirectory = the new folder; `/` 401; `/api/sectors/cards` 200 (85 sectors, full cadastral numbers, satellite
+  available, no archive column); `/api/sectors`, `/api/objects`, `/api/geodata/forest-map/sectors|status`,
+  `/api/sat-monitoring/health|overview` 200; public app URL (DNS → this server) 401; journal 0 Traceback/ERROR;
+  all other API instances (:8002/:8003/:8004), forest-bot and both tenant Telegram workers: PIDs unchanged;
+  `forest-satellite-jobs` ran after the restart (10:36:30, success). Read-only browser on :8000: 10/10 (Sektori, BIK-001
+  fallback B + Foto → comparison, T-56 note, Meža karte focus, LG917, Satelītu monitorings overview, LVM GEO), 0 console
+  errors, no POST. Screenshots `/root/sectors_sandbox/screenshots_prod_20261118/`.
+- Tag `prod-2026-11-18-sectors-workspace` (574e535) created **locally only**: the owner's pre-push scan over
+  `origin/master..tag` found 76 hits, all in commits already on GitHub (Stage 0 fixtures/doc 000f235 before the redaction,
+  satellite docs/routes 00a5b2e/81237a6, the accepted `DASHBOARD_*="$U"` names in ded1e8f) → not pushed.
+
 ## Rollback
 
 Roll back code only. Do **not** restore the DB backup over live user writes unless a
 data recovery has been separately approved. All schema changes are additive and can
 remain in place.
 
-- **satellite-monitoring → forest-map-contrast (current rollback target, 2026-11-16):**
+- **sectors-workspace → remove-integrations-page (current rollback target, 2026-11-18):** no DB change to undo.
+  ```sh
+  rm /etc/systemd/system/forest-api.service.d/99-zz-sectors-workspace-release.conf
+  systemctl daemon-reload && systemctl restart forest-api
+  readlink /proc/$(systemctl show -p MainPID --value forest-api)/cwd   # → …/forest-api-remove-integrations-page-20261118T0532Z
+  ```
+  Confirm `/api/deployment` reports `geo-e546c26f549f` / backend `42ca313c1c67`.
+- **satellite-monitoring → forest-map-contrast (older rollback target, 2026-11-16):**
   ```sh
   systemctl disable --now forest-satellite-sync.timer forest-satellite-jobs.timer
   rm -f /etc/systemd/system/forest-api.service.d/97-satellite-monitoring.conf \
