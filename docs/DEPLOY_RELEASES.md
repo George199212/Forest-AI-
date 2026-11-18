@@ -96,8 +96,10 @@ these are committed, a release built from git alone would revert them.
                                                  production_activated false, steps a-c only; no systemd unit, nginx or process
                                                  references it, checked 2026-11-17 16:50 UTC on NEW). Pre-bc8c428 code: 6-band S2 decoder.
   forest-api-satellite-monitoring-20261116T1545Z DO NOT ROLL BACK: cannot read 8-band S2 (was active 2026-11-16 15:52 – 2026-11-17 07:11)
-  forest-api-satellite-monitoring-20261117T0521Z ACTIVE on :8000 + satellite worker units since 2026-11-17 07:11 UTC (bc8c428)
+  forest-api-satellite-monitoring-20261117T0521Z :8000 2026-11-17 07:11 – 2026-11-18 05:33 UTC; ROLLBACK TARGET for :8000;
+                                                 satellite worker units STILL run this folder (bc8c428)
   forest-api-satellite-monitoring-rollback8band-20261117T0831Z  ONLY valid rollback target for 0521Z (7bd2bbb + e0c9c84)
+  forest-api-remove-integrations-page-20261118T0532Z ACTIVE on :8000 since 2026-11-18 05:33 UTC (b86ebf4 = bc8c428 + Integrations page removed)
 ```
 
 ### History of :8000
@@ -111,6 +113,7 @@ these are committed, a release built from git alone would revert them.
 | 2026-11-10 10:32 | `forest-api-forest-map-contrast-20261110T0949Z` | d0015b1f82a0 | `96-` drop-in (row added 2026-11-16) |
 | 2026-11-16 15:52 | `forest-api-satellite-monitoring-20261116T1545Z` | 178d80bd1896 | `97-` env + `98-` release drop-ins; satellite.db migrated; worker units + timers installed |
 | 2026-11-17 07:11 | `forest-api-satellite-monitoring-20261117T0521Z` | d7081327a3d2 | `98-` re-pointed; worker units re-pointed; no migration |
+| 2026-11-18 05:33 | `forest-api-remove-integrations-page-20261118T0532Z` | e546c26f549f | `98-` re-pointed; worker units NOT re-pointed (stay on 0521Z); no migration |
 | 2026-11-09 16:28 | `forest-api-forest-map-violations-20261109T1623Z` | 3b9cdfaac106 | `90-` drop-in; `80-` removed |
 
 - **Name:** `forest-api-<feature-slug>-<UTC timestamp YYYYMMDDTHHMM[SS]Z>`. The timestamp is
@@ -124,6 +127,36 @@ these are committed, a release built from git alone would revert them.
 - **`.env`** is not in the folder. The unit loads `EnvironmentFile=/root/forest_ai/.env`.
 - **The geodata manifest** comes from the drop-in `geodata.conf`
   (`FOREST_GEODATA_MANIFEST=/root/forest_ai/data/geodata/nationwide/active.json`).
+
+## Activation record: remove-integrations-page-20261118T0532Z (2026-11-18 05:33:36 UTC, owner "approved release")
+
+- **Git:** branch `feature/remove-integrations-page`, commit `b86ebf4` (on `bc8c428`); annotated tag
+  `prod-2026-11-18-remove-integrations-page` → `b86ebf4`. Release folder: 96 files byte-identical to `b86ebf4`
+  (`git hash-object`); not in git: `pre-activation-check.sh`; `release-manifest.json` is the folder's own.
+- **Build:** copy of the active `…20261117T0521Z` + `git archive b86ebf4 index.html`; `assets/john-deere-logo.png`
+  removed. `changed_vs_baseline` = `index.html`; `removed_vs_baseline` = the logo. `pre-activation-check.sh` OK
+  (97 files; baseline 0521Z unchanged, 98 files).
+- **Tests before release:** pytest (system python) 9 failed / 448 passed / 5 skipped / 40 errors on both `bc8c428`
+  and `b86ebf4`, identical failure+error set; node tests 9/9 files pass; sandbox 127.0.0.1:8031 (release code,
+  DB copies, no `.env`) headless Chromium: 0 console errors.
+- **Backup:** `/root/backups/remove_integrations_page_activation_20261118T053321Z` (0700): unit + all drop-ins, `.env` copy, `forest_ai.db` + `satellite.db` (online backup,
+  integrity ok), `code-0521Z.tar.gz`, `activate-release.conf`, `rollback-release.conf` (= old `98-`),
+  `rollback-forest-api.sh`, `SHA256SUMS`, `units-before.txt`. sha256: forest_ai.db `f5dbb09d…`, satellite.db
+  `d8b1945d…`, rollback-release.conf `31ebe7d3…`.
+- **Switch:** `98-satellite-monitoring-release.conf` → `forest-api-remove-integrations-page-20261118T0532Z`; `daemon-reload`; restart of `forest-api` only
+  (05:33:36, PID 372710, NRestarts 0). forest-rm-api, forest-review-api, forest-ai-ingka(+telegram),
+  forest-ai-rigas-telegram, forest-bot, nginx, timers: PIDs/timestamps unchanged. `forest-satellite-sync` daily run 9
+  was started by its own timer at 05:33:35 (unrelated, runs from 0521Z).
+- **Smoke:** 127.0.0.1:8000/ without auth 401; https://app.forestaisystems.com/ with `.env` credentials 200, served
+  HTML has no "Integrācijas", no `sec-integrations`, no logo reference; `/assets/john-deere-logo.png` 404;
+  `#integrations`, `#integration-detail`, in-page hash change and stale history entries → `#overview`/Pārskats;
+  Pārskats, Objekti, Sektori, Satelītu monitorings, Riski, GPS sesijas, Kokvedēju atskaites, Kokmateriāli, LVM GEO,
+  Meža karte open with the right active item, 0 console errors, 0 page errors, 0 failed requests;
+  `/api/sat-monitoring/health` 200; `/api/integrations`, `/api/john-deere/status`, `/api/summary` 200;
+  journal from 05:33:30 without traceback.
+- **forest-map tag:** `<script src="/assets/forest-map.js?v=20261107"></script>` present once in `index.html`,
+  line byte-identical to `bc8c428`. Served HTML shows `?v=<content hash>` because `serve_index()` fingerprints every
+  `/assets/*.js` URL (api.py unchanged; same before this release).
 
 ## Activation record: satellite-monitoring-20261117T0521Z (2026-11-17 07:11 UTC, owner "approved release")
 
@@ -367,6 +400,9 @@ Roll back code only. Do **not** restore the DB backup over live user writes unle
 data recovery has been separately approved. All schema changes are additive and can
 remain in place.
 
+- **forest-api-remove-integrations-page-20261118T0532Z → forest-api-satellite-monitoring-20261117T0521Z (code only, UI):**
+  `sh /root/backups/remove_integrations_page_activation_20261118T053321Z/rollback-forest-api.sh` (installs the old `98-` drop-in, `daemon-reload`, restarts forest-api only).
+  Safe: identical api.py and satellite code; only `index.html` and the logo differ. Worker units are not involved.
 - **forest-api-satellite-monitoring-20261117T0521Z → forest-api-satellite-monitoring-rollback8band-20261117T0831Z — the ONLY valid rollback target (built 2026-11-17 08:31 UTC on OLD, owner OK):**
   Re-verified on NEW 2026-11-17 ~16:45 UTC (read-only, not activated): folder = 96 files byte-identical to `e0c9c84`
   (+ `pre-activation-check.sh`, not in git; `release-manifest.json` is the folder's own); vs `7bd2bbb` exactly

@@ -2,6 +2,18 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-18 05:33 UTC — DEPLOYED: `forest-api-remove-integrations-page-20261118T0532Z` (`b86ebf4`, `geo-e546c26f549f`)
+
+- Web UI: the Integrations page ("Integrācijas") is removed: sidebar item, `#sec-integrations` (John Deere card and
+  the LVM GEO status card that only this page showed), `#sec-integration-detail`, their CSS/JS, and
+  `assets/john-deere-logo.png`. Old links and history entries (`#integrations`, `#integration-detail`) open
+  Pārskats and the URL is rewritten to `#overview`.
+- Unchanged: backend (John Deere OAuth/token code, `john_deere_sessions`, `/api/integrations*`, `/api/john-deere/*`),
+  `assets/lvm-geodata.js` and the LVM GEO page, Satellite Monitoring, Objects machine-sector mapping, the
+  `forest-map.js?v=20261107` tag in `index.html`.
+- forest-api only; satellite worker units stay on `…20261117T0521Z` (identical satellite code). No DB migration.
+  Tag `prod-2026-11-18-remove-integrations-page`. Rollback = `…20261117T0521Z` (`docs/DEPLOY_RELEASES.md`).
+
 ## 2026-11-17 16:50 UTC — NEW host verification (no code deployed, no restart)
 
 - Production confirmed on NEW host 64.225.79.80 (snapshot of OLD ~10:30 UTC); `docs/DEPLOY_RELEASES.md` gets a

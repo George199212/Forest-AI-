@@ -7,6 +7,23 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-18 05:40 UTC — Integrations page removed; release `forest-api-remove-integrations-page-20261118T0532Z` LIVE on :8000
+
+- :8000 runs `/root/forest_ai/releases/forest-api-remove-integrations-page-20261118T0532Z` (`b86ebf4`, tag `prod-2026-11-18-remove-integrations-page`,
+  `geo-e546c26f549f`) since 05:33:36 UTC. Only `index.html` changed and `assets/john-deere-logo.png` was removed vs
+  `…20261117T0521Z`. Satellite worker units still run `…20261117T0521Z` (same satellite code). Only forest-api was
+  restarted; other units kept their PIDs.
+- The web dashboard has no Integrations page; `#integrations` → Pārskats. Backend integration and John Deere APIs
+  are still served (200) and unchanged; the John Deere Operations Center connection can no longer be managed from the UI.
+- The LVM GEO connection card that was shown only on the Integrations page is gone; the LVM GEO page keeps its own
+  `/health` + capabilities check.
+- Rollback target: `…20261117T0521Z` (backup `/root/backups/remove_integrations_page_activation_20261118T053321Z`, `rollback-forest-api.sh` there).
+- **Pending branches must rebase on this release (`index.html` changed):** `fix/navigation-history`
+  (`/root/forest_ai_navfix`) and `feature/sectors-workspace` (`/root/wt/sectors-workspace`), both based on `bc8c428`.
+  Same applies to any other unreleased UI branch based on `bc8c428`.
+- Not touched: `/root/wt/hide-integrations` (someone else's uncommitted feature-flag variant of this change, 2026-11-17
+  10:22) is now superseded; its owner decides whether to drop it.
+
 ## Update 2026-11-17 16:50 UTC — production on NEW host 64.225.79.80; satellite rollback re-verified
 
 - Production runs on the NEW host `forest-ai-production-ams3` (64.225.79.80), restored from an OLD-host snapshot of
