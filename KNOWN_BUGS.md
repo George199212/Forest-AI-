@@ -1,5 +1,9 @@
 # Known Bugs / Limitations
 
+- **Release hygiene (2026-11-18):** `/root/forest_ai/releases/forest-api-sat-swipe-fix-20261118T0644Z` is an unactivated
+  folder built on the pre-Sectors release. Activating it would remove Sectors from :8000. Swipe is live via
+  `forest-api-swipe-on-sectors-20261118T1105Z`; the old folder is kept (release folders are never modified/deleted by agents).
+
 - **Sectors release 2026-11-18 — limitations until Stage 5 (satellite workspace) is released:** the sector page shows the
   map fallback (no embedded workspace, no `SatWorkspace.mount`), cards have no worst-event colour dot (the colour function is
   imported from Stage 5, not re-implemented), and "Pēdējā veiksmīgā analīze" shows "Nav pieejams" because the production

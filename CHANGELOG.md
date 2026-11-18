@@ -2,6 +2,13 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-18 — swipe-on-sectors: DEPLOYED to :8000 at 11:14:25 UTC
+
+- Release `forest-api-swipe-on-sectors-20261118T1105Z` (`release/2026-11-18-swipe-on-sectors` @ `8f5351a` = `feature/swipe-fix` 3988240 on top of Sectors).
+- Satellite compare: swipe divider + handle on the map (drag, keyboard), PIRMS/PĒC labels, initial view on the event
+  polygons, muted OSM under the Sentinel images (D7).
+- Forest Map coordinate search accepts the Latvian decimal comma (`56,9496 24,1052`) (D6).
+
 ## 2026-11-18 — Sectors as satellite-first workspace: DEPLOYED to :8000 at 10:33:58 UTC
 
 - Release `forest-api-sectors-workspace-20261118T1017Z` (branch `feature/sectors-workspace` @ `574e535`, `geo-621ad7f28437`) via drop-in
