@@ -11,7 +11,7 @@ change + restart) only after an explicit human OK in the chat.
 
 | port | unit | code location | git |
 |---|---|---|---|
-| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-swipe-on-sectors-20261118T1105Z` (via drop-in `99-zz-swipe-on-sectors-release.conf`, sorts last; `99-zz-sectors-workspace-release.conf` below it = rollback layer; `97-` SAT_*, `99-bind-localhost.conf` ExecStart, `90-` FOREST_GPS_VIOLATIONS_DAYS) | branch `release/2026-11-18-swipe-on-sectors` @ `8f5351a` (tag `prod-2026-11-18-swipe-on-sectors`), dashboard `geo-cfd99226df8d`, backend `06c49c04bb64` (since 2026-11-18 11:14:25 UTC) |
+| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-satellite-workspace-20261118T1134Z` (via drop-in `99-zzz-satellite-workspace-release.conf`, sorts last; `99-zz-swipe-on-sectors-…`, `99-zz-sectors-…` and `98-` below it are inactive layers) | tag `prod-2026-11-18-satellite-workspace` |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
 | 8003 | `forest-review-api` | `/root/forest_ai_review` (copy of `84cb00b`) | 84cb00b |
@@ -71,6 +71,7 @@ these are committed, a release built from git alone would revert them.
 | 2026-11-18 05:33 | `forest-api-remove-integrations-page-20261118T0532Z` | e546c26f549f | `98-` drop-in edited in place (row added 2026-11-18 by the Sectors release; activation time from systemd) |
 | 2026-11-18 10:33 | `forest-api-sectors-workspace-20261118T1017Z` | 621ad7f28437 | new drop-in `99-zz-sectors-workspace-release.conf` (98- left unchanged) |
 | 2026-11-18 11:14 | `forest-api-swipe-on-sectors-20261118T1105Z` | cfd99226df8d | new drop-in `99-zz-swipe-on-sectors-release.conf` (Sectors drop-in kept underneath) |
+| 2026-11-18 11:40 | `forest-api-satellite-workspace-20261118T1134Z` | 9decb9d7456e | new drop-in `99-zzz-satellite-workspace-release.conf` (C1 on swipe-on-sectors); only forest-api restarted |
 
 - **Name:** `forest-api-<feature-slug>-<UTC timestamp YYYYMMDDTHHMM[SS]Z>`. The timestamp is
   when the release was cut. The audit candidate's folder name includes `1645Z`.
@@ -341,6 +342,37 @@ sorted-key JSON of `{path: sha256}`. The paths are `index.html`,
   `origin/master..tag` found 76 hits, all in commits already on GitHub (Stage 0 fixtures/doc 000f235 before the redaction,
   satellite docs/routes 00a5b2e/81237a6, the accepted `DASHBOARD_*="$U"` names in ded1e8f) → not pushed.
 
+## Release lock rule (owner, 2026-11-18)
+
+- Every session creates `/root/forest_ai/RELEASE_LOCK` (session id + UTC time, created atomically, e.g. `set -o noclobber`)
+  BEFORE installing or removing any forest-api drop-in, and aborts if the file already exists. Remove it when done.
+- Never `daemon-reload` a drop-in that is not approved: a loaded drop-in goes live on the next restart by anyone.
+- Background: on 2026-11-18 two sessions prepared overlapping releases; an unapproved drop-in was loaded at 11:11 and went live at
+  11:14 (later accepted by the owner).
+
+## Activation record: satellite-workspace (2026-11-18 11:40:34 UTC, owner "approved release" + "go")
+
+- Lock `/root/forest_ai/RELEASE_LOCK` held by this session 11:33:49 → end of release; activity re-checked first (quiet).
+- **Git:** `release/2026-11-18-satellite-workspace` = `891b03c` (Stage A + C1) merged with `7c18b4e` (Sectors docs), tag
+  `prod-2026-11-18-swipe-on-sectors` (`8f5351a`) and `b892a20` (its docs). Tag `prod-2026-11-18-satellite-workspace`.
+  Drift vs live `8f5351a`: runtime = C1 only (8 files; 7 byte-identical to `891b03c`, `index.html` +2 tags; forest-map.js
+  identical to live, `?v=20261107` tag byte-exact).
+- **Folder:** `/root/forest_ai/releases/forest-api-satellite-workspace-20261118T1134Z` = copy of the active swipe-on-sectors folder + those 8 files;
+  102 files byte-identical to the release commit; `pre-activation-check.sh` OK. (`…20261118T1105Z` satellite-workspace folder
+  was built on Sectors only — superseded, never activate.)
+- **Tests on the release bytes:** pytest 9 failed / 462 passed / 5 skipped / 40 errors (failure set = baseline; +6 v2 API, +1 Q2,
+  +7 Sectors); node 12/12 files.
+- **Backup:** `/root/backups/satellite_workspace_release_20261118T113724Z`: forest_ai.db sha256 `b05a6b79…`, satellite.db `32281d52…` (integrity ok), drop-in dir before, activate conf,
+  `rollback-forest-api.sh`, `units-before.txt`.
+- **Switch:** `99-zzz-satellite-workspace-release.conf` installed, daemon-reload, `systemctl cat` checked (WorkingDirectory = this folder,
+  ExecStart uvicorn 127.0.0.1:8000), ONE `systemctl restart forest-api` at 11:40:34 (PID 558528, NRestarts 0). Workers, timers,
+  rm / review / ingka / bot / nginx unchanged.
+- **Verification (production, headless Chromium, GETs only):** 102/102 workspace checks at 1440×900 and 1920×1080, LV + EN
+  (Teritorija on Ķekava–Baloži with imagery, #62 swipe at 3 positions + true-colour hint 299 → 331, side by side, change only,
+  timeline + stepper change the image, #60 composites never mixed, BIK-001 empty state, Kas šeit? inside / outside with the add
+  confirm dismissed, Pierādījumi tab) + 9 extra checks (badge "Laba — no radara (S1) 29.07.; optiskie: ierobežota", Sectors cards,
+  Forest Map `sat_event=62`, LVM GEO button hook, rm.* and ingka.* load), 0 console errors, journal 0 errors, no POST.
+
 ## Activation record: swipe-on-sectors (2026-11-18 11:14:25 UTC, owner "approved release")
 
 - What: `feature/swipe-fix` (3988240: satellite compare swipe divider/handle on the map + event focus + muted basemap, D7;
@@ -365,7 +397,11 @@ Roll back code only. Do **not** restore the DB backup over live user writes unle
 data recovery has been separately approved. All schema changes are additive and can
 remain in place.
 
-- **swipe-on-sectors → sectors-workspace (current rollback target, 2026-11-18 11:14):** no DB change.
+- **satellite-workspace → swipe-on-sectors (current rollback target, 2026-11-18 11:40):** code only, no DB change.
+  `sh /root/backups/satellite_workspace_release_20261118T113724Z/rollback-forest-api.sh` =
+  `rm /etc/systemd/system/forest-api.service.d/99-zzz-satellite-workspace-release.conf && systemctl daemon-reload && systemctl restart forest-api`
+  → `forest-api-swipe-on-sectors-20261118T1105Z`. Take RELEASE_LOCK first.
+- **swipe-on-sectors → sectors-workspace (previous rollback target, 2026-11-18 11:14):** no DB change.
   ```sh
   rm /etc/systemd/system/forest-api.service.d/99-zz-swipe-on-sectors-release.conf
   systemctl daemon-reload && systemctl restart forest-api   # → …sectors-workspace-20261118T1017Z, geo-621ad7f28437

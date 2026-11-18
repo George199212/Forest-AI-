@@ -2,6 +2,20 @@
 
 Newest first. Entries describe branches; "deployed" is stated explicitly when a release is active.
 
+## 2026-11-18 — Satelītu monitorings workspace (C1): DEPLOYED to :8000 at 11:40:34 UTC
+
+- Release `forest-api-satellite-workspace-20261118T1134Z` (`release/2026-11-18-satellite-workspace`, tag `prod-2026-11-18-satellite-workspace`) = live
+  swipe-on-sectors (`8f5351a`) + `feature/satellite-workspace` `891b03c`. Runtime vs live: `assets/sat-workspace.{js,css}`
+  (new), `assets/sat-monitoring.js` (3 hooks), `assets/i18n-lv.js` (+139 LV strings), `index.html` (+2 tags),
+  `satellite_monitoring/{api_routes,store,vmd_context}.py` (v2 read-only additions + per-acquisition `evidence_quality`).
+- Workspace: Teritorija (area cards, imagery map, latest changes), Izmaiņas (stepper, composites never mixed, layers,
+  events, swipe / side by side / change only, true-colour pair hint, event card with evidence-quality source), Pierādījumi
+  (existing event page), S1/S2 timeline, Kas šeit? (identify + add to monitoring with cost "Nav pieejams"), status bar.
+- 2026-11-18 10:46:40 UTC — satellite.db: sat_monitored_areas id 2 (EVAL_BBOX kekava-2026-vmd-clearcuts) name
+  'Kekava positive control' → 'Ķekava–Baloži' (owner D3). One-row UPDATE guarded by id + old name, rowcount 1. Backup
+  /root/backups/sat_rename_area2_20261118T104640Z/satellite.db sha256 b727162e5955c031a10f3fcc019718847df241b3120f16fe25d62a4478c9cb66.
+  No code, schema, event or detection change.
+
 ## 2026-11-18 — swipe-on-sectors: DEPLOYED to :8000 at 11:14:25 UTC
 
 - Release `forest-api-swipe-on-sectors-20261118T1105Z` (`release/2026-11-18-swipe-on-sectors` @ `8f5351a` = `feature/swipe-fix` 3988240 on top of Sectors).

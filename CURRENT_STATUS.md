@@ -7,6 +7,19 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-18 11:45 UTC — Satelītu monitorings workspace (C1) is LIVE on :8000
+
+- :8000 runs `/root/forest_ai/releases/forest-api-satellite-workspace-20261118T1134Z` (`release/2026-11-18-satellite-workspace`, tag
+  `prod-2026-11-18-satellite-workspace`, `geo-9decb9d7456e`) since 11:40:34 UTC = live swipe-on-sectors (`8f5351a`) + C1:
+  Teritorija / Izmaiņas / Pierādījumi workspace, swipe + true-colour pair hint, S1/S2 timeline, Kas šeit?, status bar;
+  `/events/{id}` after[] carries per-acquisition `evidence_quality` (read-only). Drop-in `99-zzz-satellite-workspace-release.conf`
+  (sorts last); `98-`, `99-zz-sectors-…`, `99-zz-swipe-on-sectors-…` untouched. Only forest-api restarted; satellite workers stay
+  on `…satellite-monitoring-20261117T0521Z`.
+- satellite.db: area 2 renamed 'Kekava positive control' → 'Ķekava–Baloži' (owner D3, 10:46:40 UTC, backup
+  `/root/backups/sat_rename_area2_20261118T104640Z`).
+- Rollback target: `forest-api-swipe-on-sectors-20261118T1105Z` (remove `99-zzz`, daemon-reload, restart forest-api).
+- Verified on production: 102 + 9 headless checks, 0 console errors, no POST during verification; rm.* and ingka.* load.
+
 ## Update 2026-11-18 11:15 UTC — swipe-on-sectors is LIVE on :8000
 
 - :8000 runs `/root/forest_ai/releases/forest-api-swipe-on-sectors-20261118T1105Z` (`8f5351a`, `geo-cfd99226df8d`) since 11:14:25 UTC: Sectors + satellite compare

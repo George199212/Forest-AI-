@@ -152,7 +152,7 @@ def main():
                 pg.goto(f'{base}/#sat-monitoring'); wait(pg, 2500)
                 pg.fill('#satw-q', '56,8390 24,1500'); pg.press('#satw-q', 'Enter'); wait(pg, 3500)
                 pop = pg.locator('.satw-what').inner_text()
-                check(f'Kas šeit inside {tag}', ('Kekava' in pop) and ('56.83900' in pop), pop[:300])
+                check(f'Kas šeit inside {tag}', ('Kekava' in pop or 'Ķekava' in pop) and ('56.83900' in pop), pop[:300])
                 shot(pg, f'11-kas-seit-inside-{tag}')
                 pg.fill('#satw-q', '56.65949, 24.20804'); pg.press('#satw-q', 'Enter'); wait(pg, 3500)
                 pop = pg.locator('.satw-what').inner_text()

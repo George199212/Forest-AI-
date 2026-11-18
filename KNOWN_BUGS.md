@@ -135,6 +135,18 @@ Status 2026-11-16 evening; :8000 still runs `7bd2bbb` (Stage 4 release). Next de
 - **LĢIA orthophoto as context basemap — unverified.** Verify terms and the service directly with LĢIA (the LVM GEO WMS
   `geoserver.lvmgeo.lv` timed out on 2026-11-17, layers/terms not readable).
 
+### Backlog recorded 2026-11-18 (satellite workspace release; NOT scheduled)
+
+- **Context basemap (D4):** LĢIA open WMTS (cycle 3, 2007–2008, EPSG:3059 tiles only) is NOT used. Faint OSM stays.
+  Backlog: (a) LVM GEO orthophoto licence terms; (b) self-host open cycle-6 (2016–2018) GeoTIFFs clipped to monitored areas.
+- **Drop-in chain:** forest-api is switched by stacked drop-ins (`98-`, `99-zz-sectors-…`, `99-zz-swipe-on-sectors-…`,
+  `99-zzz-satellite-workspace-…`); the last WorkingDirectory wins. Consolidate into ONE active-release pointer (backlog).
+- **forest-map.js under `?v=20261107`:** content changed (Sectors, D6) while index.html keeps the literal tag. Mitigated:
+  serve_index() rewrites asset URLs to a content hash (`?v=d25586fbd237` now), HTML `no-store`, assets `no-cache` + ETag.
+- **Workspace C1 limits:** #62 default pair is the first S2 after-image (false colour) — true colour via the hint;
+  "Kas mainījās" uses the event window of any sensor; the event callout can run under the tool rail on narrow views;
+  `SatWorkspace.mount` for the Sectors page is not implemented (Sectors keeps its link-through stub).
+
 ### Satellite Monitoring — backlog (owner decisions D2/D6/D7, 2026-11-18; NOT scheduled, each needs its own approval)
 
 - **Per-polygon clear-pixel check (worker side).** SCL/dataMask are stored per acquisition (6-band GeoTIFF on the
