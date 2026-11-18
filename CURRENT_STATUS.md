@@ -7,6 +7,13 @@ route enumeration via import, TestClient auth probes, pytest (30/30 passed), pyp
 No VPS access in this session — everything about the running servers is **[NOT VERIFIED]**.
 **Supersedes:** CURRENT_STATUS.md of 2026-09-09 (commit `0db0a79`) and the Project Knowledge copies of 2026-09-02/07.
 
+## Update 2026-11-18 11:15 UTC — swipe-on-sectors is LIVE on :8000
+
+- :8000 runs `/root/forest_ai/releases/forest-api-swipe-on-sectors-20261118T1105Z` (`8f5351a`, `geo-cfd99226df8d`) since 11:14:25 UTC: Sectors + satellite compare
+  swipe on the map (D7) + Latvian decimal comma in the Forest Map coordinate search (D6). Rollback: remove
+  `99-zz-swipe-on-sectors-release.conf`, daemon-reload, restart → Sectors folder.
+- Swipe ships only via `release/2026-11-18-swipe-on-sectors`; do not activate `…sat-swipe-fix-20261118T0644Z`.
+
 ## Update 2026-11-18 10:34 UTC — Sectors as satellite-first workspace is LIVE on :8000
 
 - :8000 runs `/root/forest_ai/releases/forest-api-sectors-workspace-20261118T1017Z` (`574e535`, `geo-621ad7f28437`, backend `06c49c04bb64`) since 10:33:58 UTC via

@@ -11,7 +11,7 @@ change + restart) only after an explicit human OK in the chat.
 
 | port | unit | code location | git |
 |---|---|---|---|
-| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-sectors-workspace-20261118T1017Z` (via drop-in `99-zz-sectors-workspace-release.conf`, sorts last; `97-satellite-monitoring.conf` sets `SAT_*`; `99-bind-localhost.conf` sets ExecStart `--host 127.0.0.1`; `90-` supplies `FOREST_GPS_VIOLATIONS_DAYS=90`) | branch `feature/sectors-workspace` @ `574e535` (tag `prod-2026-11-18-sectors-workspace`, local), dashboard `geo-621ad7f28437`, backend `06c49c04bb64` (since 2026-11-18 10:33:58 UTC) |
+| 8000 | `forest-api` | `/root/forest_ai/releases/forest-api-swipe-on-sectors-20261118T1105Z` (via drop-in `99-zz-swipe-on-sectors-release.conf`, sorts last; `99-zz-sectors-workspace-release.conf` below it = rollback layer; `97-` SAT_*, `99-bind-localhost.conf` ExecStart, `90-` FOREST_GPS_VIOLATIONS_DAYS) | branch `release/2026-11-18-swipe-on-sectors` @ `8f5351a` (tag `prod-2026-11-18-swipe-on-sectors`), dashboard `geo-cfd99226df8d`, backend `06c49c04bb64` (since 2026-11-18 11:14:25 UTC) |
 | — | `forest-bot` | `/root/forest_ai` (repo root; `python3 bot.py`) | repo root; its Ingka routing hook is **not** in git yet |
 | 8002 | `forest-rm-api` | `/root/forest_ai_rm` (plain copy, `data/DEPLOYED_COMMIT` = `574bd97`) | 574bd97 |
 | 8003 | `forest-review-api` | `/root/forest_ai_review` (copy of `84cb00b`) | 84cb00b |
@@ -70,6 +70,7 @@ these are committed, a release built from git alone would revert them.
 | 2026-11-09 16:28 | `forest-api-forest-map-violations-20261109T1623Z` | 3b9cdfaac106 | `90-` drop-in; `80-` removed |
 | 2026-11-18 05:33 | `forest-api-remove-integrations-page-20261118T0532Z` | e546c26f549f | `98-` drop-in edited in place (row added 2026-11-18 by the Sectors release; activation time from systemd) |
 | 2026-11-18 10:33 | `forest-api-sectors-workspace-20261118T1017Z` | 621ad7f28437 | new drop-in `99-zz-sectors-workspace-release.conf` (98- left unchanged) |
+| 2026-11-18 11:14 | `forest-api-swipe-on-sectors-20261118T1105Z` | cfd99226df8d | new drop-in `99-zz-swipe-on-sectors-release.conf` (Sectors drop-in kept underneath) |
 
 - **Name:** `forest-api-<feature-slug>-<UTC timestamp YYYYMMDDTHHMM[SS]Z>`. The timestamp is
   when the release was cut. The audit candidate's folder name includes `1645Z`.
@@ -340,13 +341,36 @@ sorted-key JSON of `{path: sha256}`. The paths are `index.html`,
   `origin/master..tag` found 76 hits, all in commits already on GitHub (Stage 0 fixtures/doc 000f235 before the redaction,
   satellite docs/routes 00a5b2e/81237a6, the accepted `DASHBOARD_*="$U"` names in ded1e8f) → not pushed.
 
+## Activation record: swipe-on-sectors (2026-11-18 11:14:25 UTC, owner "approved release")
+
+- What: `feature/swipe-fix` (3988240: satellite compare swipe divider/handle on the map + event focus + muted basemap, D7;
+  Forest Map coordinate search accepts the Latvian decimal comma, D6) merged onto production Sectors (574e535) →
+  `release/2026-11-18-swipe-on-sectors` @ 8f5351a. Owner rule: swipe ships only via this branch; never build/activate
+  from `feature/swipe-fix` (the old folder `forest-api-sat-swipe-fix-20261118T0644Z` was built on the pre-Sectors release
+  and must not be activated); further swipe work branches from 8f5351a.
+- Gates: G1 sandbox Sectors 22/22 + `scripts/verify_sat_swipe.py` 25/25, 0 console errors; G2 live Sectors folder = 574e535
+  (0 drift), the 4 replaced assets identical to 574e535; G3 pytest failure set == baseline (49 ids), JS 114/114; G4 rollback
+  paths exist; G5 `bc8c428..8f5351a` without d1ebfe0.
+- Backups: `/root/backups/swipe_on_sectors_release_20261118T1110Z/` (forest_ai.db `b05a6b79…`, satellite.db `32281d52…`).
+- Folder: live Sectors folder + 4 assets from 8f5351a (`assets/forest-map.js`, `assets/i18n-lv.js`,
+  `assets/sat-monitoring.{js,css}`); manifest 100 files, `pre-activation-check.sh` OK, 0 drift vs 8f5351a.
+- Restart of forest-api only (PID 523354 → 545927). `/api/deployment` = `geo-cfd99226df8d` / `06c49c04bb64`, `/proc` cwd and
+  WorkingDirectory = the new folder; all smoke routes 200, `/` and public URL 401, journal clean, other API instances, bot
+  and tenant workers unchanged, `forest-satellite-jobs` OK after restart (11:17:19). Read-only browser on :8000: Sectors
+  10/10, swipe 25/25, 0 console errors. Tag `prod-2026-11-18-swipe-on-sectors` pushed (scan 0 hits).
+
 ## Rollback
 
 Roll back code only. Do **not** restore the DB backup over live user writes unless a
 data recovery has been separately approved. All schema changes are additive and can
 remain in place.
 
-- **sectors-workspace → remove-integrations-page (current rollback target, 2026-11-18):** no DB change to undo.
+- **swipe-on-sectors → sectors-workspace (current rollback target, 2026-11-18 11:14):** no DB change.
+  ```sh
+  rm /etc/systemd/system/forest-api.service.d/99-zz-swipe-on-sectors-release.conf
+  systemctl daemon-reload && systemctl restart forest-api   # → …sectors-workspace-20261118T1017Z, geo-621ad7f28437
+  ```
+- **sectors-workspace → remove-integrations-page (previous rollback target):** no DB change to undo.
   ```sh
   rm /etc/systemd/system/forest-api.service.d/99-zz-sectors-workspace-release.conf
   systemctl daemon-reload && systemctl restart forest-api
